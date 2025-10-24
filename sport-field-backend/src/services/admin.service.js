@@ -1,32 +1,64 @@
+// src/services/admin.service.js
+import { prisma } from "./_prisma.js";
 
-import { prisma } from './_prisma.js';
-
-export async function dashboard() {
-  const [users, fields, bookings, payments] = await Promise.all([
-    prisma.user.count(),
-    prisma.field.count(),
-    prisma.booking.count(),
-    prisma.payment.count(),
-  ]);
-  return { users, fields, bookings, payments };
-}
-
+// 🔹 Lấy danh sách người dùng
 export async function listUsers() {
-  return prisma.user.findMany({
-    select: { id: true, email: true, name: true, role: true, createdAt: true }
+  return await prisma.users.findMany({
+    orderBy: { created_at: "desc" },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      status: true,
+      created_at: true,
+    },
   });
 }
 
+// 🔹 Cập nhật trạng thái user
 export async function updateUserStatus(id, status) {
-  // if your schema has status column
-  return prisma.user.update({ where: { id }, data: { status } });
+  const updated = await prisma.users.update({
+    where: { id: Number(id) },
+    data: { status },
+  });
+  return { message: "Cập nhật trạng thái thành công", user: updated };
 }
 
+// 🔹 Lấy danh sách sân để admin duyệt
 export async function listFieldsForAdmin() {
-  return prisma.field.findMany({});
+  return await prisma.fields.findMany({
+    orderBy: { created_at: "desc" },
+    include: {
+      owner: {
+        select: { id: true, name: true, email: true },
+      },
+    },
+  });
 }
 
-export async function approveField(id) {
-  // if your schema has 'approved' column
-  return prisma.field.update({ where: { id }, data: { approved: true } });
+// 🔹 Duyệt / từ chối sân
+export async function approveField(id, status) {
+  const updated = await prisma.fields.update({
+    where: { id: Number(id) },
+    data: { status },
+  });
+  return { message: `Sân đã được cập nhật trạng thái: ${status}`, field: updated };
+}
+
+// 🔹 Dashboard thống kê hệ thống
+export async function dashboard() {
+  const [totalUsers, totalFields, totalBookings, totalRevenue] = await Promise.all([
+    prisma.users.count(),
+    prisma.fields.count(),
+    prisma.bookings.count(),
+    prisma.payments.aggregate({ _sum: { amount: true } }),
+  ]);
+
+  return {
+    totalUsers,
+    totalFields,
+    totalBookings,
+    totalRevenue: totalRevenue._sum.amount || 0,
+  };
 }

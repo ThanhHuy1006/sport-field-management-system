@@ -1,14 +1,19 @@
-
-import { Router } from 'express';
-import { auth } from '../middleware/auth.js';
-import * as ctrl from '../controllers/admin.controller.js';
+// src/routes/admin.routes.js
+import { Router } from "express";
+import { auth } from "../middleware/auth.js";
+import * as ctrl from "../controllers/admin.controller.js";
 
 const r = Router();
 
-r.get('/dashboard', auth(['admin']), ctrl.dashboard);
-r.get('/users', auth(['admin']), ctrl.listUsers);
-r.patch('/users/:id/status', auth(['admin']), ctrl.updateUserStatus);
-r.get('/fields', auth(['admin']), ctrl.listFieldsForAdmin);
-r.patch('/fields/:id/approve', auth(['admin']), ctrl.approveField);
+// Dashboard tổng quan
+r.get("/dashboard", auth(["ADMIN"]), ctrl.dashboard);
+
+// Quản lý người dùng
+r.get("/users", auth(["ADMIN"]), ctrl.listUsers);
+r.patch("/users/:id/status", auth(["ADMIN"]), ctrl.updateUserStatus);
+
+// Quản lý sân thể thao
+r.get("/fields", auth(["ADMIN"]), ctrl.listFieldsForAdmin);
+r.patch("/fields/:id/approve", auth(["ADMIN"]), ctrl.approveField);
 
 export default r;
