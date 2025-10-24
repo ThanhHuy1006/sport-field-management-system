@@ -1,0 +1,379 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model admin_actions {
+  id          Int                        @id @default(autoincrement())
+  admin_id    Int
+  target_type admin_actions_target_type?
+  target_id   Int?
+  action      admin_actions_action?
+  meta_json   String?                    @db.Text
+  created_at  DateTime?                  @default(now()) @db.DateTime(0)
+  users       users                      @relation(fields: [admin_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_admin_action_admin")
+
+  @@index([admin_id], map: "fk_admin_action_admin")
+}
+
+model blackout_dates {
+  id             Int      @id @default(autoincrement())
+  field_id       Int
+  start_datetime DateTime @db.DateTime(0)
+  end_datetime   DateTime @db.DateTime(0)
+  reason         String?  @db.VarChar(255)
+  fields         fields   @relation(fields: [field_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_blackout_field")
+
+  @@index([field_id], map: "fk_blackout_field")
+}
+
+model booking_status_history {
+  id          Int       @id @default(autoincrement())
+  booking_id  Int
+  from_status String?   @db.VarChar(24)
+  to_status   String?   @db.VarChar(24)
+  changed_by  Int?
+  changed_at  DateTime? @default(now()) @db.DateTime(0)
+  reason      String?   @db.VarChar(255)
+  bookings    bookings  @relation(fields: [booking_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_bsh_booking")
+  users       users?    @relation(fields: [changed_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_bsh_user")
+
+  @@index([booking_id], map: "fk_bsh_booking")
+  @@index([changed_by], map: "fk_bsh_user")
+}
+
+model bookings {
+  id                     Int                      @id @default(autoincrement())
+  user_id                Int
+  field_id               Int
+  start_datetime         DateTime                 @db.DateTime(0)
+  end_datetime           DateTime                 @db.DateTime(0)
+  status                 bookings_status?         @default(PENDING_CONFIRM)
+  total_price            Decimal?                 @db.Decimal(12, 2)
+  voucher_id             Int?
+  notes                  String?                  @db.VarChar(255)
+  created_at             DateTime?                @default(now()) @db.DateTime(0)
+  updated_at             DateTime?                @default(now()) @db.DateTime(0)
+  booking_status_history booking_status_history[]
+  fields                 fields                   @relation(fields: [field_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_booking_field")
+  users                  users                    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_booking_user")
+  payments               payments?
+  reviews                reviews[]
+
+  @@index([field_id], map: "fk_booking_field")
+  @@index([user_id], map: "fk_booking_user")
+}
+
+model facilities {
+  id               Int                @id @default(autoincrement())
+  name             String             @unique(map: "name") @db.VarChar(120)
+  icon             String?            @db.VarChar(120)
+  field_facilities field_facilities[]
+}
+
+model field_facilities {
+  field_id    Int
+  facility_id Int
+  note        String?    @db.VarChar(160)
+  facilities  facilities @relation(fields: [facility_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ff_facility")
+  fields      fields     @relation(fields: [field_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_ff_field")
+
+  @@id([field_id, facility_id])
+  @@index([facility_id], map: "fk_ff_facility")
+}
+
+model field_images {
+  id         Int      @id @default(autoincrement())
+  field_id   Int
+  url        String   @db.VarChar(500)
+  is_primary Boolean? @default(false)
+  order_no   Int?     @default(0)
+  fields     fields   @relation(fields: [field_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_fieldimages_field")
+
+  @@index([field_id], map: "fk_fieldimages_field")
+}
+
+model fields {
+  id                   Int                @id @default(autoincrement())
+  owner_id             Int
+  field_name           String?            @db.VarChar(160)
+  sport_type           String?            @db.VarChar(40)
+  description          String?            @db.Text
+  address              String?            @db.VarChar(255)
+  latitude             Decimal?           @db.Decimal(10, 6)
+  longitude            Decimal?           @db.Decimal(10, 6)
+  base_price_per_hour  Decimal?           @db.Decimal(12, 2)
+  currency             String?            @default("VND") @db.VarChar(8)
+  status               fields_status?     @default(active)
+  min_duration_minutes Int?               @default(60)
+  max_players          Int?
+  created_at           DateTime?          @default(now()) @db.DateTime(0)
+  updated_at           DateTime?          @default(now()) @db.DateTime(0)
+  blackout_dates       blackout_dates[]
+  bookings             bookings[]
+  field_facilities     field_facilities[]
+  field_images         field_images[]
+  users                users              @relation(fields: [owner_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_field_owner")
+  operating_hours      operating_hours[]
+  reports_daily        reports_daily[]
+  reviews              reviews[]
+
+  @@index([owner_id], map: "fk_field_owner")
+}
+
+model notifications {
+  id         Int                 @id @default(autoincrement())
+  user_id    Int?
+  title      String?             @db.VarChar(160)
+  body       String?             @db.Text
+  type       notifications_type?
+  is_read    Boolean?            @default(false)
+  created_at DateTime?           @default(now()) @db.DateTime(0)
+  users      users?              @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_notify_user")
+
+  @@index([user_id], map: "fk_notify_user")
+}
+
+model operating_hours {
+  id          Int     @id @default(autoincrement())
+  field_id    Int
+  day_of_week Int     @db.TinyInt
+  open_time   String? @db.VarChar(10)
+  close_time  String? @db.VarChar(10)
+  fields      fields  @relation(fields: [field_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_operating_field")
+
+  @@index([field_id], map: "fk_operating_field")
+}
+
+model owner_profiles {
+  user_id                                 Int       @id
+  business_name                           String?   @db.VarChar(160)
+  tax_code                                String?   @db.VarChar(50)
+  address                                 String?   @db.VarChar(255)
+  verified                                Boolean?  @default(false)
+  approved_by                             Int?
+  approved_at                             DateTime? @db.DateTime(0)
+  users_owner_profiles_approved_byTousers users?    @relation("owner_profiles_approved_byTousers", fields: [approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ownerprofile_admin")
+  users_owner_profiles_user_idTousers     users     @relation("owner_profiles_user_idTousers", fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ownerprofile_user")
+
+  @@index([approved_by], map: "fk_ownerprofile_admin")
+}
+
+model payments {
+  id               Int                @id @default(autoincrement())
+  booking_id       Int?               @unique(map: "booking_id")
+  provider         payments_provider?
+  amount           Decimal?           @db.Decimal(12, 2)
+  currency         String?            @default("VND") @db.VarChar(8)
+  transaction_code String?            @db.VarChar(120)
+  status           payments_status?   @default(pending)
+  paid_at          DateTime?          @db.DateTime(0)
+  raw_response     String?            @db.Text
+  bookings         bookings?          @relation(fields: [booking_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_payment_booking")
+  refunds          refunds[]
+}
+
+model refunds {
+  id          Int             @id @default(autoincrement())
+  payment_id  Int
+  amount      Decimal?        @db.Decimal(12, 2)
+  reason      String?         @db.VarChar(255)
+  status      refunds_status? @default(requested)
+  refunded_at DateTime?       @db.DateTime(0)
+  payments    payments        @relation(fields: [payment_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_refund_payment")
+
+  @@index([payment_id], map: "fk_refund_payment")
+}
+
+model reports_daily {
+  id             Int       @id @default(autoincrement())
+  day            DateTime  @db.Date
+  field_id       Int?
+  owner_id       Int?
+  total_bookings Int?      @default(0)
+  total_revenue  Decimal?  @default(0.00) @db.Decimal(12, 2)
+  generated_at   DateTime? @default(now()) @db.DateTime(0)
+  fields         fields?   @relation(fields: [field_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_report_field")
+  users          users?    @relation(fields: [owner_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_report_owner")
+
+  @@index([field_id], map: "fk_report_field")
+  @@index([owner_id], map: "fk_report_owner")
+}
+
+model reviews {
+  id         Int       @id @default(autoincrement())
+  booking_id Int
+  field_id   Int
+  user_id    Int
+  rating     Int?
+  comment    String?   @db.Text
+  visible    Boolean?  @default(true)
+  created_at DateTime? @default(now()) @db.DateTime(0)
+  bookings   bookings  @relation(fields: [booking_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_review_booking")
+  fields     fields    @relation(fields: [field_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_review_field")
+  users      users     @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_review_user")
+
+  @@index([booking_id], map: "fk_review_booking")
+  @@index([field_id], map: "fk_review_field")
+  @@index([user_id], map: "fk_review_user")
+}
+
+model system_policies {
+  policy_key String    @id @db.VarChar(64)
+  value      String?   @db.Text
+  updated_by Int?
+  updated_at DateTime? @default(now()) @db.DateTime(0)
+  users      users?    @relation(fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_policy_user")
+
+  @@index([updated_by], map: "fk_policy_user")
+}
+
+model user_vouchers {
+  user_id      Int
+  voucher_id   Int
+  used_count   Int?      @default(0)
+  last_used_at DateTime? @db.DateTime(0)
+  users        users     @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_uv_user")
+  vouchers     vouchers  @relation(fields: [voucher_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_uv_voucher")
+
+  @@id([user_id, voucher_id])
+  @@index([voucher_id], map: "fk_uv_voucher")
+}
+
+model users {
+  id                                               Int                      @id @default(autoincrement())
+  name                                             String?                  @db.VarChar(120)
+  email                                            String                   @unique(map: "email") @db.VarChar(160)
+  password_hash                                    String                   @db.VarChar(255)
+  phone                                            String?                  @db.VarChar(30)
+  role                                             users_role
+  status                                           users_status?            @default(active)
+  created_at                                       DateTime?                @default(now()) @db.DateTime(0)
+  updated_at                                       DateTime?                @default(now()) @db.DateTime(0)
+  admin_actions                                    admin_actions[]
+  booking_status_history                           booking_status_history[]
+  bookings                                         bookings[]
+  fields                                           fields[]
+  notifications                                    notifications[]
+  owner_profiles_owner_profiles_approved_byTousers owner_profiles[]         @relation("owner_profiles_approved_byTousers")
+  owner_profiles_owner_profiles_user_idTousers     owner_profiles?          @relation("owner_profiles_user_idTousers")
+  reports_daily                                    reports_daily[]
+  reviews                                          reviews[]
+  system_policies                                  system_policies[]
+  user_vouchers                                    user_vouchers[]
+  vouchers_vouchers_created_byTousers              vouchers[]               @relation("vouchers_created_byTousers")
+  vouchers_vouchers_owner_idTousers                vouchers[]               @relation("vouchers_owner_idTousers")
+}
+
+model vouchers {
+  id                               Int              @id @default(autoincrement())
+  code                             String           @unique(map: "code") @db.VarChar(64)
+  type                             vouchers_type?
+  discount_value                   Decimal?         @db.Decimal(12, 2)
+  max_discount_amount              Decimal?         @db.Decimal(12, 2)
+  min_order_value                  Decimal?         @db.Decimal(12, 2)
+  start_date                       DateTime?        @db.Date
+  end_date                         DateTime?        @db.Date
+  usage_limit_total                Int?             @default(0)
+  usage_limit_per_user             Int?             @default(0)
+  status                           vouchers_status? @default(active)
+  owner_id                         Int?
+  created_by                       Int?
+  created_at                       DateTime?        @default(now()) @db.DateTime(0)
+  user_vouchers                    user_vouchers[]
+  users_vouchers_created_byTousers users?           @relation("vouchers_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_voucher_creator")
+  users_vouchers_owner_idTousers   users?           @relation("vouchers_owner_idTousers", fields: [owner_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_voucher_owner")
+
+  @@index([created_by], map: "fk_voucher_creator")
+  @@index([owner_id], map: "fk_voucher_owner")
+}
+
+enum admin_actions_target_type {
+  USER
+  FIELD
+  BOOKING
+  VOUCHER
+  OWNER_PROFILE
+}
+
+enum payments_provider {
+  VNPAY
+  MOMO
+  ZALOPAY
+  ONSITE
+}
+
+enum vouchers_type {
+  PERCENT
+  FIXED
+}
+
+enum admin_actions_action {
+  APPROVE
+  REJECT
+  LOCK
+  UNLOCK
+  UPDATE
+  DELETE
+}
+
+enum notifications_type {
+  BOOKING
+  PAYMENT
+  SYSTEM
+  PROMO
+}
+
+enum refunds_status {
+  requested
+  processed
+  failed
+}
+
+enum bookings_status {
+  PENDING_CONFIRM
+  APPROVED
+  AWAITING_PAYMENT
+  PAID
+  REJECTED
+  CANCELLED
+  COMPLETED
+  PAY_FAILED
+}
+
+enum users_role {
+  USER
+  OWNER
+  ADMIN
+}
+
+enum payments_status {
+  pending
+  success
+  failed
+  refunded
+}
+
+enum users_status {
+  active
+  locked
+  deleted
+}
+
+enum fields_status {
+  active
+  hidden
+  maintenance
+}
+
+enum vouchers_status {
+  active
+  expired
+  inactive
+}
