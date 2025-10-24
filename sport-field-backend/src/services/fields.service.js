@@ -1,55 +1,100 @@
+// src/services/fields.service.js
+import { prisma } from "./_prisma.js";
 
-import { prisma } from './_prisma.js';
-
-export async function listFields(query) {
+// 🔹 Lấy danh sách sân (public)
+export async function getAllFields(filters) {
   const where = {};
-  if (query.q) where.name = { contains: query.q };
-  if (query.sport) where.sport = { equals: query.sport };
-  return prisma.field.findMany({
+  if (filters.type) where.type = filters.type;
+  if (filters.location) where.location = { contains: filters.location };
+  if (filters.status) where.status = filters.status;
+  else where.status = "approved"; // chỉ hiển thị sân đã duyệt
+
+  return await prisma.fields.findMany({
     where,
-    orderBy: { createdAt: 'desc' },
+    orderBy: { created_at: "desc" },
+    include: {
+      owner: { select: { id: true, name: true, email: true } },
+    },
   });
 }
 
-export async function getField(id) {
-  return prisma.field.findUnique({
-    where: { id },
-    include: { reviews: true },
+// 🔹 Lấy chi tiết sân
+export async function getFieldById(id) {
+  const field = await prisma.fields.findUnique({
+    where: { id: Number(id) },
+    include: {
+      owner: { select: { id: true, name: true, email: true } },
+      reviews: {
+        select: {
+          id: true,
+          rating: true,
+          comment: true,
+          user: { select: { name: true } },
+        },
+      },
+    },
+  });
+  if (!field) throw { status: 404, message: "Không tìm thấy sân" };
+  return field;
+}
+
+// 🔹 Xem danh sách sân của chủ sân
+export async function getMyFields(ownerId) {
+  return await prisma.fields.findMany({
+    where: { owner_id: ownerId },
+    orderBy: { created_at: "desc" },
   });
 }
 
-export async function createField(user, payload) {
-  if (user.role !== 'owner' && user.role !== 'admin') throw { status: 403, message: 'Forbidden' };
-  return prisma.field.create({
+// 🔹 Thêm sân mới
+export async function createField(ownerId, data) {
+  const field = await prisma.fields.create({
     data: {
-      name: payload.name,
-      location: payload.location,
-      price: payload.price,
-      sport: payload.sport,
-      ownerId: user.id
-    }
+      owner_id: ownerId,
+      name: data.name,
+      type: data.type,
+      location: data.location,
+      price_per_hour: Number(data.price_per_hour),
+      description: data.description,
+      status: "pending",
+    },
   });
+  return { message: "Tạo sân thành công, chờ admin duyệt", field };
 }
 
-export async function updateField(user, id, payload) {
-  const field = await prisma.field.findUnique({ where: { id } });
-  if (!field) throw { status: 404, message: 'Not found' };
-  if (user.role !== 'admin' && field.ownerId !== user.id) throw { status: 403, message: 'Forbidden' };
-  return prisma.field.update({
-    where: { id },
+// 🔹 Cập nhật sân
+export async function updateField(id, ownerId, data) {
+  const existing = await prisma.fields.findUnique({ where: { id: Number(id) } });
+  if (!existing || existing.owner_id !== ownerId)
+    throw { status: 403, message: "Không có quyền sửa sân này" };
+
+  const field = await prisma.fields.update({
+    where: { id: Number(id) },
     data: {
-      name: payload.name,
-      location: payload.location,
-      price: payload.price,
-      sport: payload.sport,
-    }
+      name: data.name,
+      type: data.type,
+      location: data.location,
+      price_per_hour: Number(data.price_per_hour),
+      description: data.description,
+    },
   });
+  return { message: "Cập nhật sân thành công", field };
 }
 
-export async function deleteField(user, id) {
-  const field = await prisma.field.findUnique({ where: { id } });
-  if (!field) throw { status: 404, message: 'Not found' };
-  if (user.role !== 'admin' && field.ownerId !== user.id) throw { status: 403, message: 'Forbidden' };
-  await prisma.field.delete({ where: { id } });
-  return { id };
+// 🔹 Xóa sân
+export async function deleteField(id, ownerId) {
+  const existing = await prisma.fields.findUnique({ where: { id: Number(id) } });
+  if (!existing || existing.owner_id !== ownerId)
+    throw { status: 403, message: "Không có quyền xóa sân này" };
+  await prisma.fields.delete({ where: { id: Number(id) } });
+  return { message: "Đã xóa sân thành công" };
+}
+
+// 🔹 Admin duyệt sân
+export async function updateStatus(id, status) {
+  const field = await prisma.fields.update({
+    where: { id: Number(id) },
+    data: { status },
+  });
+  return { message: `Cập nhật trạng thái sân: ${status}`, field };
 }

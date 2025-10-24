@@ -1,15 +1,21 @@
-
-import { Router } from 'express';
-import { auth } from '../middleware/auth.js';
-import * as ctrl from '../controllers/fields.controller.js';
+// src/routes/fields.routes.js
+import { Router } from "express";
+import { auth } from "../middleware/auth.js";
+import * as ctrl from "../controllers/fields.controller.js";
 
 const r = Router();
 
-r.get('/', ctrl.listFields);
-r.get('/:id', ctrl.getField);
+// Public
+r.get("/", ctrl.getAllFields);
+r.get("/:id", ctrl.getFieldById);
 
-r.post('/', auth(['owner', 'admin']), ctrl.createField);
-r.put('/:id', auth(['owner', 'admin']), ctrl.updateField);
-r.delete('/:id', auth(['owner', 'admin']), ctrl.deleteField);
+// Owner
+r.get("/my", auth(["OWNER"]), ctrl.getMyFields);
+r.post("/", auth(["OWNER"]), ctrl.createField);
+r.put("/:id", auth(["OWNER"]), ctrl.updateField);
+r.delete("/:id", auth(["OWNER"]), ctrl.deleteField);
+
+// Admin
+r.patch("/:id/status", auth(["ADMIN"]), ctrl.updateStatus);
 
 export default r;
