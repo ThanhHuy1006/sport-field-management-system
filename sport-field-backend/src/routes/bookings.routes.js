@@ -1,14 +1,16 @@
-
-import { Router } from 'express';
-import { auth } from '../middleware/auth.js';
-import * as ctrl from '../controllers/bookings.controller.js';
+// src/routes/bookings.routes.js
+import { Router } from "express";
+import { auth } from "../middleware/auth.js";
+import * as ctrl from "../controllers/bookings.controller.js";
 
 const r = Router();
 
-r.post('/', auth(['user','owner','admin']), ctrl.createBooking);
-r.get('/user/me', auth(['user','owner','admin']), ctrl.getMyBookings);
-r.get('/:id', auth(['user','owner','admin']), ctrl.getBooking);
-r.patch('/:id/status', auth(['owner','admin']), ctrl.updateStatus);
-r.delete('/:id', auth(['user','owner','admin']), ctrl.cancelBooking);
+// User
+r.post("/", auth(["USER"]), ctrl.createBooking);
+r.get("/user/me", auth(["USER"]), ctrl.getUserBookings);
+
+// Owner
+r.get("/owner", auth(["OWNER"]), ctrl.getOwnerBookings);
+r.patch("/:id/status", auth(["OWNER"]), ctrl.updateBookingStatus);
 
 export default r;

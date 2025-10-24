@@ -1,38 +1,42 @@
-
-import * as svc from '../services/bookings.service.js';
-import { ok, created } from '../utils/http.js';
+// src/controllers/bookings.controller.js
+import * as bookingService from "../services/bookings.service.js";
 
 export async function createBooking(req, res, next) {
   try {
-    const data = await svc.createBooking(req.user, req.body);
-    return created(res, data);
-  } catch (e) { next(e); }
+    const data = await bookingService.createBooking(req.user.id, req.body);
+    res.status(201).json(data);
+  } catch (err) {
+    next(err);
+  }
 }
 
-export async function getMyBookings(req, res, next) {
+export async function getUserBookings(req, res, next) {
   try {
-    const data = await svc.getMyBookings(req.user.id);
-    return ok(res, data);
-  } catch (e) { next(e); }
+    const data = await bookingService.getUserBookings(req.user.id);
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
 }
 
-export async function getBooking(req, res, next) {
+export async function getOwnerBookings(req, res, next) {
   try {
-    const data = await svc.getBooking(Number(req.params.id), req.user);
-    return ok(res, data);
-  } catch (e) { next(e); }
+    const data = await bookingService.getOwnerBookings(req.user.id);
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
 }
 
-export async function updateStatus(req, res, next) {
+export async function updateBookingStatus(req, res, next) {
   try {
-    const data = await svc.updateStatus(Number(req.params.id), req.body.status, req.user);
-    return ok(res, data);
-  } catch (e) { next(e); }
-}
-
-export async function cancelBooking(req, res, next) {
-  try {
-    const data = await svc.cancelBooking(Number(req.params.id), req.user);
-    return ok(res, data);
-  } catch (e) { next(e); }
+    const data = await bookingService.updateBookingStatus(
+      req.params.id,
+      req.user.id,
+      req.body.status
+    );
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
 }
