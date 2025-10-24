@@ -1,12 +1,15 @@
-
-import { Router } from 'express';
-import { auth } from '../middleware/auth.js';
-import * as ctrl from '../controllers/payments.controller.js';
+// src/routes/payments.routes.js
+import { Router } from "express";
+import { auth } from "../middleware/auth.js";
+import * as ctrl from "../controllers/payments.controller.js";
 
 const r = Router();
 
-r.post('/create', auth(['user','owner','admin']), ctrl.createPayment);
-r.get('/:id', auth(['user','owner','admin']), ctrl.getPayment);
-r.post('/webhook', ctrl.webhook); // provider callback
+// User
+r.post("/", auth(["USER"]), ctrl.createPayment);
+r.get("/user/me", auth(["USER"]), ctrl.getUserPayments);
+
+// Owner
+r.get("/owner/revenue", auth(["OWNER"]), ctrl.getOwnerRevenue);
 
 export default r;

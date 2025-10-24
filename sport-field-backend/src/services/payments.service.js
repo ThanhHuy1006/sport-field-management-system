@@ -1,33 +1,55 @@
+// src/services/payments.service.js
+import { prisma } from "./_prisma.js";
 
-import { prisma } from './_prisma.js';
+// 🔹 Tạo thanh toán
+export async function createPayment(userId, data) {
+  const booking = await prisma.bookings.findUnique({
+    where: { id: Number(data.booking_id) },
+  });
+  if (!booking || booking.user_id !== userId)
+    throw { status: 403, message: "Không thể thanh toán cho đơn này" };
 
-export async function createPayment(user, { bookingId, amount, provider = 'mock' }) {
-  // You can integrate VNPay/MoMo here. For now we create a pending record.
-  return prisma.payment.create({
+  const payment = await prisma.payments.create({
     data: {
-      bookingId,
-      userId: user.id,
-      amount,
-      currency: 'VND',
-      provider,
-      status: 'PENDING'
-    }
+      booking_id: data.booking_id,
+      user_id: userId,
+      amount: booking.total_price,
+      method: data.method || "cash",
+      status: "success",
+    },
+  });
+
+  // Cập nhật booking đã thanh toán
+  await prisma.bookings.update({
+    where: { id: booking.id },
+    data: { status: "paid" },
+  });
+
+  return { message: "Thanh toán thành công", payment };
+}
+
+// 🔹 Lịch sử thanh toán người dùng
+export async function getUserPayments(userId) {
+  return await prisma.payments.findMany({
+    where: { user_id: userId },
+    include: {
+      booking: {
+        include: { field: { select: { name: true } } },
+      },
+    },
+    orderBy: { created_at: "desc" },
   });
 }
 
-export async function getPayment(id, user) {
-  const p = await prisma.payment.findUnique({ where: { id } });
-  if (!p) throw { status: 404, message: 'Not found' };
-  if (user.role === 'user' && p.userId !== user.id) throw { status: 403, message: 'Forbidden' };
-  return p;
-}
-
-export async function webhook(payload) {
-  // Handle provider callback to update payment status
-  // Example payload: { paymentId, status }
-  if (!payload?.paymentId) return;
-  await prisma.payment.update({
-    where: { id: payload.paymentId },
-    data: { status: payload.status || 'SUCCESS' }
+// 🔹 Doanh thu của Owner
+export async function getOwnerRevenue(ownerId) {
+  const payments = await prisma.payments.findMany({
+    where: {
+      booking: { field: { owner_id: ownerId } },
+    },
+    include: { booking: true },
   });
+
+  const total = payments.reduce((sum, p) => sum + p.amount, 0);
+  return { totalRevenue: total, totalPayments: payments.length, payments };
 }
