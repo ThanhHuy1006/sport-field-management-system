@@ -4,6 +4,7 @@ import { Field, Booking, Voucher } from "./types";
 // Get all fields
 export async function getFields(): Promise<Field[]> {
   const res = await api.get("/fields");
+  
   return res.data;
 }
 

@@ -15,6 +15,9 @@ app.get("/api/health", (req, res) => res.json({ status: "ok" }));
 
 // 🔹 Quan trọng
 app.use("/api", router);
+// src/app.js
+
+
 
 app.use(errorHandler);
 
