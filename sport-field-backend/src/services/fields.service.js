@@ -1,13 +1,14 @@
 // src/services/fields.service.js
 import { prisma } from "./_prisma.js";
+import { fields_status } from "@prisma/client"; // ✅ enum Prisma cho status
 
 // 🔹 Lấy danh sách sân (public)
 export async function getAllFields(filters) {
   const where = {};
-  if (filters.type) where.type = filters.type;
-  if (filters.location) where.location = { contains: filters.location };
+  if (filters.type) where.sport_type = filters.type;
+  if (filters.location) where.address = { contains: filters.location };
   if (filters.status) where.status = filters.status;
-  else where.status = "approved"; // chỉ hiển thị sân đã duyệt
+  else where.status = fields_status.approved; // ✅ enum thay vì chuỗi
 
   return await prisma.fields.findMany({
     where,
@@ -51,12 +52,12 @@ export async function createField(ownerId, data) {
   const field = await prisma.fields.create({
     data: {
       owner_id: ownerId,
-      name: data.name,
-      type: data.type,
-      location: data.location,
-      price_per_hour: Number(data.price_per_hour),
+      field_name: data.name,
+      sport_type: data.type,
+      address: data.location,
+      base_price_per_hour: Number(data.price_per_hour),
       description: data.description,
-      status: "pending",
+      status: fields_status.pending, // ✅ enum đúng cú pháp
     },
   });
   return { message: "Tạo sân thành công, chờ admin duyệt", field };
@@ -71,10 +72,10 @@ export async function updateField(id, ownerId, data) {
   const field = await prisma.fields.update({
     where: { id: Number(id) },
     data: {
-      name: data.name,
-      type: data.type,
-      location: data.location,
-      price_per_hour: Number(data.price_per_hour),
+      field_name: data.name,
+      sport_type: data.type,
+      address: data.location,
+      base_price_per_hour: Number(data.price_per_hour),
       description: data.description,
     },
   });
@@ -94,7 +95,7 @@ export async function deleteField(id, ownerId) {
 export async function updateStatus(id, status) {
   const field = await prisma.fields.update({
     where: { id: Number(id) },
-    data: { status },
+    data: { status: fields_status[status] || fields_status.approved }, // ✅ convert từ chuỗi sang enum
   });
   return { message: `Cập nhật trạng thái sân: ${status}`, field };
 }
