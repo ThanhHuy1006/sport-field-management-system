@@ -1,15 +1,18 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
 import { User, Mail, Lock, Phone, ArrowLeft } from "lucide-react"
+import { registerUser } from "@/lib/auth"
 
 export default function RegisterPage() {
+  const router = useRouter()
+  const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -28,9 +31,32 @@ export default function RegisterPage() {
     }))
   }
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Register:", formData)
+
+    if (formData.password !== formData.confirmPassword) {
+      alert("Passwords do not match!")
+      return
+    }
+
+    setLoading(true)
+    try {
+      const role = formData.userType === "owner" ? "OWNER" : "USER"
+      const res = await registerUser(formData.email, formData.password, formData.fullName)
+
+      // ✅ Lưu token & user
+      localStorage.setItem("token", res.accessToken)
+      localStorage.setItem("refresh", res.refreshToken)
+      localStorage.setItem("user", JSON.stringify({ ...res.user, role }))
+
+      alert("Đăng ký thành công! Bạn đã được đăng nhập.")
+      router.push("/")
+    } catch (err: any) {
+      console.error("Register error:", err)
+      alert(err.response?.data?.message || "Đăng ký thất bại!")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -94,7 +120,6 @@ export default function RegisterPage() {
                   value={formData.phone}
                   onChange={handleChange}
                   className="pl-10"
-                  required
                 />
               </div>
             </div>
@@ -165,8 +190,8 @@ export default function RegisterPage() {
               </span>
             </label>
 
-            <Button type="submit" className="w-full">
-              Create Account
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Creating..." : "Create Account"}
             </Button>
           </form>
 

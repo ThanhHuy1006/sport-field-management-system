@@ -1,22 +1,40 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
 import { Mail, Lock, ArrowLeft } from "lucide-react"
+import { loginUser } from "@/lib/auth"
 
 export default function LoginPage() {
+  const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [rememberMe, setRememberMe] = useState(false)
+  const [loading, setLoading] = useState(false)
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Login:", { email, password, rememberMe })
+    setLoading(true)
+    try {
+      const data = await loginUser(email, password)
+      // ✅ Lưu token
+      localStorage.setItem("token", data.accessToken)
+      localStorage.setItem("refresh", data.refreshToken)
+      localStorage.setItem("user", JSON.stringify(data.user))
+
+      alert("Đăng nhập thành công!")
+      router.push("/") // Chuyển về trang chủ hoặc profile
+    } catch (err: any) {
+      console.error("Login error:", err)
+      alert(err.response?.data?.message || "Sai email hoặc mật khẩu!")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -82,8 +100,8 @@ export default function LoginPage() {
               </Link>
             </div>
 
-            <Button type="submit" className="w-full">
-              Sign In
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
 
