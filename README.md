@@ -12,3 +12,16 @@ Hệ thống được xây dựng bằng **Node.js + Express + MySQL**, theo mô
 ### 1️⃣ Cài đặt các gói cần thiết
 ```bash
 npm install
+```
+### 2️⃣ Cấu hình file .env
+
+Tạo file .env trong thư mục gốc và thêm nội dung:
+
+PORT=3000
+DB_HOST=localhost
+DB_USER=root
+DB_PASS=
+DB_NAME=hcmutsfms
+
+3️⃣ Chạy server
+npm run dev
