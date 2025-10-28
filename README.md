@@ -16,12 +16,13 @@ npm install
 ### 2️⃣ Cấu hình file .env
 
 Tạo file .env trong thư mục gốc và thêm nội dung:
-
+```bash
 PORT=3000
 DB_HOST=localhost
 DB_USER=root
 DB_PASS=
 DB_NAME=hcmutsfms
-
+```
 3️⃣ Chạy server
+```bash
 npm run dev
