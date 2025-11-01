@@ -26,9 +26,9 @@ export function TopNav() {
             </Button>
             <ThemeToggle />
             <RoleSwitcher />
-            <Button variant="ghost" size="icon">
+            {/* <Button variant="ghost" size="icon">
               <LogOut className="h-5 w-5" />
-            </Button>
+            </Button> */}
           </div>
         </div>
       </div>
