@@ -1,9 +1,9 @@
+// src/services/auth.service.js
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { prisma } from "./_prisma.js";
 import { env } from "../config/env.js";
 
-// 🔹 Tạo access & refresh token
 function signToken(user) {
   const payload = { id: user.id, role: user.role };
   const accessToken = jwt.sign(payload, env.JWT_ACCESS_SECRET, { expiresIn: "1h" });
@@ -11,54 +11,8 @@ function signToken(user) {
   return { accessToken, refreshToken, user: payload };
 }
 
-// // 🔹 Đăng ký
-// export async function register({ email, password, name, role }) {
-//   if (!email || !password) throw { status: 400, message: "Email và mật khẩu là bắt buộc" };
-
-//   const exists = await prisma.users.findUnique({ where: { email } });
-//   if (exists) throw { status: 409, message: "Email đã tồn tại" };
-
-//   const hash = await bcrypt.hash(password, 10);
-//   const user = await prisma.users.create({
-//     data: {
-//       email,
-//       password_hash: hash,
-//       name: name || "Người dùng mới",
-//       role: role || "USER",
-//       status: "active",
-//     },
-//   });
-
-//   return signToken(user);
-// }
-// src/services/auth.service.js
-// export async function register({ email, password, name, role, userType }) {
-//   if (!email || !password) throw { status: 400, message: "Email và mật khẩu là bắt buộc" };
-
-//   const exists = await prisma.users.findUnique({ where: { email } });
-//   if (exists) throw { status: 409, message: "Email đã tồn tại" };
-
-//   const hash = await bcrypt.hash(password, 10);
-
-//   // ✅ Map userType từ FE sang role trong DB
-//   let finalRole = "USER";
-//   if (userType === "owner") finalRole = "OWNER";
-//   else if (userType === "admin") finalRole = "ADMIN";
-
-//   const user = await prisma.users.create({
-//     data: {
-//       email,
-//       password_hash: hash,
-//       name: name || "Người dùng mới",
-//       role: finalRole,
-//       status: "active",
-//     },
-//   });
-
-//   return signToken(user);
-// }
-// src/services/auth.service.js
-export async function register({ email, password, name, userType }) {
+// 🔹 Đăng ký
+export async function register({ email, password, name, userType, role }) {
   if (!email || !password) throw { status: 400, message: "Email và mật khẩu là bắt buộc" };
 
   const exists = await prisma.users.findUnique({ where: { email } });
@@ -66,10 +20,13 @@ export async function register({ email, password, name, userType }) {
 
   const hash = await bcrypt.hash(password, 10);
 
-  // ✅ Mapping userType → role trong DB
+  // ✅ Xác định role cuối cùng
   let finalRole = "USER";
-  if (userType === "owner") finalRole = "OWNER";
-  else if (userType === "admin") finalRole = "ADMIN";
+  if (["OWNER", "owner"].includes(role) || ["owner", "OWNER"].includes(userType)) {
+    finalRole = "OWNER";
+  } else if (["ADMIN", "admin"].includes(role) || ["admin", "ADMIN"].includes(userType)) {
+    finalRole = "ADMIN";
+  }
 
   const user = await prisma.users.create({
     data: {
@@ -83,6 +40,7 @@ export async function register({ email, password, name, userType }) {
 
   return signToken(user);
 }
+
 
 // 🔹 Đăng nhập
 export async function login({ email, password }) {
