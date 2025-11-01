@@ -1,17 +1,30 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
+import React, { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
 import { User, Mail, Lock, Phone, ArrowLeft } from "lucide-react"
+import { registerUser } from "@/lib/auth" // ✅ gọi API thật
+
+// Định nghĩa kiểu dữ liệu của form để TypeScript hiểu
+interface RegisterForm {
+  fullName: string
+  email: string
+  phone: string
+  password: string
+  confirmPassword: string
+  userType: string
+  agreeTerms: boolean
+}
 
 export default function RegisterPage() {
-  const [formData, setFormData] = useState({
+  const router = useRouter()
+  const [loading, setLoading] = useState(false)
+  const [formData, setFormData] = useState<RegisterForm>({
     fullName: "",
     email: "",
     phone: "",
@@ -21,18 +34,43 @@ export default function RegisterPage() {
     agreeTerms: false,
   })
 
+  // ✅ Bắt sự kiện thay đổi input
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
-    setFormData((prev) => ({
+    setFormData((prev: RegisterForm) => ({
       ...prev,
       [name]: type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
     }))
   }
 
-  const handleRegister = (e: React.FormEvent) => {
-    e.preventDefault()
-    console.log("Register:", formData)
+  // ✅ Gọi API đăng ký thật
+
+
+const handleRegister = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  if (formData.password !== formData.confirmPassword) {
+    alert("Mật khẩu không khớp!");
+    return;
   }
+
+  try {
+    const res = await registerUser(
+      formData.email,
+      formData.password,
+      formData.fullName,
+      formData.userType // ✅ gửi đúng kiểu
+    );
+
+    localStorage.setItem("token", res.accessToken);
+    alert("Đăng ký thành công!");
+    window.location.href = "/browse";
+  } catch (err: any) {
+    console.error("Register error:", err);
+    alert("Đăng ký thất bại. Vui lòng thử lại.");
+  }
+};
+
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-primary/10 to-blue-50 flex items-center justify-center p-4">
@@ -52,6 +90,7 @@ export default function RegisterPage() {
           </div>
 
           <form onSubmit={handleRegister} className="space-y-4">
+            {/* Họ và tên */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">Họ và Tên</label>
               <div className="relative">
@@ -68,6 +107,7 @@ export default function RegisterPage() {
               </div>
             </div>
 
+            {/* Email */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">Địa Chỉ Email</label>
               <div className="relative">
@@ -84,6 +124,7 @@ export default function RegisterPage() {
               </div>
             </div>
 
+            {/* Số điện thoại */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">Số Điện Thoại</label>
               <div className="relative">
@@ -100,6 +141,7 @@ export default function RegisterPage() {
               </div>
             </div>
 
+            {/* Loại người dùng */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">Tôi là</label>
               <select
@@ -113,6 +155,7 @@ export default function RegisterPage() {
               </select>
             </div>
 
+            {/* Mật khẩu */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">Mật Khẩu</label>
               <div className="relative">
@@ -129,6 +172,7 @@ export default function RegisterPage() {
               </div>
             </div>
 
+            {/* Xác nhận mật khẩu */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">Xác Nhận Mật Khẩu</label>
               <div className="relative">
@@ -145,6 +189,7 @@ export default function RegisterPage() {
               </div>
             </div>
 
+            {/* Checkbox đồng ý điều khoản */}
             <label className="flex items-start gap-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -166,8 +211,9 @@ export default function RegisterPage() {
               </span>
             </label>
 
-            <Button type="submit" className="w-full">
-              Tạo Tài Khoản
+            {/* Nút submit */}
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Đang tạo..." : "Tạo Tài Khoản"}
             </Button>
           </form>
 

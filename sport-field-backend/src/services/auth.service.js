@@ -11,20 +11,72 @@ function signToken(user) {
   return { accessToken, refreshToken, user: payload };
 }
 
-// 🔹 Đăng ký
-export async function register({ email, password, name, role }) {
+// // 🔹 Đăng ký
+// export async function register({ email, password, name, role }) {
+//   if (!email || !password) throw { status: 400, message: "Email và mật khẩu là bắt buộc" };
+
+//   const exists = await prisma.users.findUnique({ where: { email } });
+//   if (exists) throw { status: 409, message: "Email đã tồn tại" };
+
+//   const hash = await bcrypt.hash(password, 10);
+//   const user = await prisma.users.create({
+//     data: {
+//       email,
+//       password_hash: hash,
+//       name: name || "Người dùng mới",
+//       role: role || "USER",
+//       status: "active",
+//     },
+//   });
+
+//   return signToken(user);
+// }
+// src/services/auth.service.js
+// export async function register({ email, password, name, role, userType }) {
+//   if (!email || !password) throw { status: 400, message: "Email và mật khẩu là bắt buộc" };
+
+//   const exists = await prisma.users.findUnique({ where: { email } });
+//   if (exists) throw { status: 409, message: "Email đã tồn tại" };
+
+//   const hash = await bcrypt.hash(password, 10);
+
+//   // ✅ Map userType từ FE sang role trong DB
+//   let finalRole = "USER";
+//   if (userType === "owner") finalRole = "OWNER";
+//   else if (userType === "admin") finalRole = "ADMIN";
+
+//   const user = await prisma.users.create({
+//     data: {
+//       email,
+//       password_hash: hash,
+//       name: name || "Người dùng mới",
+//       role: finalRole,
+//       status: "active",
+//     },
+//   });
+
+//   return signToken(user);
+// }
+// src/services/auth.service.js
+export async function register({ email, password, name, userType }) {
   if (!email || !password) throw { status: 400, message: "Email và mật khẩu là bắt buộc" };
 
   const exists = await prisma.users.findUnique({ where: { email } });
   if (exists) throw { status: 409, message: "Email đã tồn tại" };
 
   const hash = await bcrypt.hash(password, 10);
+
+  // ✅ Mapping userType → role trong DB
+  let finalRole = "USER";
+  if (userType === "owner") finalRole = "OWNER";
+  else if (userType === "admin") finalRole = "ADMIN";
+
   const user = await prisma.users.create({
     data: {
       email,
       password_hash: hash,
       name: name || "Người dùng mới",
-      role: role || "USER",
+      role: finalRole,
       status: "active",
     },
   });
