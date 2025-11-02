@@ -1,86 +1,59 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
+import { useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { MapPin, Star, Clock, Phone, Mail, ArrowLeft, Heart, Share2, ChevronLeft, ChevronRight } from "lucide-react"
+import { getFieldById, type FieldDetail } from "@/lib/fetchers"
 
-const mockFieldDetails = {
-  1: {
-    id: 1,
-    name: "Green Valley Soccer Field",
-    type: "Soccer",
-    location: "District 1, HCMC",
-    address: "123 Sports Street, District 1, Ho Chi Minh City",
-    price: 500000,
-    rating: 4.8,
-    reviewCount: 124,
-    images: ["/placeholder.svg?key=vbfdr", "/placeholder.svg?key=njyq6", "/placeholder.svg?key=ejrsp"],
-    description:
-      "Professional soccer field with premium grass, perfect for matches and training. Equipped with modern facilities including changing rooms, parking, and spectator seating.",
-    amenities: [
-      "Parking",
-      "Changing Rooms",
-      "Shower Facilities",
-      "Spectator Seating",
-      "Floodlights",
-      "Equipment Rental",
-    ],
-    hours: "06:00 - 22:00",
-    capacity: 22,
-    owner: {
-      name: "Green Valley Sports",
-      phone: "+84 123 456 789",
-      email: "contact@greenvalley.com",
-      rating: 4.8,
-      reviews: 156,
-    },
-    availability: {
-      "2025-01-15": ["08:00", "09:00", "10:00", "14:00", "15:00", "16:00", "18:00", "19:00", "20:00"],
-      "2025-01-16": ["08:00", "09:00", "10:00", "11:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"],
-      "2025-01-17": ["08:00", "09:00", "10:00", "14:00", "15:00", "16:00", "18:00", "19:00"],
-    },
-    reviews: [
-      { id: 1, author: "John Doe", rating: 5, text: "Excellent field! Very well maintained.", date: "2025-01-10" },
-      { id: 2, author: "Jane Smith", rating: 4, text: "Good facilities, friendly staff.", date: "2025-01-08" },
-      { id: 3, author: "Mike Johnson", rating: 5, text: "Best soccer field in the city!", date: "2025-01-05" },
-    ],
-  },
-}
-
-export default function FieldDetailsPage({ params }: { params: { id: string } }) {
-  const field = mockFieldDetails[params.id as keyof typeof mockFieldDetails]
+export default function FieldDetailsPage() {
+  const { id } = useParams()
+  const [field, setField] = useState<FieldDetail | null>(null)
+  const [loading, setLoading] = useState(true)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [isWishlisted, setIsWishlisted] = useState(false)
 
-  if (!field) {
-    return (
-      <main className="min-h-screen bg-background">
-        <div className="max-w-7xl mx-auto px-4 py-12 text-center">
-          <h1 className="text-2xl font-bold">Không tìm thấy sân</h1>
-          <Link href="/">
-            <Button className="mt-4">Về trang chủ</Button>
-          </Link>
-        </div>
-      </main>
-    )
-  }
+  // ✅ Gọi API thật khi vào trang
+  useEffect(() => {
+    if (!id) return
+    getFieldById(id as string)
+      .then(setField)
+      .catch((err) => console.error("Fetch field error:", err))
+      .finally(() => setLoading(false))
+  }, [id])
 
   const nextImage = () => {
+    if (!field?.images?.length) return
     setCurrentImageIndex((prev) => (prev + 1) % field.images.length)
   }
 
   const prevImage = () => {
+    if (!field?.images?.length) return
     setCurrentImageIndex((prev) => (prev - 1 + field.images.length) % field.images.length)
   }
+
+  if (loading)
+    return (
+      <main className="min-h-screen flex items-center justify-center">
+        <p className="text-muted-foreground">Đang tải thông tin sân...</p>
+      </main>
+    )
+
+  if (!field)
+    return (
+      <main className="min-h-screen flex items-center justify-center">
+        <p className="text-muted-foreground">Không tìm thấy sân</p>
+      </main>
+    )
 
   return (
     <main className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-background border-b border-border">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 text-primary hover:text-primary/80">
+          <Link href="/browse" className="flex items-center gap-2 text-primary hover:text-primary/80">
             <ArrowLeft className="w-5 h-5" />
             Quay lại
           </Link>
@@ -97,45 +70,38 @@ export default function FieldDetailsPage({ params }: { params: { id: string } })
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content */}
+          {/* Left Column */}
           <div className="lg:col-span-2">
             {/* Image Gallery */}
             <div className="relative bg-muted rounded-lg overflow-hidden mb-8">
               <img
-                src={field.images[currentImageIndex] || "/placeholder.svg"}
+                src={field.images?.[currentImageIndex] || "/placeholder.svg"}
                 alt={field.name}
                 className="w-full h-96 object-cover"
               />
-              <button
-                onClick={prevImage}
-                className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full transition"
-              >
-                <ChevronLeft className="w-6 h-6" />
-              </button>
-              <button
-                onClick={nextImage}
-                className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full transition"
-              >
-                <ChevronRight className="w-6 h-6" />
-              </button>
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-                {field.images.map((_, idx) => (
+              {field.images?.length > 1 && (
+                <>
                   <button
-                    key={idx}
-                    onClick={() => setCurrentImageIndex(idx)}
-                    className={`w-2 h-2 rounded-full transition ${
-                      idx === currentImageIndex ? "bg-white" : "bg-white/50"
-                    }`}
-                  />
-                ))}
-              </div>
+                    onClick={prevImage}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full transition"
+                  >
+                    <ChevronLeft className="w-6 h-6" />
+                  </button>
+                  <button
+                    onClick={nextImage}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full transition"
+                  >
+                    <ChevronRight className="w-6 h-6" />
+                  </button>
+                </>
+              )}
             </div>
 
             {/* Field Info */}
             <div className="mb-8">
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <h1 className="text-4xl font-bold text-foreground mb-2">{field.name}</h1>
+                  <h1 className="text-4xl font-bold mb-2">{field.name}</h1>
                   <div className="flex items-center gap-4 text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <MapPin className="w-4 h-4" />
@@ -143,7 +109,7 @@ export default function FieldDetailsPage({ params }: { params: { id: string } })
                     </div>
                     <div className="flex items-center gap-1">
                       <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                      {field.rating} ({field.reviewCount} đánh giá)
+                      {field.rating ? `${field.rating.toFixed(1)} (${field.reviewCount})` : "Chưa có đánh giá"}
                     </div>
                   </div>
                 </div>
@@ -157,139 +123,86 @@ export default function FieldDetailsPage({ params }: { params: { id: string } })
             {/* Description */}
             <Card className="p-6 mb-8">
               <h2 className="text-2xl font-bold mb-4">Về sân này</h2>
-              <p className="text-muted-foreground mb-6">{field.description}</p>
+              <p className="text-muted-foreground mb-6">{field.description || "Chưa có mô tả"}</p>
 
               <h3 className="text-lg font-bold mb-3">Tiện nghi</h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {field.amenities.map((amenity, idx) => (
-                  <div key={idx} className="flex items-center gap-2 text-foreground">
-                    <div className="w-2 h-2 bg-primary rounded-full" />
-                    {amenity}
-                  </div>
-                ))}
+                {field.amenities.length > 0 ? (
+                  field.amenities.map((a, idx) => (
+                    <div key={idx} className="flex items-center gap-2 text-foreground">
+                      <div className="w-2 h-2 bg-primary rounded-full" />
+                      {a}
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">Chưa cập nhật</p>
+                )}
               </div>
             </Card>
 
-            {/* Operating Hours */}
+            {/* Hours */}
             <Card className="p-6 mb-8">
               <div className="flex items-center gap-2 mb-4">
                 <Clock className="w-5 h-5 text-primary" />
                 <h3 className="text-lg font-bold">Giờ hoạt động</h3>
               </div>
-              <p className="text-foreground">{field.hours}</p>
-            </Card>
-
-            {/* Owner Info */}
-            <Card className="p-6 mb-8">
-              <h3 className="text-lg font-bold mb-4">Chủ sân</h3>
-              <div className="flex items-start justify-between">
-                <div>
-                  <h4 className="font-bold text-foreground mb-2">{field.owner.name}</h4>
-                  <div className="flex items-center gap-1 mb-3">
-                    <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                    <span className="text-sm">
-                      {field.owner.rating} ({field.owner.reviews} đánh giá)
-                    </span>
-                  </div>
-                  <div className="space-y-2 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <Phone className="w-4 h-4" />
-                      {field.owner.phone}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Mail className="w-4 h-4" />
-                      {field.owner.email}
-                    </div>
-                  </div>
-                </div>
-                <Button variant="outline">Liên hệ chủ sân</Button>
-              </div>
+              <p className="text-foreground">{field.hours || "Chưa cập nhật"}</p>
             </Card>
 
             {/* Reviews */}
             <Card className="p-6">
               <h3 className="text-lg font-bold mb-6">Đánh giá khách hàng</h3>
-              <div className="space-y-6">
-                {field.reviews.map((review) => (
-                  <div key={review.id} className="pb-6 border-b border-border last:border-b-0">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <h4 className="font-bold text-foreground">{review.author}</h4>
-                        <div className="flex items-center gap-1">
-                          {[...Array(5)].map((_, i) => (
-                            <Star
-                              key={i}
-                              className={`w-4 h-4 ${
-                                i < review.rating ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"
-                              }`}
-                            />
-                          ))}
-                        </div>
+              {field.reviews.length ? (
+                <div className="space-y-6">
+                  {field.reviews.map((r) => (
+                    <div key={r.id} className="pb-6 border-b border-border last:border-b-0">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="font-medium">{r.author}</span>
+                        <span className="text-yellow-500">⭐ {r.rating}</span>
                       </div>
-                      <span className="text-sm text-muted-foreground">{review.date}</span>
+                      <p className="text-muted-foreground">{r.text}</p>
                     </div>
-                    <p className="text-muted-foreground">{review.text}</p>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Chưa có đánh giá nào.</p>
+              )}
             </Card>
           </div>
 
-          {/* Booking Sidebar */}
+          {/* Sidebar Booking */}
           <div className="lg:col-span-1">
-            <Card className="p-6 sticky top-24">
-              <h3 className="text-xl font-bold mb-6">Đặt sân này</h3>
-
-              <div className="space-y-4 mb-6">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">Chọn ngày</label>
-                  <input type="date" className="w-full px-3 py-2 border border-border rounded-md" />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">Chọn giờ</label>
-                  <select className="w-full px-3 py-2 border border-border rounded-md bg-background">
-                    <option>Chọn khung giờ</option>
-                    <option>08:00 - 09:00</option>
-                    <option>09:00 - 10:00</option>
-                    <option>10:00 - 11:00</option>
-                    <option>14:00 - 15:00</option>
-                    <option>15:00 - 16:00</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">Thời lượng (giờ)</label>
-                  <select className="w-full px-3 py-2 border border-border rounded-md bg-background">
-                    <option>1 giờ</option>
-                    <option>2 giờ</option>
-                    <option>3 giờ</option>
-                    <option>4 giờ</option>
-                  </select>
-                </div>
+            <Card className="p-6 sticky top-24 space-y-4">
+              <h3 className="text-xl font-bold mb-4">Đặt sân này</h3>
+              <div>
+                <label className="block text-sm font-medium mb-2">Chọn ngày</label>
+                <input type="date" className="w-full px-3 py-2 border rounded-md" />
               </div>
-
-              <div className="bg-muted p-4 rounded-lg mb-6">
-                <div className="flex justify-between mb-2">
-                  <span className="text-muted-foreground">Giá mỗi giờ</span>
-                  <span className="font-bold">{field.price.toLocaleString()} VND</span>
-                </div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-muted-foreground">Thời lượng</span>
-                  <span className="font-bold">1 giờ</span>
-                </div>
-                <div className="border-t border-border pt-2 mt-2 flex justify-between">
-                  <span className="font-bold">Tổng cộng</span>
-                  <span className="text-lg font-bold text-primary">{field.price.toLocaleString()} VND</span>
-                </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Chọn giờ</label>
+                <select className="w-full px-3 py-2 border rounded-md bg-background">
+                  <option>08:00</option>
+                  <option>09:00</option>
+                  <option>10:00</option>
+                  <option>14:00</option>
+                </select>
               </div>
+              <Button className="w-full text-lg">Đặt sân ngay</Button>
 
-              <Link href={`/booking/${field.id}`}>
-                <Button className="w-full mb-3">Tiếp tục đặt sân</Button>
-              </Link>
-              <Button variant="outline" className="w-full bg-transparent">
-                Thêm vào yêu thích
-              </Button>
+              {/* Chủ sân */}
+              {field.owner && (
+                <div className="border-t pt-4 mt-4 text-sm">
+                  <p className="font-semibold">{field.owner.name}</p>
+                  <div className="flex items-center gap-2 mt-1 text-muted-foreground">
+                    <Mail className="h-4 w-4" /> {field.owner.email}
+                  </div>
+                  {field.owner.phone && (
+                    <div className="flex items-center gap-2 mt-1 text-muted-foreground">
+                      <Phone className="h-4 w-4" /> {field.owner.phone}
+                    </div>
+                  )}
+                </div>
+              )}
             </Card>
           </div>
         </div>
