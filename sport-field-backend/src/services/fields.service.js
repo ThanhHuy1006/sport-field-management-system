@@ -141,6 +141,23 @@ export async function createField(ownerId, data) {
 // ======================================================
 // 🔹 Cập nhật sân
 // ======================================================
+// export async function updateField(id, ownerId, data) {
+//   const existing = await prisma.fields.findUnique({ where: { id: Number(id) } });
+//   if (!existing || existing.owner_id !== ownerId)
+//     throw { status: 403, message: "Không có quyền sửa sân này" };
+
+//   const field = await prisma.fields.update({
+//     where: { id: Number(id) },
+//     data: {
+//       field_name: data.name,
+//       sport_type: data.type,
+//       address: data.location,
+//       base_price_per_hour: Number(data.price_per_hour),
+//       description: data.description,
+//     },
+//   });
+//   return { message: "Cập nhật sân thành công", field };
+// }
 export async function updateField(id, ownerId, data) {
   const existing = await prisma.fields.findUnique({ where: { id: Number(id) } });
   if (!existing || existing.owner_id !== ownerId)
@@ -151,13 +168,17 @@ export async function updateField(id, ownerId, data) {
     data: {
       field_name: data.name,
       sport_type: data.type,
-      address: data.location,
-      base_price_per_hour: Number(data.price_per_hour),
+      address: data.address,
+      base_price_per_hour: Number(data.price),
       description: data.description,
+      status: data.status,
+      max_players: Number(data.capacity),
     },
   });
+
   return { message: "Cập nhật sân thành công", field };
 }
+
 
 // ======================================================
 // 🔹 Xóa sân

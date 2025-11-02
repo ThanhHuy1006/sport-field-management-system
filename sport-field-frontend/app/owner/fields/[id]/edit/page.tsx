@@ -1,58 +1,44 @@
 "use client"
+
+import { useEffect, useState } from "react"
+import { useParams } from "next/navigation"
 import EditFieldForm from "./edit-field-form"
+import { getFieldById } from "@/lib/fetchers"
 
-// Mock data - in real app, fetch from API
-const mockFieldData = {
-  1: {
-    name: "Sân Bóng Đá Green Valley",
-    type: "soccer",
-    location: "Quận 1, TP.HCM",
-    address: "123 Đường Nguyễn Huệ",
-    capacity: "22",
-    price: "500000",
-    description: "Sân bóng đá chất lượng cao với cỏ nhân tạo",
-    status: "active",
-    amenities: ["Bãi đỗ xe", "Phòng thay đồ", "Wifi miễn phí"],
-    openTime: "06:00",
-    closeTime: "22:00",
-  },
-  2: {
-    name: "Sân Cầu Lông Sky Court",
-    type: "badminton",
-    location: "Quận 3, TP.HCM",
-    address: "456 Đường Lê Văn Sỹ",
-    capacity: "4",
-    price: "200000",
-    description: "Sân cầu lông trong nhà, điều hòa mát mẻ",
-    status: "active",
-    amenities: ["Điều hòa", "Phòng thay đồ", "Cho thuê vợt"],
-    openTime: "07:00",
-    closeTime: "23:00",
-  },
-  3: {
-    name: "Sân Bóng Rổ Urban Court",
-    type: "basketball",
-    location: "Quận 7, TP.HCM",
-    address: "789 Đường Nguyễn Văn Linh",
-    capacity: "10",
-    price: "300000",
-    description: "Sân bóng rổ ngoài trời với sàn cao su",
-    status: "active",
-    amenities: ["Bãi đỗ xe", "Nước uống miễn phí", "Ánh sáng đêm"],
-    openTime: "06:00",
-    closeTime: "22:00",
-  },
-}
+export default function EditFieldPage() {
+  const { id } = useParams()
+  const [fieldData, setFieldData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
-export default async function EditFieldPage({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
-  const { id } = await params
+  useEffect(() => {
+    if (!id) return
+    // ✅ Gọi API lấy chi tiết sân
+    getFieldById(Number(id))
+      .then((data) => {
+        console.log("📦 Dữ liệu sân nhận được:", data)
+        setFieldData({
+          name: data.name || "",
+          type: data.type || "",
+          location: data.location || "",
+          // ✅ Backend không có 'address' → tạm dùng location
+          address: data.address || data.location || "",
+          capacity: data.capacity ? String(data.capacity) : "",
+          price: data.price ? String(data.price) : "",
+          description: data.description || "",
+          status: data.status || "active",
+          amenities: data.amenities || [],
+          openTime: "06:00",
+          closeTime: "22:00",
+        })
+      })
+      .catch((err) => console.error("❌ Lỗi tải dữ liệu sân:", err))
+      .finally(() => setLoading(false))
+  }, [id])
 
-  // Load existing field data
-  const existingData = mockFieldData[id as keyof typeof mockFieldData] || mockFieldData[1]
+  if (loading) return <p className="text-center mt-20">⏳ Đang tải dữ liệu sân...</p>
 
-  return <EditFieldForm fieldId={id} existingData={existingData} />
+  if (!fieldData) return <p className="text-center mt-20 text-red-500">Không tìm thấy sân!</p>
+
+  // ✅ Truyền dữ liệu sang form
+  return <EditFieldForm fieldId={String(id)} existingData={fieldData} />
 }

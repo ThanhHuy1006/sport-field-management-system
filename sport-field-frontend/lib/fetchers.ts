@@ -33,6 +33,7 @@ export interface FieldDetail {
   id: number
   name: string
   type: string
+  address?: string
   location: string
   description?: string
   price: number
@@ -42,6 +43,7 @@ export interface FieldDetail {
   amenities: string[]
   hours: string
   capacity?: number
+  status?: string
   owner?: {
     id: number
     name: string
@@ -93,5 +95,9 @@ export async function createField(data: {
 
 export async function deleteField(id: number): Promise<any> {
   const res = await api.delete(`/fields/${id}`)
+  return res.data
+}
+export async function updateField(id: string | number, payload: any) {
+  const res = await api.put(`/fields/${id}`, payload)
   return res.data
 }
