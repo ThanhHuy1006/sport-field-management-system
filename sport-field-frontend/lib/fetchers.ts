@@ -60,3 +60,38 @@ export async function getFieldById(id: string | number): Promise<FieldDetail> {
   const res = await api.get(`/fields/${id}`)
   return res.data
 }
+// ========================
+// OWNER — Quản lý sân của tôi
+// ========================
+export interface OwnerField {
+  id: number
+  field_name: string
+  sport_type: string
+  address: string
+  base_price_per_hour: number
+  status: string
+  created_at: string
+  max_players?: number | null
+  image?: string | null
+}
+
+export async function getMyFields(): Promise<OwnerField[]> {
+  const res = await api.get("/fields/my") // ✅ Gọi API của Owner
+  return res.data
+}
+
+export async function createField(data: {
+  name: string
+  type: string
+  location: string
+  price_per_hour: number
+  description: string
+}): Promise<any> {
+  const res = await api.post("/fields", data)
+  return res.data
+}
+
+export async function deleteField(id: number): Promise<any> {
+  const res = await api.delete(`/fields/${id}`)
+  return res.data
+}
