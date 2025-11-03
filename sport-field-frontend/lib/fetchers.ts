@@ -1,4 +1,3 @@
-// sports-field-frontend/lib/fetchers.ts
 import api from "./api"
 
 // ========================
@@ -62,6 +61,7 @@ export async function getFieldById(id: string | number): Promise<FieldDetail> {
   const res = await api.get(`/fields/${id}`)
   return res.data
 }
+
 // ========================
 // OWNER — Quản lý sân của tôi
 // ========================
@@ -77,11 +77,13 @@ export interface OwnerField {
   image?: string | null
 }
 
+// 🔹 Lấy danh sách sân của chủ sở hữu
 export async function getMyFields(): Promise<OwnerField[]> {
-  const res = await api.get("/fields/my") // ✅ Gọi API của Owner
+  const res = await api.get("/fields/my")
   return res.data
 }
 
+// 🔹 Tạo sân mới (Owner)
 export async function createField(data: {
   name: string
   type: string
@@ -93,11 +95,29 @@ export async function createField(data: {
   return res.data
 }
 
+// 🔹 Cập nhật sân
+export async function updateField(id: string | number, payload: any): Promise<any> {
+  const res = await api.put(`/fields/${id}`, payload)
+  return res.data
+}
+
+// 🔹 Xóa sân
 export async function deleteField(id: number): Promise<any> {
   const res = await api.delete(`/fields/${id}`)
   return res.data
 }
-export async function updateField(id: string | number, payload: any) {
-  const res = await api.put(`/fields/${id}`, payload)
+// ========================
+// ADMIN — Duyệt sân
+// ========================
+
+// 🔹 Lấy danh sách sân chờ duyệt
+export async function getPendingFields() {
+  const res = await api.get("/fields?status=pending")
+  return res.data
+}
+
+// 🔹 Cập nhật trạng thái sân (approve / reject / hide / maintenance)
+export async function updateFieldStatus(id: number, status: string) {
+  const res = await api.patch(`/fields/${id}/status`, { status })
   return res.data
 }

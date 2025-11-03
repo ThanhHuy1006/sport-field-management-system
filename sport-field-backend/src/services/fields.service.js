@@ -119,7 +119,6 @@ export async function getMyFields(ownerId) {
     orderBy: { created_at: "desc" },
   });
 }
-
 // ======================================================
 // 🔹 Thêm sân mới
 // ======================================================
@@ -132,11 +131,30 @@ export async function createField(ownerId, data) {
       address: data.location,
       base_price_per_hour: Number(data.price_per_hour),
       description: data.description,
-      status: fields_status.active,
+      status:fields_status.pending, 
     },
   });
-  return { message: "Tạo sân thành công, chờ admin duyệt", field };
+  return { message: "✅ Tạo sân thành công, vui lòng chờ admin duyệt.", field };
 }
+
+
+// ======================================================
+// // 🔹 Thêm sân mới
+// // ======================================================
+// export async function createField(ownerId, data) {
+//   const field = await prisma.fields.create({
+//     data: {
+//       owner_id: ownerId,
+//       field_name: data.name,
+//       sport_type: data.type,
+//       address: data.location,
+//       base_price_per_hour: Number(data.price_per_hour),
+//       description: data.description,
+//       status: fields_status.active,
+//     },
+//   });
+//   return { message: "Tạo sân thành công, chờ admin duyệt", field };
+// }
 
 // ======================================================
 // 🔹 Cập nhật sân

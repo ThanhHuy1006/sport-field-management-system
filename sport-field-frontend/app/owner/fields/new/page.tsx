@@ -1,6 +1,4 @@
-"use client"
-
-import type React from "react"
+ "use client"
 
 import { useState } from "react"
 import Link from "next/link"
@@ -12,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowLeft, Upload, Plus, X } from "lucide-react"
+import { createField } from "@/lib/fetchers"
 
 export default function NewFieldPage() {
   const router = useRouter()
@@ -23,20 +22,30 @@ export default function NewFieldPage() {
     capacity: "",
     price: "",
     description: "",
-    status: "active",
-  })
-  const [amenities, setAmenities] = useState<string[]>([])
-  const [newAmenity, setNewAmenity] = useState("")
-  const [operatingHours, setOperatingHours] = useState({
-    openTime: "06:00",
-    closeTime: "22:00",
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [amenities, setAmenities] = useState<string[]>([])
+  const [newAmenity, setNewAmenity] = useState("")
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Handle form submission
-    console.log("[v0] Form data:", formData, amenities, operatingHours)
-    router.push("/owner/fields")
+    try {
+      const payload = {
+        name: formData.name,
+        type: formData.type,
+        location: formData.location,
+        price_per_hour: Number(formData.price),
+        description: formData.description,
+      }
+
+      console.log("📦 Sending:", payload)
+      const res = await createField(payload)
+      alert(res.message || "✅ Tạo sân thành công, vui lòng chờ admin duyệt.")
+      router.push("/owner/fields")
+    } catch (err: any) {
+      console.error("❌ Error creating field:", err)
+      alert("Không thể tạo sân. Vui lòng thử lại.")
+    }
   }
 
   const addAmenity = () => {
@@ -52,7 +61,6 @@ export default function NewFieldPage() {
 
   return (
     <main className="min-h-screen bg-background">
-      {/* Header */}
       <header className="sticky top-0 z-50 bg-background border-b border-border">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/owner/fields" className="flex items-center gap-2 text-primary hover:text-primary/80">
@@ -94,22 +102,6 @@ export default function NewFieldPage() {
                       <SelectItem value="tennis">Tennis</SelectItem>
                       <SelectItem value="badminton">Cầu Lông</SelectItem>
                       <SelectItem value="volleyball">Bóng Chuyền</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="status">Trạng Thái *</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(value) => setFormData({ ...formData, status: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Hoạt Động</SelectItem>
-                      <SelectItem value="inactive">Không Hoạt Động</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -186,42 +178,6 @@ export default function NewFieldPage() {
             </div>
           </Card>
 
-          {/* Giờ hoạt động */}
-          <Card className="p-6">
-            <h2 className="text-lg font-semibold mb-4">Giờ Hoạt Động</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="openTime">Giờ Mở Cửa</Label>
-                <Input
-                  id="openTime"
-                  type="time"
-                  value={operatingHours.openTime}
-                  onChange={(e) =>
-                    setOperatingHours({
-                      ...operatingHours,
-                      openTime: e.target.value,
-                    })
-                  }
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="closeTime">Giờ Đóng Cửa</Label>
-                <Input
-                  id="closeTime"
-                  type="time"
-                  value={operatingHours.closeTime}
-                  onChange={(e) =>
-                    setOperatingHours({
-                      ...operatingHours,
-                      closeTime: e.target.value,
-                    })
-                  }
-                />
-              </div>
-            </div>
-          </Card>
-
           {/* Tiện ích */}
           <Card className="p-6">
             <h2 className="text-lg font-semibold mb-4">Tiện Ích</h2>
@@ -262,7 +218,9 @@ export default function NewFieldPage() {
             <h2 className="text-lg font-semibold mb-4">Hình Ảnh</h2>
             <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
               <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground mb-2">Kéo thả hình ảnh hoặc click để chọn</p>
+              <p className="text-sm text-muted-foreground mb-2">
+                Kéo thả hình ảnh hoặc click để chọn
+              </p>
               <Button type="button" variant="outline" size="sm">
                 Chọn Hình Ảnh
               </Button>
