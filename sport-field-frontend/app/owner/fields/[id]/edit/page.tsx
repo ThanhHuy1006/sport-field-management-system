@@ -12,7 +12,6 @@ export default function EditFieldPage() {
 
   useEffect(() => {
     if (!id) return
-    // ✅ Gọi API lấy chi tiết sân
     getFieldById(Number(id))
       .then((data) => {
         console.log("📦 Dữ liệu sân nhận được:", data)
@@ -20,7 +19,6 @@ export default function EditFieldPage() {
           name: data.name || "",
           type: data.type || "",
           location: data.location || "",
-          // ✅ Backend không có 'address' → tạm dùng location
           address: data.address || data.location || "",
           capacity: data.capacity ? String(data.capacity) : "",
           price: data.price ? String(data.price) : "",
@@ -36,9 +34,6 @@ export default function EditFieldPage() {
   }, [id])
 
   if (loading) return <p className="text-center mt-20">⏳ Đang tải dữ liệu sân...</p>
-
   if (!fieldData) return <p className="text-center mt-20 text-red-500">Không tìm thấy sân!</p>
-
-  // ✅ Truyền dữ liệu sang form
   return <EditFieldForm fieldId={String(id)} existingData={fieldData} />
 }
