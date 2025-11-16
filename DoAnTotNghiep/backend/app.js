@@ -21,6 +21,7 @@ import cors from "cors";
 import authRoutes from "./modules/auth/auth.routes.js";
 import adminRoutes from "./modules/admin/admin.routes.js";
 import ownerFieldRoutes from "./modules/owner/owner.field.routes.js";
+import ownerProfileRoutes from "./modules/owner/owner.profile.routes.js";
 
 const app = express();
 
@@ -34,6 +35,7 @@ app.use("/uploads", express.static("uploads"));
 app.use("/auth", authRoutes);
 app.use("/admin",adminRoutes);
 app.use("/owner/fields", ownerFieldRoutes);
+app.use("/owner/profile", ownerProfileRoutes);
 
 
 

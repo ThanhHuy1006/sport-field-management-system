@@ -130,8 +130,127 @@ export async function registerOwnerStep3(req, res) {
   }
 }
 
+// // =====================
+// // LOGIN
+// // =====================
+// export async function login(req, res) {
+//   try {
+//     const { email, password, role } = req.body;
+
+//     const user = await prisma.users.findUnique({ where: { email } });
+//     if (!user) return res.status(400).json({ message: "Email không tồn tại" });
+
+//     const match = await bcrypt.compare(password, user.password_hash);
+//     if (!match)
+//       return res.status(400).json({ message: "Sai mật khẩu" });
+
+//     if (role && user.role !== role)
+//       return res.status(400).json({ message: "Sai phân quyền" });
+
+//     const token = jwt.sign(
+//       {
+//         id: user.id,
+//         email: user.email,
+//         role: user.role,
+//       },
+//       process.env.JWT_ACCESS_SECRET,
+//       { expiresIn: "3d" }
+//     );
+
+//     return res.json({
+//       message: "Login OK",
+//       token,
+//       user: {
+//         id: user.id,
+//         email: user.email,
+//         role: user.role,
+//       },
+//     });
+//   } catch (err) {
+//     return res.status(500).json({ message: err.message });
+//   }
+// }
 // =====================
-// LOGIN
+// // LOGIN (FULL OWNER CHECK)
+// // =====================
+// export async function login(req, res) {
+//   try {
+//     const { email, password, role } = req.body;
+
+//     // 1) Tìm user theo email
+//     const user = await prisma.users.findUnique({ where: { email } });
+//     if (!user) 
+//       return res.status(400).json({ message: "Email không tồn tại" });
+
+//     // 2) Kiểm tra mật khẩu
+//     const match = await bcrypt.compare(password, user.password_hash);
+//     if (!match)
+//       return res.status(400).json({ message: "Sai mật khẩu" });
+
+//     // 3) Kiểm tra vai trò (nếu FE muốn login đúng role)
+//     if (role && user.role !== role)
+//       return res.status(400).json({ message: "Sai phân quyền" });
+
+//     // =============================
+//     // 4) OWNER LOGIN – check trạng thái hồ sơ
+//     // =============================
+//     if (user.role === "OWNER") {
+//       const profile = await prisma.owner_profiles.findUnique({
+//         where: { user_id: user.id },
+//       });
+
+//       if (!profile) {
+//         return res.status(400).json({
+//           message: "Hồ sơ chủ sân không tồn tại. Vui lòng đăng ký lại.",
+//         });
+//       }
+
+//       if (profile.status === "pending") {
+//         return res.status(403).json({
+//           message: "Hồ sơ chủ sân đang chờ Admin phê duyệt",
+//         });
+//       }
+
+//       if (profile.status === "rejected") {
+//         return res.status(403).json({
+//           message: "Hồ sơ của bạn đã bị từ chối",
+//           reason: profile.reject_reason,
+//         });
+//       }
+//     }
+
+//     // =============================
+//     // 5) Tạo JWT Token
+//     // =============================
+//     const token = jwt.sign(
+//       {
+//         id: user.id,
+//         email: user.email,
+//         role: user.role,
+//       },
+//       process.env.JWT_ACCESS_SECRET,
+//       { expiresIn: "3d" }
+//     );
+
+//     // =============================
+//     // 6) Trả về Response
+//     // =============================
+//     return res.json({
+//       message: "Login OK",
+//       token,
+//       user: {
+//         id: user.id,
+//         email: user.email,
+//         role: user.role,
+//       },
+//     });
+
+//   } catch (err) {
+//     return res.status(500).json({ message: err.message });
+//   }
+// }
+// =====================
+// LOGIN (FLOW CHO CÁCH 1)
 // =====================
 export async function login(req, res) {
   try {
@@ -141,12 +260,27 @@ export async function login(req, res) {
     if (!user) return res.status(400).json({ message: "Email không tồn tại" });
 
     const match = await bcrypt.compare(password, user.password_hash);
-    if (!match)
-      return res.status(400).json({ message: "Sai mật khẩu" });
+    if (!match) return res.status(400).json({ message: "Sai mật khẩu" });
 
     if (role && user.role !== role)
       return res.status(400).json({ message: "Sai phân quyền" });
 
+    let profile = null;
+
+    // Nếu role là OWNER → lấy trạng thái hồ sơ
+    if (user.role === "OWNER") {
+      profile = await prisma.owner_profiles.findUnique({
+        where: { user_id: user.id },
+      });
+
+      if (!profile) {
+        return res.status(400).json({
+          message: "Hồ sơ chủ sân không tồn tại",
+        });
+      }
+    }
+
+    // Tạo token bình thường
     const token = jwt.sign(
       {
         id: user.id,
@@ -164,12 +298,16 @@ export async function login(req, res) {
         id: user.id,
         email: user.email,
         role: user.role,
+        profile_status: profile ? profile.status : null,
+        reject_reason: profile?.reject_reason || null,
       },
     });
+
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
 }
+
 
 // =====================
 // GET CURRENT USER
