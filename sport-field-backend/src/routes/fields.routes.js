@@ -22,6 +22,7 @@
 import { Router } from "express";
 import { auth } from "../middleware/auth.js";
 import * as ctrl from "../controllers/fields.controller.js";
+import { upload } from "../middleware/upload.js";
 
 const r = Router();
 
@@ -39,5 +40,15 @@ r.delete("/:id", auth(["OWNER"]), ctrl.deleteField);
 
 // Admin
 r.patch("/:id/status", auth(["ADMIN"]), ctrl.updateStatus);
+
+// Upload ảnh sân
+r.post("/upload", auth(["OWNER"]), upload.array("images", 5), async (req, res) => {
+  try {
+    const urls = req.files.map(f => `/uploads/fields/${f.filename}`)
+    res.json({ message: "✅ Upload thành công", urls })
+  } catch (err) {
+    res.status(500).json({ message: "Lỗi upload ảnh" })
+  }
+})
 
 export default r;
