@@ -1,8 +1,9 @@
 {
+  "/_not-found/page": "app/_not-found/page.js",
+  "/browse/page": "app/browse/page.js",
   "/login/page": "app/login/page.js",
   "/owner/dashboard/page": "app/owner/dashboard/page.js",
-  "/owner/pending/page": "app/owner/pending/page.js",
-  "/owner/rejected/page": "app/owner/rejected/page.js",
-  "/page": "app/page.js",
-  "/register/page": "app/register/page.js"
+  "/owner/fields/new/page": "app/owner/fields/new/page.js",
+  "/owner/fields/page": "app/owner/fields/page.js",
+  "/page": "app/page.js"
 }

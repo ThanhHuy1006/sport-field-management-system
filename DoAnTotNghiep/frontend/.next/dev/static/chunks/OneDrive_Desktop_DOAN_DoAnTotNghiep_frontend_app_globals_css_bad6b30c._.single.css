@@ -108,6 +108,7 @@
     --color-orange-50: #fff7ed;
     --color-orange-100: #ffedd5;
     --color-orange-200: #ffd7a8;
+    --color-orange-300: #ffb96d;
     --color-orange-400: #ff8b1a;
     --color-orange-500: #fe6e00;
     --color-orange-600: #f05100;
@@ -127,6 +128,7 @@
     --color-yellow-50: #fefce8;
     --color-yellow-100: #fef9c2;
     --color-yellow-200: #fff085;
+    --color-yellow-300: #ffe02a;
     --color-yellow-400: #fac800;
     --color-yellow-500: #edb200;
     --color-yellow-600: #cd8900;
@@ -251,6 +253,7 @@
       --color-orange-50: lab(97.7008% 1.53738 5.90646);
       --color-orange-100: lab(94.7127% 3.58391 14.3151);
       --color-orange-200: lab(88.4871% 9.94918 28.8378);
+      --color-orange-300: lab(80.8059% 21.7313 50.4455);
       --color-orange-400: lab(70.0429% 42.5156 75.8207);
       --color-orange-500: lab(64.272% 57.1788 90.3583);
       --color-orange-600: lab(57.1026% 64.2584 89.8886);
@@ -270,6 +273,7 @@
       --color-yellow-50: lab(98.6846% -1.79058 9.77662);
       --color-yellow-100: lab(97.3564% -4.51407 27.344);
       --color-yellow-200: lab(94.3433% -5.00426 52.9663);
+      --color-yellow-300: lab(89.7033% -.480324 84.4917);
       --color-yellow-400: lab(83.2664% 8.65132 106.895);
       --color-yellow-500: lab(76.3898% 14.5258 98.4589);
       --color-yellow-600: lab(62.7799% 22.4198 86.1544);
@@ -1240,6 +1244,10 @@
 
   .h-24 {
     height: calc(var(--spacing) * 24);
+  }
+
+  .h-28 {
+    height: calc(var(--spacing) * 28);
   }
 
   .h-32 {
@@ -6259,6 +6267,10 @@
     }
   }
 
+  .dark\:bg-orange-900:is(.dark *) {
+    background-color: var(--color-orange-900);
+  }
+
   .dark\:bg-orange-950:is(.dark *) {
     background-color: var(--color-orange-950);
   }
@@ -6333,6 +6345,10 @@
 
   .dark\:bg-yellow-500:is(.dark *) {
     background-color: var(--color-yellow-500);
+  }
+
+  .dark\:bg-yellow-900:is(.dark *) {
+    background-color: var(--color-yellow-900);
   }
 
   .dark\:bg-yellow-900\/30:is(.dark *) {
@@ -6459,6 +6475,10 @@
     color: var(--color-orange-100);
   }
 
+  .dark\:text-orange-300:is(.dark *) {
+    color: var(--color-orange-300);
+  }
+
   .dark\:text-orange-400:is(.dark *) {
     color: var(--color-orange-400);
   }
@@ -6493,6 +6513,10 @@
 
   .dark\:text-yellow-200:is(.dark *) {
     color: var(--color-yellow-200);
+  }
+
+  .dark\:text-yellow-300:is(.dark *) {
+    color: var(--color-yellow-300);
   }
 
   .dark\:text-yellow-400:is(.dark *) {

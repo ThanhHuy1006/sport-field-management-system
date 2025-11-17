@@ -88,7 +88,7 @@ export default function BrowsePage() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 6
 
-  const sports = ["All", "Soccer", "Badminton", "Basketball", "Tennis", "Volleyball", "Swimming"]
+  const sports = ["All", "Bóng đá", "Cầu lông", "Bóng rổ", "Quần vợt", "Bóng chuyền", "Bơi lội"]
 
   const districts = [
     { value: "all", label: "Tất cả quận" },
@@ -149,7 +149,7 @@ export default function BrowsePage() {
             <ArrowLeft className="w-5 h-5" />
             Quay Lại
           </Link>
-          <h1 className="text-xl font-bold text-foreground">Duyệt Sân</h1>
+          <h1 className="text-xl font-bold text-foreground">Danh sách sân</h1>
           <div className="w-10" />
         </div>
       </header>
@@ -251,10 +251,7 @@ export default function BrowsePage() {
               Bộ Lọc
             </button>
 
-            {/* Results */}
-            <div className="mb-6">
-              <p className="text-muted-foreground">Hiển thị {filteredFields.length} sân</p>
-            </div>
+            
 
             {/* Sort Dropdown */}
             <div className="flex items-center justify-between mb-6">

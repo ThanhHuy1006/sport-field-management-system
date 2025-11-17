@@ -23,27 +23,46 @@ __turbopack_context__.s([
 var __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$esm$2f$api$2f$server$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/node_modules/next/dist/esm/api/server.js [middleware-edge] (ecmascript) <locals>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$esm$2f$server$2f$web$2f$exports$2f$index$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/node_modules/next/dist/esm/server/web/exports/index.js [middleware-edge] (ecmascript)");
 ;
+// Danh sách route cần bảo vệ theo role
+const OWNER_PROTECTED = [
+    "/owner"
+];
+const ADMIN_PROTECTED = [
+    "/admin"
+];
 function middleware(req) {
-    const token = req.cookies.get("token")?.value;
-    const role = req.cookies.get("role")?.value;
-    const path = req.nextUrl.pathname;
-    // Nếu chưa login → không cho vào Owner/Admin
-    if (!token) {
-        if (path.startsWith("/owner") || path.startsWith("/admin")) {
+    const token = req.cookies.get("token")?.value || null;
+    const role = req.cookies.get("role")?.value || null;
+    const { pathname } = req.nextUrl;
+    // =============================
+    // 1. PROTECT OWNER ROUTES
+    // =============================
+    if (OWNER_PROTECTED.some((path)=>pathname.startsWith(path))) {
+        // Nếu không login → về login
+        if (!token) {
             return __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$esm$2f$server$2f$web$2f$exports$2f$index$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__["NextResponse"].redirect(new URL("/login", req.url));
         }
-    }
-    // Nếu login rồi nhưng cố vào admin, owner sai role
-    if (role === "OWNER") {
-        if (path.startsWith("/admin")) {
-            return __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$esm$2f$server$2f$web$2f$exports$2f$index$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__["NextResponse"].redirect(new URL("/owner/dashboard", req.url));
+        // Nếu role không phải OWNER → về home
+        if (role !== "OWNER") {
+            return __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$esm$2f$server$2f$web$2f$exports$2f$index$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__["NextResponse"].redirect(new URL("/", req.url));
         }
     }
-    if (role === "ADMIN") {
-        if (path.startsWith("/owner")) {
-            return __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$esm$2f$server$2f$web$2f$exports$2f$index$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__["NextResponse"].redirect(new URL("/admin/dashboard", req.url));
+    // =============================
+    // 2. PROTECT ADMIN ROUTES
+    // =============================
+    if (ADMIN_PROTECTED.some((path)=>pathname.startsWith(path))) {
+        // nếu chưa login
+        if (!token) {
+            return __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$esm$2f$server$2f$web$2f$exports$2f$index$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__["NextResponse"].redirect(new URL("/login", req.url));
+        }
+        // Không phải admin → về home
+        if (role !== "ADMIN") {
+            return __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$esm$2f$server$2f$web$2f$exports$2f$index$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__["NextResponse"].redirect(new URL("/", req.url));
         }
     }
+    // =============================
+    // 3. Allow request pass
+    // =============================
     return __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$esm$2f$server$2f$web$2f$exports$2f$index$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__["NextResponse"].next();
 }
 const config = {
