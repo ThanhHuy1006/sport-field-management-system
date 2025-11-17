@@ -1,12 +1,8 @@
 {
-  "/_not-found/page": "app/_not-found/page.js",
   "/login/page": "app/login/page.js",
   "/owner/dashboard/page": "app/owner/dashboard/page.js",
-  "/owner/fields/[id]/edit/page": "app/owner/fields/[id]/edit/page.js",
-  "/owner/fields/page": "app/owner/fields/page.js",
   "/owner/pending/page": "app/owner/pending/page.js",
-  "/owner/reviews/page": "app/owner/reviews/page.js",
-  "/owner/schedule/page": "app/owner/schedule/page.js",
+  "/owner/rejected/page": "app/owner/rejected/page.js",
   "/page": "app/page.js",
   "/register/page": "app/register/page.js"
 }

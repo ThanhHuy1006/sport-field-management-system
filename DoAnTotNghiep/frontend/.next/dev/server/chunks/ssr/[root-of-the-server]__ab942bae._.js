@@ -283,8 +283,16 @@ const __TURBOPACK__default__export__ = api;
 "use strict";
 
 __turbopack_context__.s([
+    "clearAuth",
+    ()=>clearAuth,
     "getCurrentUser",
     ()=>getCurrentUser,
+    "getOwnerProfile",
+    ()=>getOwnerProfile,
+    "getRole",
+    ()=>getRole,
+    "getToken",
+    ()=>getToken,
     "login",
     ()=>login,
     "registerCustomer",
@@ -294,7 +302,9 @@ __turbopack_context__.s([
     "registerOwnerStep2",
     ()=>registerOwnerStep2,
     "registerOwnerStep3",
-    ()=>registerOwnerStep3
+    ()=>registerOwnerStep3,
+    "saveAuth",
+    ()=>saveAuth
 ]);
 var __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$lib$2f$axios$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/lib/axios.ts [app-ssr] (ecmascript)");
 ;
@@ -304,6 +314,7 @@ const login = async (email, password)=>{
         password
     });
     return res.data;
+// Trả về token + user info (đúng như backend của bạn)
 };
 const getCurrentUser = async ()=>{
     const res = await __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$lib$2f$axios$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get("/auth/me");
@@ -329,6 +340,29 @@ const registerOwnerStep3 = async (userId, files)=>{
             "Content-Type": "multipart/form-data"
         }
     });
+};
+const getOwnerProfile = async (token)=>{
+    const res = await __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$lib$2f$axios$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get("/owner/profile", {
+        headers: {
+            Authorization: `Bearer ${token}`
+        }
+    });
+    // BE của bạn trả: { data: { ... } }
+    return res.data.data;
+};
+const saveAuth = (token, role)=>{
+    localStorage.setItem("token", token);
+    localStorage.setItem("role", role);
+};
+const getToken = ()=>{
+    return localStorage.getItem("token");
+};
+const getRole = ()=>{
+    return localStorage.getItem("role");
+};
+const clearAuth = ()=>{
+    localStorage.removeItem("token");
+    localStorage.removeItem("role");
 };
 }),
 "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/register/page.tsx [app-ssr] (ecmascript)", ((__turbopack_context__) => {

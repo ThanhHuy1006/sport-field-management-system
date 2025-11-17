@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `owner_profiles` ADD COLUMN `created_at` DATETIME(0) NULL DEFAULT CURRENT_TIMESTAMP(0);

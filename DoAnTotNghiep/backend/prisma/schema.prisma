@@ -167,6 +167,8 @@ model owner_profiles {
   license_url  String? @db.VarChar(255)
   id_front_url String? @db.VarChar(255)
   id_back_url  String? @db.VarChar(255)
+  created_at DateTime? @default(now()) @db.DateTime(0)///add ngày tạo
+
 
   @@index([approved_by], map: "fk_ownerprofile_admin")
 }

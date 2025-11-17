@@ -283,8 +283,16 @@ const __TURBOPACK__default__export__ = api;
 "use strict";
 
 __turbopack_context__.s([
+    "clearAuth",
+    ()=>clearAuth,
     "getCurrentUser",
     ()=>getCurrentUser,
+    "getOwnerProfile",
+    ()=>getOwnerProfile,
+    "getRole",
+    ()=>getRole,
+    "getToken",
+    ()=>getToken,
     "login",
     ()=>login,
     "registerCustomer",
@@ -294,7 +302,9 @@ __turbopack_context__.s([
     "registerOwnerStep2",
     ()=>registerOwnerStep2,
     "registerOwnerStep3",
-    ()=>registerOwnerStep3
+    ()=>registerOwnerStep3,
+    "saveAuth",
+    ()=>saveAuth
 ]);
 var __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$lib$2f$axios$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/lib/axios.ts [app-ssr] (ecmascript)");
 ;
@@ -304,6 +314,7 @@ const login = async (email, password)=>{
         password
     });
     return res.data;
+// Trả về token + user info (đúng như backend của bạn)
 };
 const getCurrentUser = async ()=>{
     const res = await __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$lib$2f$axios$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get("/auth/me");
@@ -329,6 +340,29 @@ const registerOwnerStep3 = async (userId, files)=>{
             "Content-Type": "multipart/form-data"
         }
     });
+};
+const getOwnerProfile = async (token)=>{
+    const res = await __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$lib$2f$axios$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get("/owner/profile", {
+        headers: {
+            Authorization: `Bearer ${token}`
+        }
+    });
+    // BE của bạn trả: { data: { ... } }
+    return res.data.data;
+};
+const saveAuth = (token, role)=>{
+    localStorage.setItem("token", token);
+    localStorage.setItem("role", role);
+};
+const getToken = ()=>{
+    return localStorage.getItem("token");
+};
+const getRole = ()=>{
+    return localStorage.getItem("role");
+};
+const clearAuth = ()=>{
+    localStorage.removeItem("token");
+    localStorage.removeItem("role");
 };
 }),
 "[externals]/next/dist/server/app-render/action-async-storage.external.js [external] (next/dist/server/app-render/action-async-storage.external.js, cjs)", ((__turbopack_context__, module, exports) => {
@@ -461,6 +495,158 @@ module.exports = mod;
 //     </main>
 //   )
 // }
+// "use client";
+// import type React from "react";
+// import { useState } from "react";
+// import Link from "next/link";
+// import Image from "next/image";
+// import { Button } from "@/components/ui/button";
+// import { Input } from "@/components/ui/input";
+// import { Card } from "@/components/ui/card";
+// import { Mail, Lock, ArrowLeft } from "lucide-react";
+// import { login } from "@/lib/auth";          // <-- Thêm
+// import { useRouter } from "next/navigation"; // <-- Thêm
+// export default function LoginPage() {
+//   const router = useRouter();
+//   const [email, setEmail] = useState("");
+//   const [password, setPassword] = useState("");
+//   const [rememberMe, setRememberMe] = useState(false);
+//   const [error, setError] = useState("");
+//   const handleLogin = async (e: React.FormEvent) => {
+//     e.preventDefault();
+//     setError("");
+//     try {
+//       // CALL API BACKEND
+//       const data = await login(email, password); // { token, user }
+//       // SAVE TOKEN & ROLE (localStorage + cookie cho middleware)
+//       localStorage.setItem("token", data.token);
+//       localStorage.setItem("role", data.user.role);
+//       document.cookie = `token=${data.token}; path=/;`;
+//       document.cookie = `role=${data.user.role}; path=/;`;
+//       // ROLE LOGIC ===========================================
+//       const role = data.user.role;
+//       // ADMIN
+//       if (role === "ADMIN") {
+//         router.push("/admin/dashboard");
+//         return;
+//       }
+//       // CUSTOMER (USER)
+//       if (role === "CUSTOMER" || role === "USER") {
+//         router.push("/page.tsx");
+//         return;
+//       }
+//       // OWNER → Must check approval status from backend
+//       if (role === "OWNER") {
+//         /**
+//          * Backend trả thế này:
+//          * {
+//          *   token,
+//          *   user: {...},
+//          *   ownerProfile: {
+//          *     status: "pending" | "approved" | "rejected",
+//          *     reject_reason: "...",
+//          *   }
+//          * }
+//          */
+//         const status = data.ownerProfile?.status;
+//         if (status === "pending") {
+//           router.push("/owner/pending");
+//           return;
+//         }
+//         if (status === "rejected") {
+//           router.push(`/owner/rejected?reason=${data.ownerProfile.reject_reason}`);
+//           return;
+//         }
+//         // APPROVED
+//         router.push("/owner/dashboard");
+//         return;
+//       }
+//       // DEFAULT
+//       router.push("page.tsx");
+//     } catch (err: any) {
+//       console.log(err);
+//       setError("Email hoặc mật khẩu không đúng");
+//     }
+//   };
+//   return (
+//     <main className="min-h-screen bg-gradient-to-br from-primary/10 to-blue-50 flex items-center justify-center p-4">
+//       <div className="w-full max-w-md">
+//         <Link href="/" className="flex items-center gap-2 text-primary hover:text-primary/80 mb-8">
+//           <ArrowLeft className="w-4 h-4" />
+//           Về Trang Chủ
+//         </Link>
+//         <Card className="p-8">
+//           <div className="text-center mb-8">
+//             <div className="flex justify-center mb-4">
+//               <Image src="/hcmut-logo.png" alt="HCMUT Logo" width={64} height={64} className="object-contain" />
+//             </div>
+//             <h1 className="text-3xl font-bold text-foreground">Chào Mừng Trở Lại</h1>
+//             <p className="text-muted-foreground mt-2">Đăng nhập vào Hệ Thống Quản Lý Sân Thể Thao HCMUT</p>
+//           </div>
+//           {/* ERROR MESSAGE */}
+//           {error && (
+//             <p className="text-red-500 text-center mb-4 font-medium">{error}</p>
+//           )}
+//           <form onSubmit={handleLogin} className="space-y-4">
+//             <div>
+//               <label className="block text-sm font-medium text-foreground mb-2">Địa Chỉ Email</label>
+//               <div className="relative">
+//                 <Mail className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
+//                 <Input
+//                   type="email"
+//                   placeholder="you@example.com"
+//                   value={email}
+//                   onChange={(e) => setEmail(e.target.value)}
+//                   className="pl-10"
+//                   required
+//                 />
+//               </div>
+//             </div>
+//             <div>
+//               <label className="block text-sm font-medium text-foreground mb-2">Mật Khẩu</label>
+//               <div className="relative">
+//                 <Lock className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
+//                 <Input
+//                   type="password"
+//                   placeholder="••••••••"
+//                   value={password}
+//                   onChange={(e) => setPassword(e.target.value)}
+//                   className="pl-10"
+//                   required
+//                 />
+//               </div>
+//             </div>
+//             <div className="flex items-center justify-between">
+//               <label className="flex items-center gap-2 cursor-pointer">
+//                 <input
+//                   type="checkbox"
+//                   checked={rememberMe}
+//                   onChange={(e) => setRememberMe(e.target.checked)}
+//                   className="w-4 h-4 rounded border-border"
+//                 />
+//                 <span className="text-sm text-foreground">Ghi nhớ đăng nhập</span>
+//               </label>
+//               <Link href="/forgot-password" className="text-sm text-primary hover:text-primary/80">
+//                 Quên mật khẩu?
+//               </Link>
+//             </div>
+//             <Button type="submit" className="w-full">
+//               Đăng Nhập
+//             </Button>
+//           </form>
+//           <div className="mt-6 pt-6 border-t border-border text-center">
+//             <p className="text-sm text-muted-foreground">
+//               Chưa có tài khoản?{" "}
+//               <Link href="/register" className="text-primary hover:text-primary/80 font-medium">
+//                 Đăng ký tại đây
+//               </Link>
+//             </p>
+//           </div>
+//         </Card>
+//       </div>
+//     </main>
+//   );
+// }
 __turbopack_context__.s([
     "default",
     ()=>LoginPage
@@ -476,7 +662,7 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$
 var __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$lock$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Lock$3e$__ = __turbopack_context__.i("[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/node_modules/lucide-react/dist/esm/icons/lock.js [app-ssr] (ecmascript) <export default as Lock>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$arrow$2d$left$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__ArrowLeft$3e$__ = __turbopack_context__.i("[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/node_modules/lucide-react/dist/esm/icons/arrow-left.js [app-ssr] (ecmascript) <export default as ArrowLeft>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$lib$2f$auth$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/lib/auth.ts [app-ssr] (ecmascript)"); // <-- Thêm
-var __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/node_modules/next/navigation.js [app-ssr] (ecmascript)"); // <-- Thêm
+var __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/node_modules/next/navigation.js [app-ssr] (ecmascript)");
 "use client";
 ;
 ;
@@ -494,56 +680,62 @@ function LoginPage() {
     const [password, setPassword] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])("");
     const [rememberMe, setRememberMe] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(false);
     const [error, setError] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])("");
+    // localStorage.removeItem("token");
+    // localStorage.removeItem("role");
     const handleLogin = async (e)=>{
         e.preventDefault();
         setError("");
         try {
-            // CALL API BACKEND
-            const data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$lib$2f$auth$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["login"])(email, password); // { token, user }
-            // SAVE TOKEN & ROLE (localStorage + cookie cho middleware)
-            localStorage.setItem("token", data.token);
-            localStorage.setItem("role", data.user.role);
-            document.cookie = `token=${data.token}; path=/;`;
-            document.cookie = `role=${data.user.role}; path=/;`;
-            // ROLE LOGIC ===========================================
+            // ============================
+            // 1) LOGIN BACKEND
+            // ============================
+            const data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$lib$2f$auth$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["login"])(email, password);
+            // Backend trả: { token, user: { id, role } }
+            const token = data.token;
             const role = data.user.role;
-            // ADMIN
+            // Lưu token để FE dùng ở step tiếp theo
+            localStorage.setItem("token", token);
+            localStorage.setItem("role", role);
+            document.cookie = `token=${token}; path=/;`;
+            document.cookie = `role=${role}; path=/;`;
+            // ============================
+            // 2) ROLE: ADMIN
+            // ============================
             if (role === "ADMIN") {
                 router.push("/admin/dashboard");
                 return;
             }
-            // CUSTOMER (USER)
+            // ============================
+            // 3) ROLE: CUSTOMER / USER
+            // ============================
             if (role === "CUSTOMER" || role === "USER") {
-                router.push("/page.tsx");
+                router.push("/");
                 return;
             }
-            // OWNER → Must check approval status from backend
+            // ============================
+            // 4) ROLE: OWNER → CALL PROFILE API
+            // ============================
             if (role === "OWNER") {
-                /**
-         * Backend trả thế này:
-         * {
-         *   token,
-         *   user: {...},
-         *   ownerProfile: {
-         *     status: "pending" | "approved" | "rejected",
-         *     reject_reason: "...",
-         *   }
-         * }
-         */ const status = data.ownerProfile?.status;
+                const profile = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$lib$2f$auth$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["getOwnerProfile"])(token);
+                const status = profile.status;
                 if (status === "pending") {
                     router.push("/owner/pending");
                     return;
                 }
                 if (status === "rejected") {
-                    router.push(`/owner/rejected?reason=${data.ownerProfile.reject_reason}`);
+                    router.push("/owner/rejected");
                     return;
                 }
-                // APPROVED
-                router.push("/owner/dashboard");
+                if (status === "approved") {
+                    router.push("/owner/dashboard");
+                    return;
+                }
+                // fallback
+                router.push("/owner/pending");
                 return;
             }
-            // DEFAULT
-            router.push("page.tsx");
+            // Nếu cố login vào role lạ
+            router.push("/");
         } catch (err) {
             console.log(err);
             setError("Email hoặc mật khẩu không đúng");
@@ -562,14 +754,14 @@ function LoginPage() {
                             className: "w-4 h-4"
                         }, void 0, false, {
                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                            lineNumber: 218,
+                            lineNumber: 401,
                             columnNumber: 11
                         }, this),
                         "Về Trang Chủ"
                     ]
                 }, void 0, true, {
                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                    lineNumber: 217,
+                    lineNumber: 400,
                     columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Card"], {
@@ -588,12 +780,12 @@ function LoginPage() {
                                         className: "object-contain"
                                     }, void 0, false, {
                                         fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                                        lineNumber: 225,
+                                        lineNumber: 408,
                                         columnNumber: 15
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                                    lineNumber: 224,
+                                    lineNumber: 407,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("h1", {
@@ -601,7 +793,7 @@ function LoginPage() {
                                     children: "Chào Mừng Trở Lại"
                                 }, void 0, false, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                                    lineNumber: 227,
+                                    lineNumber: 410,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -609,13 +801,13 @@ function LoginPage() {
                                     children: "Đăng nhập vào Hệ Thống Quản Lý Sân Thể Thao HCMUT"
                                 }, void 0, false, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                                    lineNumber: 228,
+                                    lineNumber: 411,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                            lineNumber: 223,
+                            lineNumber: 406,
                             columnNumber: 11
                         }, this),
                         error && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -623,8 +815,8 @@ function LoginPage() {
                             children: error
                         }, void 0, false, {
                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                            lineNumber: 233,
-                            columnNumber: 13
+                            lineNumber: 415,
+                            columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
                             onSubmit: handleLogin,
@@ -637,7 +829,7 @@ function LoginPage() {
                                             children: "Địa Chỉ Email"
                                         }, void 0, false, {
                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                                            lineNumber: 238,
+                                            lineNumber: 419,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -647,7 +839,7 @@ function LoginPage() {
                                                     className: "absolute left-3 top-3 w-5 h-5 text-muted-foreground"
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                                                    lineNumber: 240,
+                                                    lineNumber: 421,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Input"], {
@@ -659,19 +851,19 @@ function LoginPage() {
                                                     required: true
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                                                    lineNumber: 241,
+                                                    lineNumber: 422,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                                            lineNumber: 239,
+                                            lineNumber: 420,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                                    lineNumber: 237,
+                                    lineNumber: 418,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -681,7 +873,7 @@ function LoginPage() {
                                             children: "Mật Khẩu"
                                         }, void 0, false, {
                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                                            lineNumber: 253,
+                                            lineNumber: 434,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -691,7 +883,7 @@ function LoginPage() {
                                                     className: "absolute left-3 top-3 w-5 h-5 text-muted-foreground"
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                                                    lineNumber: 255,
+                                                    lineNumber: 436,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Input"], {
@@ -703,19 +895,19 @@ function LoginPage() {
                                                     required: true
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                                                    lineNumber: 256,
+                                                    lineNumber: 437,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                                            lineNumber: 254,
+                                            lineNumber: 435,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                                    lineNumber: 252,
+                                    lineNumber: 433,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -731,7 +923,7 @@ function LoginPage() {
                                                     className: "w-4 h-4 rounded border-border"
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                                                    lineNumber: 269,
+                                                    lineNumber: 450,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -739,13 +931,13 @@ function LoginPage() {
                                                     children: "Ghi nhớ đăng nhập"
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                                                    lineNumber: 275,
+                                                    lineNumber: 456,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                                            lineNumber: 268,
+                                            lineNumber: 449,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"], {
@@ -754,13 +946,13 @@ function LoginPage() {
                                             children: "Quên mật khẩu?"
                                         }, void 0, false, {
                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                                            lineNumber: 277,
+                                            lineNumber: 458,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                                    lineNumber: 267,
+                                    lineNumber: 448,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Button"], {
@@ -769,13 +961,13 @@ function LoginPage() {
                                     children: "Đăng Nhập"
                                 }, void 0, false, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                                    lineNumber: 282,
+                                    lineNumber: 463,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                            lineNumber: 236,
+                            lineNumber: 417,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -791,35 +983,35 @@ function LoginPage() {
                                         children: "Đăng ký tại đây"
                                     }, void 0, false, {
                                         fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                                        lineNumber: 290,
+                                        lineNumber: 471,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                                lineNumber: 288,
+                                lineNumber: 469,
                                 columnNumber: 13
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                            lineNumber: 287,
+                            lineNumber: 468,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-                    lineNumber: 222,
+                    lineNumber: 405,
                     columnNumber: 9
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-            lineNumber: 216,
+            lineNumber: 399,
             columnNumber: 7
         }, this)
     }, void 0, false, {
         fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/login/page.tsx",
-        lineNumber: 215,
+        lineNumber: 398,
         columnNumber: 5
     }, this);
 }
