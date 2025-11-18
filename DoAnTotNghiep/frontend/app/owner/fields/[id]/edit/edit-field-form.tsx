@@ -1,8 +1,6 @@
 "use client"
 
-import type React from "react"
 import { useState } from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -10,7 +8,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Upload, Plus, X } from "lucide-react"
+import { ArrowLeft, Plus, Upload, X } from "lucide-react"
+import Link from "next/link"
 
 interface FieldData {
   name: string
@@ -39,17 +38,61 @@ export default function EditFieldForm({ fieldId, existingData }: { fieldId: stri
     description: existingData.description,
     status: existingData.status,
   })
-  const [amenities, setAmenities] = useState<string[]>(existingData.amenities)
+
+  const [amenities, setAmenities] = useState<string[]>(existingData.amenities ?? [])
   const [newAmenity, setNewAmenity] = useState("")
+
   const [operatingHours, setOperatingHours] = useState({
     openTime: existingData.openTime,
     closeTime: existingData.closeTime,
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [loading, setLoading] = useState(false)
+
+  // 🟢 HANDLE SUBMIT — FIXED & UPDATED
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("[v0] Updated field data:", { fieldId, formData, amenities, operatingHours })
-    router.push("/owner/fields")
+    setLoading(true)
+
+    try {
+      const token = localStorage.getItem("token")
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/owner/fields/${fieldId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          // MAP field gửi lên backend
+          field_name: formData.name,
+          sport_type: formData.type,
+          address: formData.address,
+          max_players: Number(formData.capacity),
+          base_price_per_hour: Number(formData.price),
+          description: formData.description,
+          status: formData.status,
+          amenities: amenities,
+          openTime: operatingHours.openTime,
+          closeTime: operatingHours.closeTime,
+        }),
+      })
+
+      if (!res.ok) {
+        console.log("UPDATE FIELD FAILED:", await res.text())
+        alert("Cập nhật sân thất bại!")
+        setLoading(false)
+        return
+      }
+
+      alert("Cập nhật thành công!")
+      router.push("/owner/fields")
+    } catch (err) {
+      console.error("NETWORK ERROR:", err)
+      alert("Không thể kết nối server.")
+    }
+
+    setLoading(false)
   }
 
   const addAmenity = () => {
@@ -79,7 +122,7 @@ export default function EditFieldForm({ fieldId, existingData }: { fieldId: stri
 
       <div className="max-w-4xl mx-auto px-4 py-8">
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Thông tin cơ bản */}
+          {/* === Thông Tin Cơ Bản === */}
           <Card className="p-6">
             <h2 className="text-lg font-semibold mb-4">Thông Tin Cơ Bản</h2>
             <div className="space-y-4">
@@ -87,19 +130,18 @@ export default function EditFieldForm({ fieldId, existingData }: { fieldId: stri
                 <Label htmlFor="name">Tên Sân *</Label>
                 <Input
                   id="name"
-                  placeholder="Ví dụ: Sân Bóng Đá Green Valley"
+                  required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="type">Loại Thể Thao *</Label>
+                  <Label>Loại Thể Thao *</Label>
                   <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value })}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Chọn loại thể thao" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="soccer">Bóng Đá</SelectItem>
@@ -112,11 +154,8 @@ export default function EditFieldForm({ fieldId, existingData }: { fieldId: stri
                 </div>
 
                 <div>
-                  <Label htmlFor="status">Trạng Thái *</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(value) => setFormData({ ...formData, status: value })}
-                  >
+                  <Label>Trạng Thái *</Label>
+                  <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -129,10 +168,8 @@ export default function EditFieldForm({ fieldId, existingData }: { fieldId: stri
               </div>
 
               <div>
-                <Label htmlFor="description">Mô Tả</Label>
+                <Label>Mô Tả</Label>
                 <Textarea
-                  id="description"
-                  placeholder="Mô tả chi tiết về sân..."
                   rows={4}
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -141,153 +178,130 @@ export default function EditFieldForm({ fieldId, existingData }: { fieldId: stri
             </div>
           </Card>
 
-          {/* Vị trí */}
+          {/* === Vị trí === */}
           <Card className="p-6">
             <h2 className="text-lg font-semibold mb-4">Vị Trí</h2>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="location">Khu Vực *</Label>
+                <Label>Khu Vực *</Label>
                 <Input
-                  id="location"
-                  placeholder="Ví dụ: Quận 1, TP.HCM"
+                  required
                   value={formData.location}
                   onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  required
                 />
               </div>
 
               <div>
-                <Label htmlFor="address">Địa Chỉ Chi Tiết *</Label>
+                <Label>Địa Chỉ Chi Tiết *</Label>
                 <Input
-                  id="address"
-                  placeholder="Số nhà, tên đường..."
+                  required
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  required
                 />
               </div>
             </div>
           </Card>
 
-          {/* Giá & Sức chứa */}
+          {/* === Giá & Sức chứa === */}
           <Card className="p-6">
             <h2 className="text-lg font-semibold mb-4">Giá & Sức Chứa</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="price">Giá Thuê (VND/giờ) *</Label>
+                <Label>Giá Thuê (VND/h)</Label>
                 <Input
-                  id="price"
                   type="number"
-                  placeholder="500000"
+                  required
                   value={formData.price}
                   onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                  required
                 />
               </div>
 
               <div>
-                <Label htmlFor="capacity">Sức Chứa (người) *</Label>
+                <Label>Sức Chứa (người)</Label>
                 <Input
-                  id="capacity"
                   type="number"
-                  placeholder="22"
+                  required
                   value={formData.capacity}
                   onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
-                  required
                 />
               </div>
             </div>
           </Card>
 
-          {/* Giờ hoạt động */}
+          {/* === Giờ hoạt động === */}
           <Card className="p-6">
             <h2 className="text-lg font-semibold mb-4">Giờ Hoạt Động</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="openTime">Giờ Mở Cửa</Label>
+                <Label>Giờ Mở</Label>
                 <Input
-                  id="openTime"
                   type="time"
                   value={operatingHours.openTime}
-                  onChange={(e) =>
-                    setOperatingHours({
-                      ...operatingHours,
-                      openTime: e.target.value,
-                    })
-                  }
+                  onChange={(e) => setOperatingHours({ ...operatingHours, openTime: e.target.value })}
                 />
               </div>
 
               <div>
-                <Label htmlFor="closeTime">Giờ Đóng Cửa</Label>
+                <Label>Giờ Đóng</Label>
                 <Input
-                  id="closeTime"
                   type="time"
                   value={operatingHours.closeTime}
-                  onChange={(e) =>
-                    setOperatingHours({
-                      ...operatingHours,
-                      closeTime: e.target.value,
-                    })
-                  }
+                  onChange={(e) => setOperatingHours({ ...operatingHours, closeTime: e.target.value })}
                 />
               </div>
             </div>
           </Card>
 
-          {/* Tiện ích */}
+          {/* === Tiện Ích === */}
           <Card className="p-6">
             <h2 className="text-lg font-semibold mb-4">Tiện Ích</h2>
-            <div className="space-y-4">
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Ví dụ: Bãi đỗ xe, Phòng thay đồ..."
-                  value={newAmenity}
-                  onChange={(e) => setNewAmenity(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addAmenity())}
-                />
-                <Button type="button" onClick={addAmenity}>
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </div>
 
-              {amenities.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {amenities.map((amenity, index) => (
-                    <div key={index} className="flex items-center gap-2 bg-muted px-3 py-1 rounded-full">
-                      <span className="text-sm">{amenity}</span>
-                      <button
-                        type="button"
-                        onClick={() => removeAmenity(index)}
-                        className="text-muted-foreground hover:text-foreground"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+            <div className="flex gap-2 mb-4">
+              <Input
+                placeholder="Thêm tiện ích..."
+                value={newAmenity}
+                onChange={(e) => setNewAmenity(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addAmenity())}
+              />
+              <Button type="button" onClick={addAmenity}>
+                <Plus className="w-4 h-4" />
+              </Button>
             </div>
+
+            {amenities.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {amenities.map((item, i) => (
+                  <div key={i} className="flex items-center bg-muted px-3 py-1 rounded-full gap-2">
+                    <span>{item}</span>
+                    <button type="button" onClick={() => removeAmenity(i)}>
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
 
-          {/* Hình ảnh */}
+          {/* === Hình ảnh === */}
           <Card className="p-6">
             <h2 className="text-lg font-semibold mb-4">Hình Ảnh</h2>
-            <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
-              <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground mb-2">Kéo thả hình ảnh hoặc click để chọn</p>
-              <Button type="button" variant="outline" size="sm">
+            <div className="border-2 border-dashed p-8 text-center rounded-lg">
+              <Upload className="w-12 h-12 mx-auto text-muted-foreground" />
+              <p className="text-sm text-muted-foreground mt-2 mb-3">Chức năng upload hình sẽ làm sau</p>
+              <Button type="button" variant="outline">
                 Chọn Hình Ảnh
               </Button>
             </div>
           </Card>
 
-          {/* Actions */}
-          <div className="flex gap-4 justify-end">
+          {/* === ACTIONS === */}
+          <div className="flex justify-end gap-4">
             <Button type="button" variant="outline" onClick={() => router.push("/owner/fields")}>
               Hủy
             </Button>
-            <Button type="submit">Lưu Thay Đổi</Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? "Đang xử lý..." : "Lưu Thay Đổi"}
+            </Button>
           </div>
         </form>
       </div>

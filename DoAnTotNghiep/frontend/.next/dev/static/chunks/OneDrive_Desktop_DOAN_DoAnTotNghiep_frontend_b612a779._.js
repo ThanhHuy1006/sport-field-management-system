@@ -601,50 +601,41 @@ function EditFieldForm({ fieldId, existingData }) {
         description: existingData.description,
         status: existingData.status
     });
-    const [amenities, setAmenities] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(existingData.amenities ?? []);
+    const [amenities, setAmenities] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(existingData.amenities);
     const [newAmenity, setNewAmenity] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])("");
     const [operatingHours, setOperatingHours] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])({
         openTime: existingData.openTime,
         closeTime: existingData.closeTime
     });
     const [loading, setLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
-    // 🟢 HANDLE SUBMIT — FIXED & UPDATED
     const handleSubmit = async (e)=>{
         e.preventDefault();
         setLoading(true);
         try {
-            const token = localStorage.getItem("token");
             const res = await fetch(`${("TURBOPACK compile-time value", "http://localhost:8080")}/owner/fields/${fieldId}`, {
                 method: "PUT",
                 headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`
+                    "Content-Type": "application/json"
                 },
+                credentials: "include",
                 body: JSON.stringify({
-                    // MAP field gửi lên backend
-                    field_name: formData.name,
-                    sport_type: formData.type,
-                    address: formData.address,
-                    max_players: Number(formData.capacity),
-                    base_price_per_hour: Number(formData.price),
-                    description: formData.description,
-                    status: formData.status,
-                    amenities: amenities,
+                    ...formData,
+                    amenities,
                     openTime: operatingHours.openTime,
                     closeTime: operatingHours.closeTime
                 })
             });
+            const data = await res.json();
             if (!res.ok) {
-                console.log("UPDATE FIELD FAILED:", await res.text());
-                alert("Cập nhật sân thất bại!");
+                alert("Lỗi cập nhật sân: " + data.error);
                 setLoading(false);
                 return;
             }
-            alert("Cập nhật thành công!");
+            alert("Cập nhật sân thành công!");
             router.push("/owner/fields");
         } catch (err) {
-            console.error("NETWORK ERROR:", err);
-            alert("Không thể kết nối server.");
+            alert("Lỗi kết nối server.");
+            console.error(err);
         }
         setLoading(false);
     };
@@ -676,14 +667,14 @@ function EditFieldForm({ fieldId, existingData }) {
                                     className: "w-5 h-5"
                                 }, void 0, false, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                    lineNumber: 115,
+                                    lineNumber: 106,
                                     columnNumber: 13
                                 }, this),
                                 "Quay lại"
                             ]
                         }, void 0, true, {
                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                            lineNumber: 114,
+                            lineNumber: 105,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h1", {
@@ -691,25 +682,25 @@ function EditFieldForm({ fieldId, existingData }) {
                             children: "Chỉnh Sửa Sân"
                         }, void 0, false, {
                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                            lineNumber: 118,
+                            lineNumber: 109,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                             className: "w-20"
                         }, void 0, false, {
                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                            lineNumber: 119,
+                            lineNumber: 110,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                    lineNumber: 113,
+                    lineNumber: 104,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                lineNumber: 112,
+                lineNumber: 103,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -726,7 +717,7 @@ function EditFieldForm({ fieldId, existingData }) {
                                     children: "Thông Tin Cơ Bản"
                                 }, void 0, false, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                    lineNumber: 127,
+                                    lineNumber: 118,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -739,7 +730,7 @@ function EditFieldForm({ fieldId, existingData }) {
                                                     children: "Tên Sân *"
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                    lineNumber: 130,
+                                                    lineNumber: 121,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
@@ -752,13 +743,13 @@ function EditFieldForm({ fieldId, existingData }) {
                                                         })
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                    lineNumber: 131,
+                                                    lineNumber: 122,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                            lineNumber: 129,
+                                            lineNumber: 120,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -770,7 +761,7 @@ function EditFieldForm({ fieldId, existingData }) {
                                                             children: "Loại Thể Thao *"
                                                         }, void 0, false, {
                                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                            lineNumber: 141,
+                                                            lineNumber: 132,
                                                             columnNumber: 19
                                                         }, this),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Select"], {
@@ -783,12 +774,12 @@ function EditFieldForm({ fieldId, existingData }) {
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectTrigger"], {
                                                                     children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectValue"], {}, void 0, false, {
                                                                         fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                                        lineNumber: 144,
+                                                                        lineNumber: 135,
                                                                         columnNumber: 23
                                                                     }, this)
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                                    lineNumber: 143,
+                                                                    lineNumber: 134,
                                                                     columnNumber: 21
                                                                 }, this),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectContent"], {
@@ -798,7 +789,7 @@ function EditFieldForm({ fieldId, existingData }) {
                                                                             children: "Bóng Đá"
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                                            lineNumber: 147,
+                                                                            lineNumber: 138,
                                                                             columnNumber: 23
                                                                         }, this),
                                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectItem"], {
@@ -806,7 +797,7 @@ function EditFieldForm({ fieldId, existingData }) {
                                                                             children: "Bóng Rổ"
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                                            lineNumber: 148,
+                                                                            lineNumber: 139,
                                                                             columnNumber: 23
                                                                         }, this),
                                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectItem"], {
@@ -814,7 +805,7 @@ function EditFieldForm({ fieldId, existingData }) {
                                                                             children: "Tennis"
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                                            lineNumber: 149,
+                                                                            lineNumber: 140,
                                                                             columnNumber: 23
                                                                         }, this),
                                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectItem"], {
@@ -822,7 +813,7 @@ function EditFieldForm({ fieldId, existingData }) {
                                                                             children: "Cầu Lông"
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                                            lineNumber: 150,
+                                                                            lineNumber: 141,
                                                                             columnNumber: 23
                                                                         }, this),
                                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectItem"], {
@@ -830,25 +821,25 @@ function EditFieldForm({ fieldId, existingData }) {
                                                                             children: "Bóng Chuyền"
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                                            lineNumber: 151,
+                                                                            lineNumber: 142,
                                                                             columnNumber: 23
                                                                         }, this)
                                                                     ]
                                                                 }, void 0, true, {
                                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                                    lineNumber: 146,
+                                                                    lineNumber: 137,
                                                                     columnNumber: 21
                                                                 }, this)
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                            lineNumber: 142,
+                                                            lineNumber: 133,
                                                             columnNumber: 19
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                    lineNumber: 140,
+                                                    lineNumber: 131,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -857,7 +848,7 @@ function EditFieldForm({ fieldId, existingData }) {
                                                             children: "Trạng Thái *"
                                                         }, void 0, false, {
                                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                            lineNumber: 157,
+                                                            lineNumber: 148,
                                                             columnNumber: 19
                                                         }, this),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Select"], {
@@ -870,12 +861,12 @@ function EditFieldForm({ fieldId, existingData }) {
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectTrigger"], {
                                                                     children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectValue"], {}, void 0, false, {
                                                                         fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                                        lineNumber: 160,
+                                                                        lineNumber: 151,
                                                                         columnNumber: 23
                                                                     }, this)
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                                    lineNumber: 159,
+                                                                    lineNumber: 150,
                                                                     columnNumber: 21
                                                                 }, this),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectContent"], {
@@ -885,7 +876,7 @@ function EditFieldForm({ fieldId, existingData }) {
                                                                             children: "Hoạt Động"
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                                            lineNumber: 163,
+                                                                            lineNumber: 154,
                                                                             columnNumber: 23
                                                                         }, this),
                                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectItem"], {
@@ -893,31 +884,31 @@ function EditFieldForm({ fieldId, existingData }) {
                                                                             children: "Không Hoạt Động"
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                                            lineNumber: 164,
+                                                                            lineNumber: 155,
                                                                             columnNumber: 23
                                                                         }, this)
                                                                     ]
                                                                 }, void 0, true, {
                                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                                    lineNumber: 162,
+                                                                    lineNumber: 153,
                                                                     columnNumber: 21
                                                                 }, this)
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                            lineNumber: 158,
+                                                            lineNumber: 149,
                                                             columnNumber: 19
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                    lineNumber: 156,
+                                                    lineNumber: 147,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                            lineNumber: 139,
+                                            lineNumber: 130,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -926,7 +917,7 @@ function EditFieldForm({ fieldId, existingData }) {
                                                     children: "Mô Tả"
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                    lineNumber: 171,
+                                                    lineNumber: 162,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$textarea$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Textarea"], {
@@ -938,25 +929,25 @@ function EditFieldForm({ fieldId, existingData }) {
                                                         })
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                    lineNumber: 172,
+                                                    lineNumber: 163,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                            lineNumber: 170,
+                                            lineNumber: 161,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                    lineNumber: 128,
+                                    lineNumber: 119,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                            lineNumber: 126,
+                            lineNumber: 117,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Card"], {
@@ -967,7 +958,7 @@ function EditFieldForm({ fieldId, existingData }) {
                                     children: "Vị Trí"
                                 }, void 0, false, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                    lineNumber: 183,
+                                    lineNumber: 174,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -979,7 +970,7 @@ function EditFieldForm({ fieldId, existingData }) {
                                                     children: "Khu Vực *"
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                    lineNumber: 186,
+                                                    lineNumber: 177,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
@@ -991,13 +982,13 @@ function EditFieldForm({ fieldId, existingData }) {
                                                         })
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                    lineNumber: 187,
+                                                    lineNumber: 178,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                            lineNumber: 185,
+                                            lineNumber: 176,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1006,7 +997,7 @@ function EditFieldForm({ fieldId, existingData }) {
                                                     children: "Địa Chỉ Chi Tiết *"
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                    lineNumber: 195,
+                                                    lineNumber: 186,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
@@ -1018,25 +1009,25 @@ function EditFieldForm({ fieldId, existingData }) {
                                                         })
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                    lineNumber: 196,
+                                                    lineNumber: 187,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                            lineNumber: 194,
+                                            lineNumber: 185,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                    lineNumber: 184,
+                                    lineNumber: 175,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                            lineNumber: 182,
+                            lineNumber: 173,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Card"], {
@@ -1047,7 +1038,7 @@ function EditFieldForm({ fieldId, existingData }) {
                                     children: "Giá & Sức Chứa"
                                 }, void 0, false, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                    lineNumber: 207,
+                                    lineNumber: 198,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1059,7 +1050,7 @@ function EditFieldForm({ fieldId, existingData }) {
                                                     children: "Giá Thuê (VND/h)"
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                    lineNumber: 210,
+                                                    lineNumber: 201,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
@@ -1072,13 +1063,13 @@ function EditFieldForm({ fieldId, existingData }) {
                                                         })
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                    lineNumber: 211,
+                                                    lineNumber: 202,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                            lineNumber: 209,
+                                            lineNumber: 200,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1087,7 +1078,7 @@ function EditFieldForm({ fieldId, existingData }) {
                                                     children: "Sức Chứa (người)"
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                    lineNumber: 220,
+                                                    lineNumber: 211,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
@@ -1100,25 +1091,25 @@ function EditFieldForm({ fieldId, existingData }) {
                                                         })
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                    lineNumber: 221,
+                                                    lineNumber: 212,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                            lineNumber: 219,
+                                            lineNumber: 210,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                    lineNumber: 208,
+                                    lineNumber: 199,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                            lineNumber: 206,
+                            lineNumber: 197,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Card"], {
@@ -1129,7 +1120,7 @@ function EditFieldForm({ fieldId, existingData }) {
                                     children: "Giờ Hoạt Động"
                                 }, void 0, false, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                    lineNumber: 233,
+                                    lineNumber: 224,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1141,7 +1132,7 @@ function EditFieldForm({ fieldId, existingData }) {
                                                     children: "Giờ Mở"
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                    lineNumber: 236,
+                                                    lineNumber: 227,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
@@ -1153,13 +1144,13 @@ function EditFieldForm({ fieldId, existingData }) {
                                                         })
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                    lineNumber: 237,
+                                                    lineNumber: 228,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                            lineNumber: 235,
+                                            lineNumber: 226,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1168,7 +1159,7 @@ function EditFieldForm({ fieldId, existingData }) {
                                                     children: "Giờ Đóng"
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                    lineNumber: 245,
+                                                    lineNumber: 236,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
@@ -1180,25 +1171,25 @@ function EditFieldForm({ fieldId, existingData }) {
                                                         })
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                    lineNumber: 246,
+                                                    lineNumber: 237,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                            lineNumber: 244,
+                                            lineNumber: 235,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                    lineNumber: 234,
+                                    lineNumber: 225,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                            lineNumber: 232,
+                            lineNumber: 223,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Card"], {
@@ -1209,7 +1200,7 @@ function EditFieldForm({ fieldId, existingData }) {
                                     children: "Tiện Ích"
                                 }, void 0, false, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                    lineNumber: 257,
+                                    lineNumber: 248,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1222,7 +1213,7 @@ function EditFieldForm({ fieldId, existingData }) {
                                             onKeyDown: (e)=>e.key === "Enter" && (e.preventDefault(), addAmenity())
                                         }, void 0, false, {
                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                            lineNumber: 260,
+                                            lineNumber: 251,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -1232,18 +1223,18 @@ function EditFieldForm({ fieldId, existingData }) {
                                                 className: "w-4 h-4"
                                             }, void 0, false, {
                                                 fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                lineNumber: 267,
+                                                lineNumber: 258,
                                                 columnNumber: 17
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                            lineNumber: 266,
+                                            lineNumber: 257,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                    lineNumber: 259,
+                                    lineNumber: 250,
                                     columnNumber: 13
                                 }, this),
                                 amenities.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1255,7 +1246,7 @@ function EditFieldForm({ fieldId, existingData }) {
                                                     children: item
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                    lineNumber: 275,
+                                                    lineNumber: 266,
                                                     columnNumber: 21
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -1265,29 +1256,29 @@ function EditFieldForm({ fieldId, existingData }) {
                                                         className: "w-3 h-3"
                                                     }, void 0, false, {
                                                         fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                        lineNumber: 277,
+                                                        lineNumber: 268,
                                                         columnNumber: 23
                                                     }, this)
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                                    lineNumber: 276,
+                                                    lineNumber: 267,
                                                     columnNumber: 21
                                                 }, this)
                                             ]
                                         }, i, true, {
                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                            lineNumber: 274,
+                                            lineNumber: 265,
                                             columnNumber: 19
                                         }, this))
                                 }, void 0, false, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                    lineNumber: 272,
+                                    lineNumber: 263,
                                     columnNumber: 15
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                            lineNumber: 256,
+                            lineNumber: 247,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Card"], {
@@ -1298,7 +1289,7 @@ function EditFieldForm({ fieldId, existingData }) {
                                     children: "Hình Ảnh"
                                 }, void 0, false, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                    lineNumber: 287,
+                                    lineNumber: 278,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1308,7 +1299,7 @@ function EditFieldForm({ fieldId, existingData }) {
                                             className: "w-12 h-12 mx-auto text-muted-foreground"
                                         }, void 0, false, {
                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                            lineNumber: 289,
+                                            lineNumber: 280,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -1316,7 +1307,7 @@ function EditFieldForm({ fieldId, existingData }) {
                                             children: "Chức năng upload hình sẽ làm sau"
                                         }, void 0, false, {
                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                            lineNumber: 290,
+                                            lineNumber: 281,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -1325,19 +1316,19 @@ function EditFieldForm({ fieldId, existingData }) {
                                             children: "Chọn Hình Ảnh"
                                         }, void 0, false, {
                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                            lineNumber: 291,
+                                            lineNumber: 282,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                    lineNumber: 288,
+                                    lineNumber: 279,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                            lineNumber: 286,
+                            lineNumber: 277,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1350,7 +1341,7 @@ function EditFieldForm({ fieldId, existingData }) {
                                     children: "Hủy"
                                 }, void 0, false, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                    lineNumber: 299,
+                                    lineNumber: 290,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -1359,34 +1350,34 @@ function EditFieldForm({ fieldId, existingData }) {
                                     children: loading ? "Đang xử lý..." : "Lưu Thay Đổi"
                                 }, void 0, false, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                                    lineNumber: 302,
+                                    lineNumber: 293,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                            lineNumber: 298,
+                            lineNumber: 289,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                    lineNumber: 124,
+                    lineNumber: 115,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-                lineNumber: 123,
+                lineNumber: 114,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx",
-        lineNumber: 110,
+        lineNumber: 101,
         columnNumber: 5
     }, this);
 }
-_s(EditFieldForm, "d2EJGcyKBVpe8EoYONhKrHfjVSY=", false, function() {
+_s(EditFieldForm, "3vo2wMJsSDxqnlfwarBX6QTGaGM=", false, function() {
     return [
         __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"]
     ];
@@ -1398,106 +1389,6 @@ if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelper
     __turbopack_context__.k.registerExports(__turbopack_context__.m, globalThis.$RefreshHelpers$);
 }
 }),
-"[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/page.tsx [app-client] (ecmascript)", ((__turbopack_context__) => {
-"use strict";
-
-__turbopack_context__.s([
-    "default",
-    ()=>EditFieldPage
-]);
-var __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = /*#__PURE__*/ __turbopack_context__.i("[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/node_modules/next/dist/build/polyfills/process.js [app-client] (ecmascript)");
-var __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/node_modules/next/dist/compiled/react/jsx-dev-runtime.js [app-client] (ecmascript)");
-var __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/node_modules/next/navigation.js [app-client] (ecmascript)");
-var __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
-var __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$app$2f$owner$2f$fields$2f5b$id$5d2f$edit$2f$edit$2d$field$2d$form$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/edit-field-form.tsx [app-client] (ecmascript)");
-;
-var _s = __turbopack_context__.k.signature();
-"use client";
-;
-;
-;
-function EditFieldPage() {
-    _s();
-    const params = (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useParams"])();
-    const id = params.id;
-    const [data, setData] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
-    const [loading, setLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(true);
-    (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
-        "EditFieldPage.useEffect": ()=>{
-            const token = localStorage.getItem("token");
-            async function load() {
-                try {
-                    const res = await fetch(`${("TURBOPACK compile-time value", "http://localhost:8080")}/owner/fields/${id}`, {
-                        headers: {
-                            Authorization: `Bearer ${token}`
-                        }
-                    });
-                    const json = await res.json();
-                    const raw = json.data;
-                    // 🟢 MAP dữ liệu backend -> frontend
-                    const mapped = {
-                        name: raw.field_name,
-                        type: raw.sport_type,
-                        location: "",
-                        address: raw.address,
-                        capacity: raw.max_players?.toString() ?? "0",
-                        price: raw.base_price_per_hour?.toString() ?? "0",
-                        description: raw.description ?? "",
-                        status: raw.status,
-                        amenities: raw.field_facilities?.map({
-                            "EditFieldPage.useEffect.load": (f)=>f.facility_name
-                        }["EditFieldPage.useEffect.load"]) ?? [],
-                        openTime: raw.operating_hours && raw.operating_hours.length > 0 ? raw.operating_hours[0].open_time : "06:00",
-                        closeTime: raw.operating_hours && raw.operating_hours.length > 0 ? raw.operating_hours[0].close_time : "22:00"
-                    };
-                    setData(mapped);
-                } catch (err) {
-                    console.error(err);
-                }
-                setLoading(false);
-            }
-            load();
-        }
-    }["EditFieldPage.useEffect"], [
-        id
-    ]);
-    if (loading) return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-        className: "p-6",
-        children: "Đang tải dữ liệu..."
-    }, void 0, false, {
-        fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/page.tsx",
-        lineNumber: 63,
-        columnNumber: 23
-    }, this);
-    if (!data) return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-        className: "p-6 text-red-500",
-        children: "Không thể tải dữ liệu sân."
-    }, void 0, false, {
-        fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/page.tsx",
-        lineNumber: 64,
-        columnNumber: 21
-    }, this);
-    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$app$2f$owner$2f$fields$2f5b$id$5d2f$edit$2f$edit$2d$field$2d$form$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
-        fieldId: id,
-        existingData: data
-    }, void 0, false, {
-        fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/[id]/edit/page.tsx",
-        lineNumber: 66,
-        columnNumber: 10
-    }, this);
-}
-_s(EditFieldPage, "9sJCvl+LYwUgzokUg19P2YQNa/Y=", false, function() {
-    return [
-        __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useParams"]
-    ];
-});
-_c = EditFieldPage;
-var _c;
-__turbopack_context__.k.register(_c, "EditFieldPage");
-if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
-    __turbopack_context__.k.registerExports(__turbopack_context__.m, globalThis.$RefreshHelpers$);
-}
-}),
 ]);
 
-//# sourceMappingURL=OneDrive_Desktop_DOAN_DoAnTotNghiep_frontend_a06f7fd7._.js.map
+//# sourceMappingURL=OneDrive_Desktop_DOAN_DoAnTotNghiep_frontend_b612a779._.js.map
