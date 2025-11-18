@@ -1038,240 +1038,6 @@ const __TURBOPACK__default__export__ = api;
 "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx [app-ssr] (ecmascript)", ((__turbopack_context__) => {
 "use strict";
 
-// "use client"
-// import { useState } from "react"
-// import Link from "next/link"
-// import { Button } from "@/components/ui/button"
-// import { Card } from "@/components/ui/card"
-// import { Input } from "@/components/ui/input"
-// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-// import {
-//   Dialog,
-//   DialogContent,
-//   DialogDescription,
-//   DialogFooter,
-//   DialogHeader,
-//   DialogTitle,
-// } from "@/components/ui/dialog"
-// import { Plus, Edit, Trash2, MapPin, Users, Search, Filter, ArrowLeft } from "lucide-react"
-// import { useToast } from "@/hooks/use-toast"
-// import { Pagination } from "@/components/pagination"
-// const mockFields = [
-//   {
-//     id: 1,
-//     name: "Sân Bóng Đá Green Valley",
-//     type: "Bóng Đá",
-//     location: "Quận 1, TP.HCM",
-//     capacity: 22,
-//     price: 500000,
-//     status: "active",
-//     image: "/soccer-field.png",
-//   },
-//   {
-//     id: 2,
-//     name: "Sân Bóng Rổ Arena",
-//     type: "Bóng Rổ",
-//     location: "Quận 7, TP.HCM",
-//     capacity: 10,
-//     price: 400000,
-//     status: "active",
-//     image: "/outdoor-basketball-court.png",
-//   },
-//   {
-//     id: 3,
-//     name: "Sân Tennis Elite",
-//     type: "Tennis",
-//     location: "Quận 2, TP.HCM",
-//     capacity: 4,
-//     price: 350000,
-//     status: "inactive",
-//     image: "/outdoor-tennis-court.png",
-//   },
-// ]
-// export default function OwnerFieldsPage() {
-//   const [fields, setFields] = useState(mockFields)
-//   const [searchQuery, setSearchQuery] = useState("")
-//   const [statusFilter, setStatusFilter] = useState("all")
-//   const [deleteDialog, setDeleteDialog] = useState<number | null>(null)
-//   const { toast } = useToast()
-//   const [currentPage, setCurrentPage] = useState(1)
-//   const itemsPerPage = 6
-//   const filteredFields = fields.filter((field) => {
-//     const matchesSearch = field.name.toLowerCase().includes(searchQuery.toLowerCase())
-//     const matchesStatus = statusFilter === "all" || field.status === statusFilter
-//     return matchesSearch && matchesStatus
-//   })
-//   const totalPages = Math.ceil(filteredFields.length / itemsPerPage)
-//   const paginatedFields = filteredFields.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-//   const handleDelete = (id: number) => {
-//     setFields(fields.filter((f) => f.id !== id))
-//     setDeleteDialog(null)
-//     toast({
-//       title: "Đã xóa sân",
-//       description: "Sân đã được xóa khỏi danh sách.",
-//     })
-//   }
-//   return (
-//     <main className="min-h-screen bg-background">
-//       {/* Header */}
-//       <header className="sticky top-0 z-50 bg-background border-b border-border">
-//         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-//           <Link href="/owner/dashboard" className="flex items-center gap-2 text-primary hover:text-primary/80">
-//             <ArrowLeft className="w-5 h-5" />
-//             Quay lại
-//           </Link>
-//           <h1 className="text-xl font-bold">Quản Lý Sân</h1>
-//           <Link href="/owner/fields/new">
-//             <Button>
-//               <Plus className="w-4 h-4 mr-2" />
-//               Thêm Sân
-//             </Button>
-//           </Link>
-//         </div>
-//       </header>
-//       <div className="max-w-7xl mx-auto px-4 py-8">
-//         <Card className="p-4">
-//           <div className="flex flex-col md:flex-row gap-4">
-//             <div className="flex-1 relative">
-//               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-//               <Input
-//                 placeholder="Tìm kiếm sân..."
-//                 value={searchQuery}
-//                 onChange={(e) => setSearchQuery(e.target.value)}
-//                 className="pl-10"
-//               />
-//             </div>
-//             <Select value={statusFilter} onValueChange={setStatusFilter}>
-//               <SelectTrigger className="w-full md:w-[200px]">
-//                 <Filter className="w-4 h-4 mr-2" />
-//                 <SelectValue />
-//               </SelectTrigger>
-//               <SelectContent>
-//                 <SelectItem value="all">Tất cả trạng thái</SelectItem>
-//                 <SelectItem value="active">Hoạt động</SelectItem>
-//                 <SelectItem value="inactive">Không hoạt động</SelectItem>
-//               </SelectContent>
-//             </Select>
-//             <Link href="/owner/fields/new">
-//               <Button>
-//                 <Plus className="w-4 h-4 mr-2" />
-//                 Thêm Sân
-//               </Button>
-//             </Link>
-//           </div>
-//         </Card>
-//         <div className="text-sm text-muted-foreground mb-4">
-//           Hiển thị {filteredFields.length} / {fields.length} sân
-//         </div>
-//         <div className="space-y-4 mb-8">
-//           {paginatedFields.map((field) => (
-//             <Card key={field.id} className="overflow-hidden">
-//               <div className="flex flex-col md:flex-row">
-//                 <img
-//                   src={field.image || "/placeholder.svg"}
-//                   alt={field.name}
-//                   className="w-full md:w-48 h-48 object-cover"
-//                 />
-//                 <div className="flex-1 p-6 flex flex-col justify-between">
-//                   <div>
-//                     <div className="flex items-start justify-between mb-4">
-//                       <div>
-//                         <h3 className="text-xl font-bold text-foreground mb-1">{field.name}</h3>
-//                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
-//                           <MapPin className="w-4 h-4" />
-//                           {field.location}
-//                         </div>
-//                       </div>
-//                       <span
-//                         className={`px-3 py-1 rounded-full text-sm font-medium ${
-//                           field.status === "active"
-//                             ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-//                             : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
-//                         }`}
-//                       >
-//                         {field.status === "active" ? "Hoạt Động" : "Không Hoạt Động"}
-//                       </span>
-//                     </div>
-//                     <div className="grid grid-cols-3 gap-4 mb-4">
-//                       <div>
-//                         <p className="text-xs text-muted-foreground">Loại</p>
-//                         <p className="font-medium text-foreground">{field.type}</p>
-//                       </div>
-//                       <div>
-//                         <p className="text-xs text-muted-foreground">Sức Chứa</p>
-//                         <p className="font-medium text-foreground flex items-center gap-1">
-//                           <Users className="w-4 h-4" />
-//                           {field.capacity} người
-//                         </p>
-//                       </div>
-//                       <div>
-//                         <p className="text-xs text-muted-foreground">Giá</p>
-//                         <p className="font-medium text-foreground">{field.price.toLocaleString()} VND/giờ</p>
-//                       </div>
-//                     </div>
-//                   </div>
-//                   <div className="flex gap-2 pt-4 border-t border-border">
-//                     <Link href={`/owner/fields/${field.id}/edit`}>
-//                       <Button variant="outline" size="sm">
-//                         <Edit className="w-4 h-4 mr-2" />
-//                         Sửa
-//                       </Button>
-//                     </Link>
-//                     <Button
-//                       variant="outline"
-//                       size="sm"
-//                       className="text-destructive bg-transparent"
-//                       onClick={() => setDeleteDialog(field.id)}
-//                     >
-//                       <Trash2 className="w-4 h-4 mr-2" />
-//                       Xóa
-//                     </Button>
-//                   </div>
-//                 </div>
-//               </div>
-//             </Card>
-//           ))}
-//         </div>
-//         {fields.length === 0 && (
-//           <Card className="p-12 text-center">
-//             <p className="text-muted-foreground text-lg mb-4">Chưa có sân nào</p>
-//             <Link href="/owner/fields/new">
-//               <Button>
-//                 <Plus className="w-4 h-4 mr-2" />
-//                 Thêm Sân Đầu Tiên
-//               </Button>
-//             </Link>
-//           </Card>
-//         )}
-//         {filteredFields.length > 0 && (
-//           <Pagination
-//             currentPage={currentPage}
-//             totalPages={totalPages}
-//             onPageChange={setCurrentPage}
-//             itemsPerPage={itemsPerPage}
-//             totalItems={filteredFields.length}
-//           />
-//         )}
-//       </div>
-//       <Dialog open={deleteDialog !== null} onOpenChange={() => setDeleteDialog(null)}>
-//         <DialogContent>
-//           <DialogHeader>
-//             <DialogTitle>Xác nhận xóa sân</DialogTitle>
-//             <DialogDescription>Bạn có chắc chắn muốn xóa sân này? Hành động này không thể hoàn tác.</DialogDescription>
-//           </DialogHeader>
-//           <DialogFooter>
-//             <Button variant="outline" onClick={() => setDeleteDialog(null)}>
-//               Hủy
-//             </Button>
-//             <Button variant="destructive" onClick={() => deleteDialog && handleDelete(deleteDialog)}>
-//               Xác Nhận Xóa
-//             </Button>
-//           </DialogFooter>
-//         </DialogContent>
-//       </Dialog>
-//     </main>
-//   )
-// }
 __turbopack_context__.s([
     "default",
     ()=>OwnerFieldsPage
@@ -1295,7 +1061,13 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$
 var __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$hooks$2f$use$2d$toast$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/hooks/use-toast.ts [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$pagination$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/components/pagination.tsx [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$lib$2f$axios$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/lib/axios.ts [app-ssr] (ecmascript)");
+(()=>{
+    const e = new Error("Cannot find module '@/lib/api/fields'");
+    e.code = 'MODULE_NOT_FOUND';
+    throw e;
+})();
 "use client";
+;
 ;
 ;
 ;
@@ -1317,6 +1089,8 @@ function OwnerFieldsPage() {
     const { toast } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$hooks$2f$use$2d$toast$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useToast"])();
     const [currentPage, setCurrentPage] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(1);
     const itemsPerPage = 6;
+    //  BASE URL BACKEND
+    const API_URL = ("TURBOPACK compile-time value", "http://localhost:8080") || "http://localhost:8000";
     // ============================
     // FETCH FIELDS FROM BACKEND
     // ============================
@@ -1344,7 +1118,7 @@ function OwnerFieldsPage() {
         load();
     }, []);
     // ============================
-    // CLIENT FILTERING
+    // FILTERING
     // ============================
     const filteredFields = fields.filter((field)=>{
         const name = field.field_name?.toLowerCase() || "";
@@ -1354,17 +1128,37 @@ function OwnerFieldsPage() {
     });
     const totalPages = Math.ceil(filteredFields.length / itemsPerPage);
     const paginatedFields = filteredFields.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-    const handleDelete = (id)=>{
-        // TODO — đợi BE API DELETE
-        setFields(fields.filter((f)=>f.id !== id));
+    // const handleDelete = (id: number) => {
+    //   // todo: call delete api here
+    //   setFields(fields.filter((f) => f.id !== id));
+    //   setDeleteDialog(null);
+    //   toast({
+    //     title: "Đã xóa sân",
+    //     description: "Sân đã được xóa khỏi danh sách.",
+    //   });
+    // };
+    const handleDelete = async (id)=>{
+        try {
+            const token = localStorage.getItem("token");
+            await deleteField(id, token);
+            // Xóa trên FE
+            setFields(fields.filter((f)=>f.id !== id));
+            toast({
+                title: "Đã xóa sân",
+                description: "Sân đã được xóa khỏi hệ thống."
+            });
+        } catch (err) {
+            console.error(err);
+            toast({
+                title: "Xóa thất bại",
+                description: "Không thể xóa sân. Vui lòng thử lại.",
+                variant: "destructive"
+            });
+        }
         setDeleteDialog(null);
-        toast({
-            title: "Đã xóa sân",
-            description: "Sân đã được xóa khỏi danh sách."
-        });
     };
     // ============================
-    // LOADING UI
+    // LOADING
     // ============================
     if (loading) {
         return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1372,7 +1166,7 @@ function OwnerFieldsPage() {
             children: "Đang tải danh sách sân..."
         }, void 0, false, {
             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-            lineNumber: 338,
+            lineNumber: 117,
             columnNumber: 7
         }, this);
     }
@@ -1392,14 +1186,14 @@ function OwnerFieldsPage() {
                                     className: "w-5 h-5"
                                 }, void 0, false, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                    lineNumber: 350,
+                                    lineNumber: 129,
                                     columnNumber: 13
                                 }, this),
                                 "Quay lại"
                             ]
                         }, void 0, true, {
                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                            lineNumber: 349,
+                            lineNumber: 128,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("h1", {
@@ -1407,7 +1201,7 @@ function OwnerFieldsPage() {
                             children: "Quản Lý Sân"
                         }, void 0, false, {
                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                            lineNumber: 353,
+                            lineNumber: 132,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"], {
@@ -1418,30 +1212,30 @@ function OwnerFieldsPage() {
                                         className: "w-4 h-4 mr-2"
                                     }, void 0, false, {
                                         fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                        lineNumber: 356,
+                                        lineNumber: 135,
                                         columnNumber: 15
                                     }, this),
                                     "Thêm Sân"
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                lineNumber: 355,
+                                lineNumber: 134,
                                 columnNumber: 13
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                            lineNumber: 354,
+                            lineNumber: 133,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                    lineNumber: 348,
+                    lineNumber: 127,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                lineNumber: 347,
+                lineNumber: 126,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1459,7 +1253,7 @@ function OwnerFieldsPage() {
                                             className: "absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"
                                         }, void 0, false, {
                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                            lineNumber: 368,
+                                            lineNumber: 147,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Input"], {
@@ -1469,13 +1263,13 @@ function OwnerFieldsPage() {
                                             className: "pl-10"
                                         }, void 0, false, {
                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                            lineNumber: 369,
+                                            lineNumber: 148,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                    lineNumber: 367,
+                                    lineNumber: 146,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Select"], {
@@ -1489,18 +1283,18 @@ function OwnerFieldsPage() {
                                                     className: "w-4 h-4 mr-2"
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                    lineNumber: 379,
+                                                    lineNumber: 158,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["SelectValue"], {}, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                    lineNumber: 380,
+                                                    lineNumber: 159,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                            lineNumber: 378,
+                                            lineNumber: 157,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["SelectContent"], {
@@ -1510,7 +1304,7 @@ function OwnerFieldsPage() {
                                                     children: "Tất cả trạng thái"
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                    lineNumber: 383,
+                                                    lineNumber: 162,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["SelectItem"], {
@@ -1518,7 +1312,7 @@ function OwnerFieldsPage() {
                                                     children: "Hoạt động"
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                    lineNumber: 384,
+                                                    lineNumber: 163,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["SelectItem"], {
@@ -1526,7 +1320,7 @@ function OwnerFieldsPage() {
                                                     children: "Không hoạt động"
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                    lineNumber: 385,
+                                                    lineNumber: 164,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["SelectItem"], {
@@ -1534,19 +1328,19 @@ function OwnerFieldsPage() {
                                                     children: "Chờ duyệt"
                                                 }, void 0, false, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                    lineNumber: 386,
+                                                    lineNumber: 165,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                            lineNumber: 382,
+                                            lineNumber: 161,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                    lineNumber: 377,
+                                    lineNumber: 156,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"], {
@@ -1557,30 +1351,30 @@ function OwnerFieldsPage() {
                                                 className: "w-4 h-4 mr-2"
                                             }, void 0, false, {
                                                 fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                lineNumber: 392,
+                                                lineNumber: 171,
                                                 columnNumber: 17
                                             }, this),
                                             "Thêm Sân"
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                        lineNumber: 391,
+                                        lineNumber: 170,
                                         columnNumber: 15
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                    lineNumber: 390,
+                                    lineNumber: 169,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                            lineNumber: 366,
+                            lineNumber: 145,
                             columnNumber: 11
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                        lineNumber: 365,
+                        lineNumber: 144,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1594,24 +1388,28 @@ function OwnerFieldsPage() {
                         ]
                     }, void 0, true, {
                         fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                        lineNumber: 399,
+                        lineNumber: 178,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                         className: "space-y-4 mb-8",
-                        children: paginatedFields.map((field)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Card"], {
+                        children: paginatedFields.map((field)=>{
+                            const rawUrl = field.field_images?.[0]?.url;
+                            // FIX PATH WINDOWS + BASE URL
+                            const imageUrl = rawUrl ? `${API_URL}/${rawUrl.replace(/\\/g, "/")}` : "/placeholder.svg";
+                            return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Card"], {
                                 className: "overflow-hidden",
                                 children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                     className: "flex flex-col md:flex-row",
                                     children: [
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
-                                            src: field.images?.[0]?.url || "/placeholder.svg",
+                                            src: imageUrl,
                                             alt: field.field_name,
                                             className: "w-full md:w-48 h-48 object-cover"
                                         }, void 0, false, {
                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                            lineNumber: 408,
-                                            columnNumber: 17
+                                            lineNumber: 195,
+                                            columnNumber: 19
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                             className: "flex-1 p-6 flex flex-col justify-between",
@@ -1628,8 +1426,8 @@ function OwnerFieldsPage() {
                                                                             children: field.field_name
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                                            lineNumber: 421,
-                                                                            columnNumber: 25
+                                                                            lineNumber: 205,
+                                                                            columnNumber: 27
                                                                         }, this),
                                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                                                             className: "flex items-center gap-1 text-sm text-muted-foreground",
@@ -1638,35 +1436,35 @@ function OwnerFieldsPage() {
                                                                                     className: "w-4 h-4"
                                                                                 }, void 0, false, {
                                                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                                                    lineNumber: 425,
-                                                                                    columnNumber: 27
+                                                                                    lineNumber: 210,
+                                                                                    columnNumber: 29
                                                                                 }, this),
                                                                                 field.address
                                                                             ]
                                                                         }, void 0, true, {
                                                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                                            lineNumber: 424,
-                                                                            columnNumber: 25
+                                                                            lineNumber: 209,
+                                                                            columnNumber: 27
                                                                         }, this)
                                                                     ]
                                                                 }, void 0, true, {
                                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                                    lineNumber: 420,
-                                                                    columnNumber: 23
+                                                                    lineNumber: 204,
+                                                                    columnNumber: 25
                                                                 }, this),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                                     className: `px-3 py-1 rounded-full text-sm font-medium ${field.status === "active" ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300" : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"}`,
                                                                     children: field.status === "active" ? "Hoạt Động" : "Không Hoạt Động"
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                                    lineNumber: 430,
-                                                                    columnNumber: 23
+                                                                    lineNumber: 215,
+                                                                    columnNumber: 25
                                                                 }, this)
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                            lineNumber: 419,
-                                                            columnNumber: 21
+                                                            lineNumber: 203,
+                                                            columnNumber: 23
                                                         }, this),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                                             className: "grid grid-cols-3 gap-4 mb-4",
@@ -1678,22 +1476,22 @@ function OwnerFieldsPage() {
                                                                             children: "Loại"
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                                            lineNumber: 443,
-                                                                            columnNumber: 25
+                                                                            lineNumber: 228,
+                                                                            columnNumber: 27
                                                                         }, this),
                                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                                                                             className: "font-medium text-foreground",
                                                                             children: field.sport_type
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                                            lineNumber: 444,
-                                                                            columnNumber: 25
+                                                                            lineNumber: 229,
+                                                                            columnNumber: 27
                                                                         }, this)
                                                                     ]
                                                                 }, void 0, true, {
                                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                                    lineNumber: 442,
-                                                                    columnNumber: 23
+                                                                    lineNumber: 227,
+                                                                    columnNumber: 25
                                                                 }, this),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                                                     children: [
@@ -1702,8 +1500,8 @@ function OwnerFieldsPage() {
                                                                             children: "Sức Chứa"
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                                            lineNumber: 450,
-                                                                            columnNumber: 25
+                                                                            lineNumber: 235,
+                                                                            columnNumber: 27
                                                                         }, this),
                                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                                                                             className: "font-medium text-foreground flex items-center gap-1",
@@ -1712,22 +1510,22 @@ function OwnerFieldsPage() {
                                                                                     className: "w-4 h-4"
                                                                                 }, void 0, false, {
                                                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                                                    lineNumber: 452,
-                                                                                    columnNumber: 27
+                                                                                    lineNumber: 237,
+                                                                                    columnNumber: 29
                                                                                 }, this),
                                                                                 field.max_players || "--",
                                                                                 " người"
                                                                             ]
                                                                         }, void 0, true, {
                                                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                                            lineNumber: 451,
-                                                                            columnNumber: 25
+                                                                            lineNumber: 236,
+                                                                            columnNumber: 27
                                                                         }, this)
                                                                     ]
                                                                 }, void 0, true, {
                                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                                    lineNumber: 449,
-                                                                    columnNumber: 23
+                                                                    lineNumber: 234,
+                                                                    columnNumber: 25
                                                                 }, this),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                                                     children: [
@@ -1736,8 +1534,8 @@ function OwnerFieldsPage() {
                                                                             children: "Giá"
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                                            lineNumber: 458,
-                                                                            columnNumber: 25
+                                                                            lineNumber: 243,
+                                                                            columnNumber: 27
                                                                         }, this),
                                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                                                                             className: "font-medium text-foreground",
@@ -1747,26 +1545,26 @@ function OwnerFieldsPage() {
                                                                             ]
                                                                         }, void 0, true, {
                                                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                                            lineNumber: 459,
-                                                                            columnNumber: 25
+                                                                            lineNumber: 244,
+                                                                            columnNumber: 27
                                                                         }, this)
                                                                     ]
                                                                 }, void 0, true, {
                                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                                    lineNumber: 457,
-                                                                    columnNumber: 23
+                                                                    lineNumber: 242,
+                                                                    columnNumber: 25
                                                                 }, this)
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                            lineNumber: 441,
-                                                            columnNumber: 21
+                                                            lineNumber: 226,
+                                                            columnNumber: 23
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                    lineNumber: 418,
-                                                    columnNumber: 19
+                                                    lineNumber: 202,
+                                                    columnNumber: 21
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                                     className: "flex gap-2 pt-4 border-t border-border",
@@ -1781,20 +1579,20 @@ function OwnerFieldsPage() {
                                                                         className: "w-4 h-4 mr-2"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                                        lineNumber: 469,
-                                                                        columnNumber: 25
+                                                                        lineNumber: 254,
+                                                                        columnNumber: 27
                                                                     }, this),
                                                                     "Sửa"
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                                lineNumber: 468,
-                                                                columnNumber: 23
+                                                                lineNumber: 253,
+                                                                columnNumber: 25
                                                             }, this)
                                                         }, void 0, false, {
                                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                            lineNumber: 467,
-                                                            columnNumber: 21
+                                                            lineNumber: 252,
+                                                            columnNumber: 23
                                                         }, this),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Button"], {
                                                             variant: "outline",
@@ -1806,42 +1604,43 @@ function OwnerFieldsPage() {
                                                                     className: "w-4 h-4 mr-2"
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                                    lineNumber: 479,
-                                                                    columnNumber: 23
+                                                                    lineNumber: 265,
+                                                                    columnNumber: 25
                                                                 }, this),
                                                                 "Xóa"
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                            lineNumber: 473,
-                                                            columnNumber: 21
+                                                            lineNumber: 259,
+                                                            columnNumber: 23
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                                    lineNumber: 466,
-                                                    columnNumber: 19
+                                                    lineNumber: 251,
+                                                    columnNumber: 21
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                            lineNumber: 417,
-                                            columnNumber: 17
+                                            lineNumber: 201,
+                                            columnNumber: 19
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                    lineNumber: 407,
-                                    columnNumber: 15
+                                    lineNumber: 194,
+                                    columnNumber: 17
                                 }, this)
                             }, field.id, false, {
                                 fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                lineNumber: 406,
-                                columnNumber: 13
-                            }, this))
+                                lineNumber: 193,
+                                columnNumber: 15
+                            }, this);
+                        })
                     }, void 0, false, {
                         fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                        lineNumber: 404,
+                        lineNumber: 183,
                         columnNumber: 9
                     }, this),
                     fields.length === 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Card"], {
@@ -1852,7 +1651,7 @@ function OwnerFieldsPage() {
                                 children: "Chưa có sân nào"
                             }, void 0, false, {
                                 fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                lineNumber: 492,
+                                lineNumber: 279,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"], {
@@ -1863,25 +1662,25 @@ function OwnerFieldsPage() {
                                             className: "w-4 h-4 mr-2"
                                         }, void 0, false, {
                                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                            lineNumber: 495,
+                                            lineNumber: 282,
                                             columnNumber: 17
                                         }, this),
                                         "Thêm Sân Đầu Tiên"
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                    lineNumber: 494,
+                                    lineNumber: 281,
                                     columnNumber: 15
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                lineNumber: 493,
+                                lineNumber: 280,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                        lineNumber: 491,
+                        lineNumber: 278,
                         columnNumber: 11
                     }, this),
                     filteredFields.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$pagination$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Pagination"], {
@@ -1892,13 +1691,13 @@ function OwnerFieldsPage() {
                         totalItems: filteredFields.length
                     }, void 0, false, {
                         fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                        lineNumber: 504,
+                        lineNumber: 291,
                         columnNumber: 11
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                lineNumber: 363,
+                lineNumber: 142,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$dialog$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Dialog"], {
@@ -1912,20 +1711,20 @@ function OwnerFieldsPage() {
                                     children: "Xác nhận xóa sân"
                                 }, void 0, false, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                    lineNumber: 518,
+                                    lineNumber: 305,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$dialog$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["DialogDescription"], {
                                     children: "Bạn có chắc chắn muốn xóa sân này? Hành động này không thể hoàn tác."
                                 }, void 0, false, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                    lineNumber: 519,
+                                    lineNumber: 306,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                            lineNumber: 517,
+                            lineNumber: 304,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$dialog$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["DialogFooter"], {
@@ -1936,7 +1735,7 @@ function OwnerFieldsPage() {
                                     children: "Hủy"
                                 }, void 0, false, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                    lineNumber: 524,
+                                    lineNumber: 312,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Button"], {
@@ -1945,30 +1744,30 @@ function OwnerFieldsPage() {
                                     children: "Xác Nhận Xóa"
                                 }, void 0, false, {
                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                                    lineNumber: 527,
+                                    lineNumber: 315,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                            lineNumber: 523,
+                            lineNumber: 311,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                    lineNumber: 516,
+                    lineNumber: 303,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-                lineNumber: 515,
+                lineNumber: 302,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/owner/fields/page.tsx",
-        lineNumber: 345,
+        lineNumber: 124,
         columnNumber: 5
     }, this);
 }

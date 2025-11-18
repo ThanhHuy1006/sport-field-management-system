@@ -18,3 +18,11 @@ export const createField = async (data: any) => {
 
   return res.data;
 };
+// Xoá sân theo ID
+export async function deleteField(id: number, token: string) {
+  return api.delete(`/owner/fields/${id}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
