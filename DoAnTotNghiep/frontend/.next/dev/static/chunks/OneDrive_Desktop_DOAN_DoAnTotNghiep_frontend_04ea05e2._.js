@@ -2582,7 +2582,7 @@ function Home() {
                                                             lineNumber: 357,
                                                             columnNumber: 19
                                                         }, this),
-                                                        "(028) 3869 4242"
+                                                        "0964167367"
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/page.tsx",
@@ -2599,7 +2599,7 @@ function Home() {
                                                             lineNumber: 361,
                                                             columnNumber: 19
                                                         }, this),
-                                                        "support@hcmut.edu.vn"
+                                                        "huy.dangthanh@hcmut.edu.vn"
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/OneDrive/Desktop/DOAN/DoAnTotNghiep/frontend/app/page.tsx",

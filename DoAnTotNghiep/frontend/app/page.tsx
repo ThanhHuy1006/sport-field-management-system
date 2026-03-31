@@ -355,11 +355,11 @@ export default function Home() {
               <ul className="space-y-2 text-sm text-gray-400">
                 <li className="flex items-center gap-2">
                   <Phone className="w-4 h-4" />
-                  (028) 3869 4242
+                  0964167367
                 </li>
                 <li className="flex items-center gap-2">
                   <Mail className="w-4 h-4" />
-                  support@hcmut.edu.vn
+                  huy.dangthanh@hcmut.edu.vn
                 </li>
                 <li className="flex items-center gap-2">
                   <MapPinIcon className="w-4 h-4" />

@@ -751,6 +751,8 @@ if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelper
 __turbopack_context__.s([
     "createField",
     ()=>createField,
+    "deleteField",
+    ()=>deleteField,
     "getMyFields",
     ()=>getMyFields
 ]);
@@ -769,6 +771,13 @@ const createField = async (data)=>{
     });
     return res.data;
 };
+async function deleteField(id, token) {
+    return __TURBOPACK__imported__module__$5b$project$5d2f$OneDrive$2f$Desktop$2f$DOAN$2f$DoAnTotNghiep$2f$frontend$2f$lib$2f$axios$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].delete(`/owner/fields/${id}`, {
+        headers: {
+            Authorization: `Bearer ${token}`
+        }
+    });
+}
 if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
     __turbopack_context__.k.registerExports(__turbopack_context__.m, globalThis.$RefreshHelpers$);
 }
