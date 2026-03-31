@@ -18,10 +18,10 @@
 // export default app;
 import express from "express";
 import cors from "cors";
-import authRoutes from "./modules/auth/auth.routes.js";
-import adminRoutes from "./modules/admin/admin.routes.js";
-import ownerFieldRoutes from "./modules/owner/owner.field.routes.js";
-import ownerProfileRoutes from "./modules/owner/owner.profile.routes.js";
+import authRoutes from "../modules/auth/auth.routes.js";
+import adminRoutes from "../modules/admin/admin.routes.js";
+import ownerFieldRoutes from "../modules/owner/owner.field.routes.js";
+import ownerProfileRoutes from "../modules/owner/owner.profile.routes.js";
 
 const app = express();
 
