@@ -1,19 +1,40 @@
-import * as AuthService from "./auth.service.js";
+import { authService } from "./auth.service.js";
+import { successResponse } from "../../core/utils/response.js";
 
-export const registerCustomer = (req, res) =>
-  AuthService.registerCustomer(req, res);
+export const authController = {
+  async register(req, res, next) {
+    try {
+      const result = await authService.register(req.body);
+      return successResponse(res, result, "Đăng ký thành công", 201);
+    } catch (error) {
+      next(error);
+    }
+  },
 
-export const registerOwnerStep1 = (req, res) =>
-  AuthService.registerOwnerStep1(req, res);
+  async login(req, res, next) {
+    try {
+      const result = await authService.login(req.body);
+      return successResponse(res, result, "Đăng nhập thành công");
+    } catch (error) {
+      next(error);
+    }
+  },
 
-export const registerOwnerStep2 = (req, res) =>
-  AuthService.registerOwnerStep2(req, res);
+  async me(req, res, next) {
+    try {
+      const user = await authService.getMe(req.user.id);
+      return successResponse(res, user, "Lấy thông tin cá nhân thành công");
+    } catch (error) {
+      next(error);
+    }
+  },
 
-export const registerOwnerStep3 = (req, res) =>
-  AuthService.registerOwnerStep3(req, res);
-
-export const login = (req, res) =>
-  AuthService.login(req, res);
-
-export const me = (req, res) =>
-  AuthService.me(req, res);
+  async changePassword(req, res, next) {
+    try {
+      await authService.changePassword(req.user.id, req.body);
+      return successResponse(res, null, "Đổi mật khẩu thành công");
+    } catch (error) {
+      next(error);
+    }
+  },
+};
