@@ -91,7 +91,7 @@ export const bookingsService = {
       user_id: userId,
       start_datetime: valid.start_datetime,
       end_datetime: valid.end_datetime,
-      note: valid.note,
+      notes: valid.notes,
       total_price: availability.total_price,
       status: "PENDING_CONFIRM",
     });

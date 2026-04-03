@@ -56,7 +56,7 @@ export const bookingsRepository = {
           user_id: data.user_id,
           start_datetime: data.start_datetime,
           end_datetime: data.end_datetime,
-          note: data.note,
+          notes: data.notes,
           total_price: data.total_price,
           status: data.status,
         },
@@ -67,7 +67,7 @@ export const bookingsRepository = {
           booking_id: booking.id,
           from_status: null,
           to_status: data.status,
-          note: "Booking created",
+          reason: "Booking created",
         },
       });
 
@@ -141,7 +141,7 @@ export const bookingsRepository = {
           booking_id: bookingId,
           from_status: booking.status,
           to_status: "CANCELLED",
-          note: "Cancelled by member",
+          reason: "Cancelled by member",
         },
       });
 
