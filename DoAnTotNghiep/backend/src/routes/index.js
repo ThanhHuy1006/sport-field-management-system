@@ -5,6 +5,8 @@ import fieldsRoutes from "../modules/fields/fields.routes.js";
 import publicSchedulesRoutes from "../modules/schedules/public.schedules.routes.js";
 import memberBookingRoutes from "../modules/bookings/member.bookings.routes.js";
 import paymentsRoutes from "../modules/payments/payments.routes.js";
+import memberReviewsRoutes from "../modules/reviews/member.reviews.routes.js";
+import ownerReviewsRoutes from "../modules/reviews/owner.reviews.routes.js";
 const router = Router();
 
 router.use("/auth", authRoutes);
@@ -13,4 +15,6 @@ router.use("/fields", fieldsRoutes);
 router.use("/fields", publicSchedulesRoutes);
 router.use("/bookings", memberBookingRoutes);
 router.use("/payments", paymentsRoutes);
+router.use("/reviews", memberReviewsRoutes);
+router.use("/owner/reviews", ownerReviewsRoutes);
 export default router;
