@@ -1,177 +1,131 @@
-// modules/admin/admin.service.js
-import prisma from "../../core/prisma.js";
+import { adminRepository } from "./admin.repository.js";
+import {
+  validateUserStatusPayload,
+  validateRejectOwnerPayload,
+  validateId,
+} from "./admin.validator.js";
 
-/**
- * GET /admin/owners/pending
- * List tất cả chủ sân ở trạng thái pending
- */
-export async function listPendingOwners(req, res) {
-  try {
-    const owners = await prisma.owner_profiles.findMany({
-      where: { status: "pending" },
-      include: {
-        users_owner_profiles_user_idTousers: true, // join user để lấy name + email + phone
-      },
-      orderBy: { user_id: "asc" },
-    });
+export const adminService = {
+  async getUsers() {
+    return adminRepository.findUsers();
+  },
 
-    const data = owners.map((o) => ({
-      user_id: o.user_id,
-      business_name: o.business_name,
-      tax_code: o.tax_code,
-      address: o.address,
-      status: o.status,
-      user: {
-        id: o.users_owner_profiles_user_idTousers.id,
-        name: o.users_owner_profiles_user_idTousers.name,
-        email: o.users_owner_profiles_user_idTousers.email,
-        phone: o.users_owner_profiles_user_idTousers.phone,
-      },
-    }));
+  async getUserDetail(userId) {
+    const id = validateId(userId, "userId");
+    const user = await adminRepository.findUserById(id);
 
-    return res.json(data);
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-}
-
-/**
- * GET /admin/owners/:id
- * :id = user_id
- */
-export async function getOwnerDetail(req, res) {
-  try {
-    const userId = Number(req.params.id);
-
-    const profile = await prisma.owner_profiles.findUnique({
-      where: { user_id: userId },
-      include: {
-        users_owner_profiles_user_idTousers: true,
-      },
-    });
-
-    if (!profile) {
-      return res.status(404).json({ message: "Owner profile not found" });
+    if (!user) {
+      throw new Error("Không tìm thấy user");
     }
 
-    const user = profile.users_owner_profiles_user_idTousers;
+    return user;
+  },
 
-    return res.json({
-      user_id: profile.user_id,
-      business_name: profile.business_name,
-      tax_code: profile.tax_code,
-      address: profile.address,
-      status: profile.status,
-      reject_reason: profile.reject_reason,
-      license_url: profile.license_url ?? null,   // nếu bạn có các field này trong schema
-      id_front_url: profile.id_front_url ?? null,
-      id_back_url: profile.id_back_url ?? null,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-      },
-      approved_by: profile.approved_by,
-      approved_at: profile.approved_at,
-    });
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-}
+  async updateUserStatus(userId, payload) {
+    const id = validateId(userId, "userId");
+    const valid = validateUserStatusPayload(payload);
 
-/**
- * POST /admin/owners/:id/approve
- */
-export async function approveOwner(req, res) {
-  try {
-    const ownerUserId = Number(req.params.id);
-    const adminId = req.user.id; // từ JWT
-
-    // dùng transaction cho chắc
-    const result = await prisma.$transaction(async (tx) => {
-      // update owner profile
-      const updated = await tx.owner_profiles.update({
-        where: { user_id: ownerUserId },
-        data: {
-          status: "approved",
-          reject_reason: null,
-          approved_by: adminId,
-          approved_at: new Date(),
-        },
-      });
-
-      // ghi log admin action (nếu muốn)
-      await tx.admin_actions.create({
-        data: {
-          admin_id: adminId,
-          target_type: "OWNER_PROFILE",
-          target_id: ownerUserId,
-          action: "APPROVE",
-          meta_json: null,
-        },
-      });
-
-      return updated;
-    });
-
-    return res.json({ message: "Approved", owner: { user_id: result.user_id } });
-  } catch (err) {
-    if (err.code === "P2025") {
-      return res.status(404).json({ message: "Owner profile not found" });
-    }
-    return res.status(500).json({ message: err.message });
-  }
-}
-
-/**
- * POST /admin/owners/:id/reject
- * body: { reason }
- */
-export async function rejectOwner(req, res) {
-  try {
-    const ownerUserId = Number(req.params.id);
-    const adminId = req.user.id;
-    const { reason } = req.body;
-
-    if (!reason || reason.trim().length < 5) {
-      return res
-        .status(400)
-        .json({ message: "Lý do từ chối phải tối thiểu 5 ký tự" });
+    const user = await adminRepository.findUserById(id);
+    if (!user) {
+      throw new Error("Không tìm thấy user");
     }
 
-    const result = await prisma.$transaction(async (tx) => {
-      const updated = await tx.owner_profiles.update({
-        where: { user_id: ownerUserId },
-        data: {
-          status: "rejected",
-          reject_reason: reason,
-          approved_by: adminId,
-          approved_at: new Date(),
-        },
-      });
+    return adminRepository.updateUserStatus(id, valid.status);
+  },
 
-      await tx.admin_actions.create({
-        data: {
-          admin_id: adminId,
-          target_type: "OWNER_PROFILE",
-          target_id: ownerUserId,
-          action: "REJECT",
-          meta_json: JSON.stringify({ reason }),
-        },
-      });
+  async getOwnerRegistrations() {
+    return adminRepository.findOwnerRegistrations();
+  },
 
-      return updated;
-    });
+  async getOwnerRegistrationDetail(userId) {
+    const id = validateId(userId, "userId");
+    const item = await adminRepository.findOwnerRegistrationByUserId(id);
 
-    return res.json({
-      message: "Rejected",
-      owner: { user_id: result.user_id, reject_reason: result.reject_reason },
-    });
-  } catch (err) {
-    if (err.code === "P2025") {
-      return res.status(404).json({ message: "Owner profile not found" });
+    if (!item) {
+      throw new Error("Không tìm thấy hồ sơ owner");
     }
-    return res.status(500).json({ message: err.message });
-  }
-}
+
+    return item;
+  },
+
+  async approveOwnerRegistration(adminId, userId) {
+    const id = validateId(userId, "userId");
+    const item = await adminRepository.findOwnerRegistrationByUserId(id);
+
+    if (!item) {
+      throw new Error("Không tìm thấy hồ sơ owner");
+    }
+
+    if (item.status !== "pending") {
+      throw new Error("Chỉ hồ sơ pending mới được duyệt");
+    }
+
+    return adminRepository.approveOwnerRegistration(adminId, id);
+  },
+
+  async rejectOwnerRegistration(adminId, userId, payload) {
+    const id = validateId(userId, "userId");
+    const valid = validateRejectOwnerPayload(payload);
+
+    const item = await adminRepository.findOwnerRegistrationByUserId(id);
+
+    if (!item) {
+      throw new Error("Không tìm thấy hồ sơ owner");
+    }
+
+    if (item.status !== "pending") {
+      throw new Error("Chỉ hồ sơ pending mới được từ chối");
+    }
+
+    return adminRepository.rejectOwnerRegistration(adminId, id, valid.reason);
+  },
+
+  async getAdminFields() {
+    return adminRepository.findAdminFields();
+  },
+
+  async approveField(fieldId) {
+    const id = validateId(fieldId, "fieldId");
+    const field = await adminRepository.findFieldById(id);
+
+    if (!field) {
+      throw new Error("Không tìm thấy sân");
+    }
+
+    if (field.status !== "pending") {
+      throw new Error("Chỉ sân pending mới được duyệt");
+    }
+
+    return adminRepository.updateFieldStatus(id, "active");
+  },
+
+  async rejectField(fieldId) {
+    const id = validateId(fieldId, "fieldId");
+    const field = await adminRepository.findFieldById(id);
+
+    if (!field) {
+      throw new Error("Không tìm thấy sân");
+    }
+
+    if (field.status !== "pending") {
+      throw new Error("Chỉ sân pending mới được từ chối");
+    }
+
+    return adminRepository.updateFieldStatus(id, "hidden");
+  },
+
+  async getAdminBookings() {
+    return adminRepository.findAdminBookings();
+  },
+
+  async getAdminBookingDetail(bookingId) {
+    const id = validateId(bookingId, "bookingId");
+    const booking = await adminRepository.findAdminBookingById(id);
+
+    if (!booking) {
+      throw new Error("Không tìm thấy booking");
+    }
+
+    return booking;
+  },
+};

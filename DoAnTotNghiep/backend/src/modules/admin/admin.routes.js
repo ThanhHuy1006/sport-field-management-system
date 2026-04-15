@@ -1,46 +1,26 @@
-// modules/admin/admin.routes.js
-import express from "express";
-import * as AdminController from "./admin.controller.js";
-import { verifyToken, requireRole } from "../../core/middleware/auth.js";
+import { Router } from "express";
+import { adminController } from "./admin.controller.js";
+import { requireAuth } from "../../core/middlewares/auth.middleware.js";
+import { requireRole } from "../../core/middlewares/role.middleware.js";
 
-const router = express.Router();
+const router = Router();
 
-const adminGuard = [verifyToken, requireRole("ADMIN")];
+router.use(requireAuth, requireRole("ADMIN"));
 
-/**
- * GET /admin/owners/pending
- */
-router.get(
-  "/owners/pending",
-  ...adminGuard,
-  AdminController.listPendingOwners
-);
+router.get("/users", adminController.getUsers);
+router.get("/users/:userId", adminController.getUserDetail);
+router.patch("/users/:userId/status", adminController.updateUserStatus);
 
-/**
- * GET /admin/owners/:id
- */
-router.get(
-  "/owners/:id",
-  ...adminGuard,
-  AdminController.getOwnerDetail
-);
+router.get("/owner-registrations", adminController.getOwnerRegistrations);
+router.get("/owner-registrations/:userId", adminController.getOwnerRegistrationDetail);
+router.patch("/owner-registrations/:userId/approve", adminController.approveOwnerRegistration);
+router.patch("/owner-registrations/:userId/reject", adminController.rejectOwnerRegistration);
 
-/**
- * POST /admin/owners/:id/approve
- */
-router.post(
-  "/owners/:id/approve",
-  ...adminGuard,
-  AdminController.approveOwner
-);
+router.get("/fields", adminController.getAdminFields);
+router.patch("/fields/:fieldId/approve", adminController.approveField);
+router.patch("/fields/:fieldId/reject", adminController.rejectField);
 
-/**
- * POST /admin/owners/:id/reject
- */
-router.post(
-  "/owners/:id/reject",   // ⬅⬅ FIX Ở ĐÂY
-  ...adminGuard,
-  AdminController.rejectOwner
-);
+router.get("/bookings", adminController.getAdminBookings);
+router.get("/bookings/:bookingId", adminController.getAdminBookingDetail);
 
 export default router;
