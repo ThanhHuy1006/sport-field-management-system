@@ -1,4 +1,5 @@
 import { Router } from "express";
+
 import authRoutes from "../modules/auth/auth.routes.js";
 // import usersRoutes from "../modules/users/users.routes.js";
 import fieldsRoutes from "../modules/fields/fields.routes.js";
@@ -10,6 +11,7 @@ import ownerReviewsRoutes from "../modules/reviews/owner.reviews.routes.js";
 import vouchersRoutes from "../modules/vouchers/vouchers.routes.js";
 import ownerVouchersRoutes from "../modules/vouchers/owner.vouchers.routes.js";
 import ownerBookingRoutes from "../modules/bookings/owner.bookings.routes.js";
+
 const router = Router();
 
 router.use("/auth", authRoutes);
