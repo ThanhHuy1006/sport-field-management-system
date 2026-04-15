@@ -52,3 +52,69 @@ export function toBookingDetail(item) {
     })),
   };
 }
+export function toOwnerBookingListItem(item) {
+  return {
+    id: item.id,
+    field_id: item.field_id,
+    user_id: item.user_id,
+    start_datetime: item.start_datetime,
+    end_datetime: item.end_datetime,
+    status: item.status,
+    note: item.note,
+    total_price: item.total_price,
+    created_at: item.created_at,
+    field: item.fields
+      ? {
+          id: item.fields.id,
+          field_name: item.fields.field_name,
+          address: item.fields.address,
+          sport_type: item.fields.sport_type,
+        }
+      : null,
+    user: item.users
+      ? {
+          id: item.users.id,
+          name: item.users.name,
+          email: item.users.email,
+          phone: item.users.phone,
+        }
+      : null,
+  };
+}
+
+export function toOwnerBookingDetail(item) {
+  return {
+    id: item.id,
+    field_id: item.field_id,
+    user_id: item.user_id,
+    start_datetime: item.start_datetime,
+    end_datetime: item.end_datetime,
+    status: item.status,
+    note: item.note,
+    total_price: item.total_price,
+    created_at: item.created_at,
+    field: item.fields
+      ? {
+          id: item.fields.id,
+          field_name: item.fields.field_name,
+          address: item.fields.address,
+          sport_type: item.fields.sport_type,
+        }
+      : null,
+    user: item.users
+      ? {
+          id: item.users.id,
+          name: item.users.name,
+          email: item.users.email,
+          phone: item.users.phone,
+        }
+      : null,
+    status_history: (item.booking_status_history || []).map((h) => ({
+      id: h.id,
+      from_status: h.from_status,
+      to_status: h.to_status,
+      changed_at: h.changed_at,
+      note: h.note,
+    })),
+  };
+}

@@ -47,3 +47,8 @@ export function validateCreateBookingPayload(payload) {
     notes: rawNotes ? String(rawNotes).trim() : null,
   };
 }
+export function validateRejectBookingPayload(payload) {
+  return {
+    note: payload?.note ? String(payload.note).trim() : "Rejected by owner",
+  };
+}

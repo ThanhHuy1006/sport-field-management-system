@@ -9,6 +9,7 @@ import memberReviewsRoutes from "../modules/reviews/member.reviews.routes.js";
 import ownerReviewsRoutes from "../modules/reviews/owner.reviews.routes.js";
 import vouchersRoutes from "../modules/vouchers/vouchers.routes.js";
 import ownerVouchersRoutes from "../modules/vouchers/owner.vouchers.routes.js";
+import ownerBookingRoutes from "../modules/bookings/owner.bookings.routes.js";
 const router = Router();
 
 router.use("/auth", authRoutes);
@@ -21,4 +22,5 @@ router.use("/reviews", memberReviewsRoutes);
 router.use("/owner/reviews", ownerReviewsRoutes);
 router.use("/vouchers", vouchersRoutes);
 router.use("/owner/vouchers", ownerVouchersRoutes);
+router.use("/owner/bookings", ownerBookingRoutes);
 export default router;

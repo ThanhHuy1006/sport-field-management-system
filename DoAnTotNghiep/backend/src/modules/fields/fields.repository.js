@@ -5,7 +5,7 @@ export const fieldsRepository = {
     const { page, limit, keyword, sport_type, minPrice, maxPrice } = filters;
 
     const where = {
-      status: "pending", // nếu enum schema của anh là ACTIVE thì đổi lại cho khớp
+      status: "active", // nếu enum schema của anh là ACTIVE thì đổi lại cho khớp
     };
 
     if (keyword) {

@@ -148,4 +148,133 @@ export const bookingsRepository = {
       return updated;
     });
   },
+    findOwnerBookings(ownerId) {
+    return prisma.bookings.findMany({
+      where: {
+        fields: {
+          owner_id: ownerId,
+        },
+      },
+      orderBy: { created_at: "desc" },
+      include: {
+        fields: {
+          select: {
+            id: true,
+            field_name: true,
+            address: true,
+            sport_type: true,
+          },
+        },
+        users: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+          },
+        },
+      },
+    });
+  },
+
+  findOwnerBookingById(ownerId, bookingId) {
+    return prisma.bookings.findFirst({
+      where: {
+        id: bookingId,
+        fields: {
+          owner_id: ownerId,
+        },
+      },
+      include: {
+        fields: {
+          select: {
+            id: true,
+            field_name: true,
+            address: true,
+            sport_type: true,
+          },
+        },
+        users: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+          },
+        },
+        booking_status_history: {
+          orderBy: { changed_at: "desc" },
+        },
+      },
+    });
+  },
+
+  approveOwnerBooking(ownerId, bookingId) {
+    return prisma.$transaction(async (tx) => {
+      const booking = await tx.bookings.findFirst({
+        where: {
+          id: bookingId,
+          fields: {
+            owner_id: ownerId,
+          },
+        },
+        include: {
+          fields: true,
+        },
+      });
+
+      if (!booking) return null;
+
+      const updated = await tx.bookings.update({
+        where: { id: bookingId },
+        data: {
+          status: "APPROVED",
+        },
+      });
+
+      await tx.booking_status_history.create({
+        data: {
+          booking_id: bookingId,
+          from_status: booking.status,
+          to_status: "APPROVED",
+          note: "Approved by owner",
+        },
+      });
+
+      return updated;
+    });
+  },
+
+  rejectOwnerBooking(ownerId, bookingId, note) {
+    return prisma.$transaction(async (tx) => {
+      const booking = await tx.bookings.findFirst({
+        where: {
+          id: bookingId,
+          fields: {
+            owner_id: ownerId,
+          },
+        },
+      });
+
+      if (!booking) return null;
+
+      const updated = await tx.bookings.update({
+        where: { id: bookingId },
+        data: {
+          status: "REJECTED",
+        },
+      });
+
+      await tx.booking_status_history.create({
+        data: {
+          booking_id: bookingId,
+          from_status: booking.status,
+          to_status: "REJECTED",
+          note: note || "Rejected by owner",
+        },
+      });
+
+      return updated;
+    });
+  },
 };

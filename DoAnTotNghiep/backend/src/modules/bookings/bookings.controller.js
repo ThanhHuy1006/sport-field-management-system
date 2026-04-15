@@ -1,6 +1,10 @@
 import { successResponse } from "../../core/utils/response.js";
 import { bookingsService } from "./bookings.service.js";
 import { toBookingListItem, toBookingDetail } from "./bookings.mapper.js";
+import {
+  toOwnerBookingListItem,
+  toOwnerBookingDetail,
+} from "./bookings.mapper.js";
 
 export const bookingsController = {
   async checkAvailability(req, res, next) {
@@ -53,6 +57,59 @@ export const bookingsController = {
         req.params.bookingId
       );
       return successResponse(res, item, "Hủy booking thành công");
+    } catch (error) {
+      next(error);
+    }
+  },
+    async getOwnerBookings(req, res, next) {
+    try {
+      const items = await bookingsService.getOwnerBookings(req.user.id);
+      return successResponse(
+        res,
+        items.map(toOwnerBookingListItem),
+        "Lấy danh sách booking của owner thành công"
+      );
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async getOwnerBookingDetail(req, res, next) {
+    try {
+      const item = await bookingsService.getOwnerBookingDetail(
+        req.user.id,
+        req.params.bookingId
+      );
+      return successResponse(
+        res,
+        toOwnerBookingDetail(item),
+        "Lấy chi tiết booking của owner thành công"
+      );
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async approveOwnerBooking(req, res, next) {
+    try {
+      const item = await bookingsService.approveOwnerBooking(
+        req.user.id,
+        req.params.bookingId
+      );
+      return successResponse(res, item, "Duyệt booking thành công");
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async rejectOwnerBooking(req, res, next) {
+    try {
+      const item = await bookingsService.rejectOwnerBooking(
+        req.user.id,
+        req.params.bookingId,
+        req.body
+      );
+      return successResponse(res, item, "Từ chối booking thành công");
     } catch (error) {
       next(error);
     }

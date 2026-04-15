@@ -1,4 +1,5 @@
 import { bookingsRepository } from "./bookings.repository.js";
+import { validateRejectBookingPayload } from "./bookings.validator.js";
 import {
   validateCheckAvailabilityPayload,
   validateCreateBookingPayload,
@@ -137,5 +138,60 @@ export const bookingsService = {
     }
 
     return bookingsRepository.cancelMyBooking(userId, id);
+  },
+    async getOwnerBookings(ownerId) {
+    return bookingsRepository.findOwnerBookings(ownerId);
+  },
+
+  async getOwnerBookingDetail(ownerId, bookingId) {
+    const id = Number(bookingId);
+    if (Number.isNaN(id)) {
+      throw new Error("bookingId không hợp lệ");
+    }
+
+    const booking = await bookingsRepository.findOwnerBookingById(ownerId, id);
+    if (!booking) {
+      throw new Error("Không tìm thấy booking");
+    }
+
+    return booking;
+  },
+
+  async approveOwnerBooking(ownerId, bookingId) {
+    const id = Number(bookingId);
+    if (Number.isNaN(id)) {
+      throw new Error("bookingId không hợp lệ");
+    }
+
+    const booking = await bookingsRepository.findOwnerBookingById(ownerId, id);
+    if (!booking) {
+      throw new Error("Không tìm thấy booking");
+    }
+
+    if (booking.status !== "PENDING_CONFIRM") {
+      throw new Error("Chỉ booking đang chờ xác nhận mới được duyệt");
+    }
+
+    return bookingsRepository.approveOwnerBooking(ownerId, id);
+  },
+
+  async rejectOwnerBooking(ownerId, bookingId, payload) {
+    const id = Number(bookingId);
+    if (Number.isNaN(id)) {
+      throw new Error("bookingId không hợp lệ");
+    }
+
+    const booking = await bookingsRepository.findOwnerBookingById(ownerId, id);
+    if (!booking) {
+      throw new Error("Không tìm thấy booking");
+    }
+
+    if (booking.status !== "PENDING_CONFIRM") {
+      throw new Error("Chỉ booking đang chờ xác nhận mới được từ chối");
+    }
+
+    const valid = validateRejectBookingPayload(payload);
+
+    return bookingsRepository.rejectOwnerBooking(ownerId, id, valid.note);
   },
 };
