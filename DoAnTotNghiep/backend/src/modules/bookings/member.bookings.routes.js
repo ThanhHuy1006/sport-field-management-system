@@ -9,5 +9,6 @@ router.post("/", requireAuth, bookingsController.createBooking);
 router.get("/my", requireAuth, bookingsController.getMyBookings);
 router.get("/my/:bookingId", requireAuth, bookingsController.getMyBookingDetail);
 router.patch("/my/:bookingId/cancel", requireAuth, bookingsController.cancelMyBooking);
+router.get("/my/:bookingId/check-in-qr", requireAuth, bookingsController.getMyBookingCheckInQr);
 
 export default router;

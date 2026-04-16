@@ -1,7 +1,6 @@
 import prisma from "../../config/prisma.js";
 
 export const adminRepository = {
-  // USERS
   findUsers() {
     return prisma.users.findMany({
       orderBy: { created_at: "desc" },
@@ -58,7 +57,6 @@ export const adminRepository = {
     });
   },
 
-  // OWNER REGISTRATIONS
   findOwnerRegistrations() {
     return prisma.owner_profiles.findMany({
       orderBy: { created_at: "desc" },
@@ -145,7 +143,6 @@ export const adminRepository = {
     });
   },
 
-  // FIELDS
   findAdminFields() {
     return prisma.fields.findMany({
       orderBy: { created_at: "desc" },
@@ -178,7 +175,6 @@ export const adminRepository = {
     });
   },
 
-  // BOOKINGS
   findAdminBookings() {
     return prisma.bookings.findMany({
       orderBy: { created_at: "desc" },

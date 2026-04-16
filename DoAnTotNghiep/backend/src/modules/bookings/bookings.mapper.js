@@ -8,6 +8,9 @@ export function toBookingListItem(item) {
     status: item.status,
     notes: item.notes,
     total_price: item.total_price,
+    checked_in_at: item.checked_in_at || null,
+    checked_in_by: item.checked_in_by || null,
+    checkin_method: item.checkin_method || null,
     created_at: item.created_at,
     field: item.fields
       ? {
@@ -32,6 +35,9 @@ export function toBookingDetail(item) {
     status: item.status,
     notes: item.notes,
     total_price: item.total_price,
+    checked_in_at: item.checked_in_at || null,
+    checked_in_by: item.checked_in_by || null,
+    checkin_method: item.checkin_method || null,
     created_at: item.created_at,
     field: item.fields
       ? {
@@ -48,10 +54,11 @@ export function toBookingDetail(item) {
       from_status: h.from_status,
       to_status: h.to_status,
       changed_at: h.changed_at,
-      reason: h.reason,
+      reason: h.reason ?? h.note ?? null,
     })),
   };
 }
+
 export function toOwnerBookingListItem(item) {
   return {
     id: item.id,
@@ -60,8 +67,11 @@ export function toOwnerBookingListItem(item) {
     start_datetime: item.start_datetime,
     end_datetime: item.end_datetime,
     status: item.status,
-    note: item.note,
+    notes: item.notes,
     total_price: item.total_price,
+    checked_in_at: item.checked_in_at || null,
+    checked_in_by: item.checked_in_by || null,
+    checkin_method: item.checkin_method || null,
     created_at: item.created_at,
     field: item.fields
       ? {
@@ -90,8 +100,11 @@ export function toOwnerBookingDetail(item) {
     start_datetime: item.start_datetime,
     end_datetime: item.end_datetime,
     status: item.status,
-    note: item.note,
+    notes: item.notes,
     total_price: item.total_price,
+    checked_in_at: item.checked_in_at || null,
+    checked_in_by: item.checked_in_by || null,
+    checkin_method: item.checkin_method || null,
     created_at: item.created_at,
     field: item.fields
       ? {
@@ -114,7 +127,7 @@ export function toOwnerBookingDetail(item) {
       from_status: h.from_status,
       to_status: h.to_status,
       changed_at: h.changed_at,
-      note: h.note,
+      reason: h.reason ?? h.note ?? null,
     })),
   };
 }

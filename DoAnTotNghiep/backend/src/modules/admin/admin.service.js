@@ -1,3 +1,7 @@
+import {
+  ConflictError,
+  NotFoundError,
+} from "../../core/errors/index.js";
 import { adminRepository } from "./admin.repository.js";
 import {
   validateUserStatusPayload,
@@ -15,7 +19,7 @@ export const adminService = {
     const user = await adminRepository.findUserById(id);
 
     if (!user) {
-      throw new Error("Không tìm thấy user");
+      throw new NotFoundError("Không tìm thấy user");
     }
 
     return user;
@@ -27,7 +31,7 @@ export const adminService = {
 
     const user = await adminRepository.findUserById(id);
     if (!user) {
-      throw new Error("Không tìm thấy user");
+      throw new NotFoundError("Không tìm thấy user");
     }
 
     return adminRepository.updateUserStatus(id, valid.status);
@@ -42,7 +46,7 @@ export const adminService = {
     const item = await adminRepository.findOwnerRegistrationByUserId(id);
 
     if (!item) {
-      throw new Error("Không tìm thấy hồ sơ owner");
+      throw new NotFoundError("Không tìm thấy hồ sơ owner");
     }
 
     return item;
@@ -53,11 +57,11 @@ export const adminService = {
     const item = await adminRepository.findOwnerRegistrationByUserId(id);
 
     if (!item) {
-      throw new Error("Không tìm thấy hồ sơ owner");
+      throw new NotFoundError("Không tìm thấy hồ sơ owner");
     }
 
     if (item.status !== "pending") {
-      throw new Error("Chỉ hồ sơ pending mới được duyệt");
+      throw new ConflictError("Chỉ hồ sơ pending mới được duyệt");
     }
 
     return adminRepository.approveOwnerRegistration(adminId, id);
@@ -70,11 +74,11 @@ export const adminService = {
     const item = await adminRepository.findOwnerRegistrationByUserId(id);
 
     if (!item) {
-      throw new Error("Không tìm thấy hồ sơ owner");
+      throw new NotFoundError("Không tìm thấy hồ sơ owner");
     }
 
     if (item.status !== "pending") {
-      throw new Error("Chỉ hồ sơ pending mới được từ chối");
+      throw new ConflictError("Chỉ hồ sơ pending mới được từ chối");
     }
 
     return adminRepository.rejectOwnerRegistration(adminId, id, valid.reason);
@@ -89,11 +93,11 @@ export const adminService = {
     const field = await adminRepository.findFieldById(id);
 
     if (!field) {
-      throw new Error("Không tìm thấy sân");
+      throw new NotFoundError("Không tìm thấy sân");
     }
 
     if (field.status !== "pending") {
-      throw new Error("Chỉ sân pending mới được duyệt");
+      throw new ConflictError("Chỉ sân pending mới được duyệt");
     }
 
     return adminRepository.updateFieldStatus(id, "active");
@@ -104,11 +108,11 @@ export const adminService = {
     const field = await adminRepository.findFieldById(id);
 
     if (!field) {
-      throw new Error("Không tìm thấy sân");
+      throw new NotFoundError("Không tìm thấy sân");
     }
 
     if (field.status !== "pending") {
-      throw new Error("Chỉ sân pending mới được từ chối");
+      throw new ConflictError("Chỉ sân pending mới được từ chối");
     }
 
     return adminRepository.updateFieldStatus(id, "hidden");
@@ -123,7 +127,7 @@ export const adminService = {
     const booking = await adminRepository.findAdminBookingById(id);
 
     if (!booking) {
-      throw new Error("Không tìm thấy booking");
+      throw new NotFoundError("Không tìm thấy booking");
     }
 
     return booking;

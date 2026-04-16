@@ -27,17 +27,6 @@ export function validateCheckAvailabilityPayload(payload) {
   };
 }
 
-// export function validateCreateBookingPayload(payload) {
-//   const { field_id, start_datetime, end_datetime, notes } =
-//     validateCheckAvailabilityPayload(payload);
-
-//   return {
-//     field_id,
-//     start_datetime,
-//     end_datetime,
-//     notes: notes ? String(notes).trim() : null,
-//   };
-// }
 export function validateCreateBookingPayload(payload) {
   const base = validateCheckAvailabilityPayload(payload);
   const rawNotes = payload.notes ?? payload.note ?? null;
@@ -47,8 +36,33 @@ export function validateCreateBookingPayload(payload) {
     notes: rawNotes ? String(rawNotes).trim() : null,
   };
 }
+
 export function validateRejectBookingPayload(payload) {
   return {
     note: payload?.note ? String(payload.note).trim() : "Rejected by owner",
+  };
+}
+
+export function validateManualCheckInPayload(payload) {
+  return {
+    note: payload?.note
+      ? String(payload.note).trim()
+      : "Checked in manually by owner",
+  };
+}
+
+export function validateCheckInQrPayload(payload) {
+  const qr_token = String(payload?.qr_token || "").trim();
+
+  if (!qr_token) {
+    throw new Error("qr_token là bắt buộc");
+  }
+
+  return { qr_token };
+}
+
+export function validateCompleteBookingPayload(payload) {
+  return {
+    note: payload?.note ? String(payload.note).trim() : "Completed by owner",
   };
 }

@@ -64,6 +64,9 @@ model bookings {
   users                  users                    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_booking_user")
   payments               payments?
   reviews                reviews[]
+  checked_in_at  DateTime? @db.DateTime(0)
+  checked_in_by  Int?
+  checkin_method String?   @db.VarChar(20)
 
   @@index([field_id], map: "fk_booking_field")
   @@index([user_id], map: "fk_booking_user")
@@ -359,6 +362,7 @@ enum bookings_status {
   CANCELLED
   COMPLETED
   PAY_FAILED
+  CHECKED_IN
 }
 
 enum users_role {

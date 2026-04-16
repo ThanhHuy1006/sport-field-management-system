@@ -35,7 +35,14 @@ export const bookingsRepository = {
         start_datetime: { lt: end },
         end_datetime: { gt: start },
         status: {
-          in: ["PENDING_CONFIRM", "APPROVED", "AWAITING_PAYMENT", "PAID", "COMPLETED"],
+          in: [
+            "PENDING_CONFIRM",
+            "APPROVED",
+            "AWAITING_PAYMENT",
+            "PAID",
+            "CHECKED_IN",
+            "COMPLETED",
+          ],
         },
       },
       orderBy: { start_datetime: "asc" },
@@ -109,6 +116,7 @@ export const bookingsRepository = {
             sport_type: true,
             base_price_per_hour: true,
             currency: true,
+            owner_id: true,
           },
         },
         booking_status_history: {
@@ -148,7 +156,8 @@ export const bookingsRepository = {
       return updated;
     });
   },
-    findOwnerBookings(ownerId) {
+
+  findOwnerBookings(ownerId) {
     return prisma.bookings.findMany({
       where: {
         fields: {
@@ -192,6 +201,7 @@ export const bookingsRepository = {
             field_name: true,
             address: true,
             sport_type: true,
+            owner_id: true,
           },
         },
         users: {
@@ -218,9 +228,6 @@ export const bookingsRepository = {
             owner_id: ownerId,
           },
         },
-        include: {
-          fields: true,
-        },
       });
 
       if (!booking) return null;
@@ -237,7 +244,7 @@ export const bookingsRepository = {
           booking_id: bookingId,
           from_status: booking.status,
           to_status: "APPROVED",
-          note: "Approved by owner",
+          reason: "Approved by owner",
         },
       });
 
@@ -270,7 +277,76 @@ export const bookingsRepository = {
           booking_id: bookingId,
           from_status: booking.status,
           to_status: "REJECTED",
-          note: note || "Rejected by owner",
+          reason: note || "Rejected by owner",
+        },
+      });
+
+      return updated;
+    });
+  },
+
+  markOwnerBookingCheckedIn(ownerId, bookingId, method, note) {
+    return prisma.$transaction(async (tx) => {
+      const booking = await tx.bookings.findFirst({
+        where: {
+          id: bookingId,
+          fields: {
+            owner_id: ownerId,
+          },
+        },
+      });
+
+      if (!booking) return null;
+
+      const updated = await tx.bookings.update({
+        where: { id: bookingId },
+        data: {
+          status: "CHECKED_IN",
+          checked_in_at: new Date(),
+          checked_in_by: ownerId,
+          checkin_method: method,
+        },
+      });
+
+      await tx.booking_status_history.create({
+        data: {
+          booking_id: bookingId,
+          from_status: booking.status,
+          to_status: "CHECKED_IN",
+          reason: note,
+        },
+      });
+
+      return updated;
+    });
+  },
+
+  completeOwnerBooking(ownerId, bookingId, note) {
+    return prisma.$transaction(async (tx) => {
+      const booking = await tx.bookings.findFirst({
+        where: {
+          id: bookingId,
+          fields: {
+            owner_id: ownerId,
+          },
+        },
+      });
+
+      if (!booking) return null;
+
+      const updated = await tx.bookings.update({
+        where: { id: bookingId },
+        data: {
+          status: "COMPLETED",
+        },
+      });
+
+      await tx.booking_status_history.create({
+        data: {
+          booking_id: bookingId,
+          from_status: booking.status,
+          to_status: "COMPLETED",
+          reason: note,
         },
       });
 

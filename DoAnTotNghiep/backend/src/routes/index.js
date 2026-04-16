@@ -11,6 +11,7 @@ import ownerReviewsRoutes from "../modules/reviews/owner.reviews.routes.js";
 import vouchersRoutes from "../modules/vouchers/vouchers.routes.js";
 import ownerVouchersRoutes from "../modules/vouchers/owner.vouchers.routes.js";
 import ownerBookingRoutes from "../modules/bookings/owner.bookings.routes.js";
+import adminRoutes from "../modules/admin/admin.routes.js";
 
 const router = Router();
 
@@ -25,4 +26,5 @@ router.use("/owner/reviews", ownerReviewsRoutes);
 router.use("/vouchers", vouchersRoutes);
 router.use("/owner/vouchers", ownerVouchersRoutes);
 router.use("/owner/bookings", ownerBookingRoutes);
+
 export default router;
