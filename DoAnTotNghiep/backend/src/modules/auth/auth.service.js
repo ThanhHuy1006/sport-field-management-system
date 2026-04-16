@@ -2,38 +2,49 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { env } from "../../config/env.js";
 import { authRepository } from "./auth.repository.js";
+import {
+  validateRegisterPayload,
+  validateLoginPayload,
+  validateChangePasswordPayload,
+} from "./auth.validator.js";
+
+function getJwtSecret() {
+  return env.JWT_SECRET || process.env.JWT_SECRET || process.env.JWT_ACCESS_SECRET;
+}
 
 function signToken(user) {
+  const secret = getJwtSecret();
+
+  if (!secret) {
+    throw new Error("JWT secret chưa được cấu hình");
+  }
+
   return jwt.sign(
     {
       sub: user.id,
       role: user.role,
       email: user.email,
     },
-    env.JWT_SECRET,
-    { expiresIn: env.JWT_EXPIRES_IN }
+    secret,
+    { expiresIn: env.JWT_EXPIRES_IN || "7d" }
   );
 }
 
 export const authService = {
   async register(payload) {
-    const { name, email, password, phone } = payload;
+    const valid = validateRegisterPayload(payload);
 
-    if (!name || !email || !password) {
-      throw new Error("Name, email và password là bắt buộc");
-    }
-
-    const existingUser = await authRepository.findByEmail(email);
+    const existingUser = await authRepository.findByEmail(valid.email);
     if (existingUser) {
       throw new Error("Email đã tồn tại");
     }
 
-    const password_hash = await bcrypt.hash(password, 10);
+    const password_hash = await bcrypt.hash(valid.password, 10);
 
     const user = await authRepository.createUser({
-      name,
-      email,
-      phone: phone || null,
+      name: valid.name,
+      email: valid.email,
+      phone: valid.phone,
       password_hash,
       role: "USER",
       status: "active",
@@ -45,13 +56,9 @@ export const authService = {
   },
 
   async login(payload) {
-    const { email, password } = payload;
+    const valid = validateLoginPayload(payload);
 
-    if (!email || !password) {
-      throw new Error("Email và password là bắt buộc");
-    }
-
-    const user = await authRepository.findByEmail(email);
+    const user = await authRepository.findByEmail(valid.email);
     if (!user) {
       throw new Error("Sai email hoặc mật khẩu");
     }
@@ -60,7 +67,7 @@ export const authService = {
       throw new Error("Tài khoản đã bị khóa hoặc không còn hoạt động");
     }
 
-    const isMatch = await bcrypt.compare(password, user.password_hash);
+    const isMatch = await bcrypt.compare(valid.password, user.password_hash);
     if (!isMatch) {
       throw new Error("Sai email hoặc mật khẩu");
     }
@@ -86,30 +93,24 @@ export const authService = {
     if (!user) {
       throw new Error("Không tìm thấy người dùng");
     }
+
     return user;
   },
 
   async changePassword(userId, payload) {
-    const { oldPassword, newPassword } = payload;
+    const valid = validateChangePasswordPayload(payload);
 
-    if (!oldPassword || !newPassword) {
-      throw new Error("oldPassword và newPassword là bắt buộc");
-    }
-
-    const user = await authRepository.findById(userId);
+    const user = await authRepository.findFullById(userId);
     if (!user) {
       throw new Error("Không tìm thấy người dùng");
     }
 
-    // findById ở trên không select password_hash, nên gọi lại theo email
-    const fullUser = await authRepository.findByEmail(user.email);
-
-    const isMatch = await bcrypt.compare(oldPassword, fullUser.password_hash);
+    const isMatch = await bcrypt.compare(valid.oldPassword, user.password_hash);
     if (!isMatch) {
       throw new Error("Mật khẩu cũ không đúng");
     }
 
-    const password_hash = await bcrypt.hash(newPassword, 10);
+    const password_hash = await bcrypt.hash(valid.newPassword, 10);
     await authRepository.updatePassword(userId, password_hash);
 
     return true;

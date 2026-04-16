@@ -1,10 +1,11 @@
 function getClientIp(req) {
-  return (
-    req.headers["x-forwarded-for"] ||
-    req.socket?.remoteAddress ||
-    req.ip ||
-    "unknown"
-  );
+  const forwarded = req.headers["x-forwarded-for"];
+
+  if (typeof forwarded === "string" && forwarded.length > 0) {
+    return forwarded.split(",")[0].trim();
+  }
+
+  return req.socket?.remoteAddress || req.ip || "unknown";
 }
 
 export function requestLoggerMiddleware(req, res, next) {

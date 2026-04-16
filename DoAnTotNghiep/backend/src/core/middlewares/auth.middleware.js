@@ -18,6 +18,10 @@ function extractBearerToken(req) {
   return token;
 }
 
+function getJwtSecret() {
+  return process.env.JWT_SECRET || process.env.JWT_ACCESS_SECRET || null;
+}
+
 export async function requireAuth(req, res, next) {
   try {
     const token = extractBearerToken(req);
@@ -26,13 +30,12 @@ export async function requireAuth(req, res, next) {
       throw new AuthError("Bạn chưa đăng nhập");
     }
 
-    const secret = process.env.JWT_SECRET;
+    const secret = getJwtSecret();
     if (!secret) {
-      throw new Error("JWT_SECRET chưa được cấu hình");
+      throw new Error("JWT secret chưa được cấu hình");
     }
 
     const decoded = jwt.verify(token, secret);
-
     const userId = decoded?.id ?? decoded?.userId ?? decoded?.sub;
 
     if (!userId) {
@@ -94,7 +97,7 @@ export async function optionalAuth(req, res, next) {
       return next();
     }
 
-    const secret = process.env.JWT_SECRET;
+    const secret = getJwtSecret();
     if (!secret) {
       req.user = null;
       return next();

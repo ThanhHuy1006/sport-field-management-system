@@ -1,40 +1,25 @@
 import { authService } from "./auth.service.js";
 import { successResponse } from "../../core/utils/response.js";
+import { asyncHandler } from "../../core/utils/asyncHandler.js";
 
 export const authController = {
-  async register(req, res, next) {
-    try {
-      const result = await authService.register(req.body);
-      return successResponse(res, result, "Đăng ký thành công", 201);
-    } catch (error) {
-      next(error);
-    }
-  },
+  register: asyncHandler(async (req, res) => {
+    const result = await authService.register(req.body);
+    return successResponse(res, result, "Đăng ký thành công", 201);
+  }),
 
-  async login(req, res, next) {
-    try {
-      const result = await authService.login(req.body);
-      return successResponse(res, result, "Đăng nhập thành công");
-    } catch (error) {
-      next(error);
-    }
-  },
+  login: asyncHandler(async (req, res) => {
+    const result = await authService.login(req.body);
+    return successResponse(res, result, "Đăng nhập thành công");
+  }),
 
-  async me(req, res, next) {
-    try {
-      const user = await authService.getMe(req.user.id);
-      return successResponse(res, user, "Lấy thông tin cá nhân thành công");
-    } catch (error) {
-      next(error);
-    }
-  },
+  me: asyncHandler(async (req, res) => {
+    const user = await authService.getMe(req.user.id);
+    return successResponse(res, user, "Lấy thông tin cá nhân thành công");
+  }),
 
-  async changePassword(req, res, next) {
-    try {
-      await authService.changePassword(req.user.id, req.body);
-      return successResponse(res, null, "Đổi mật khẩu thành công");
-    } catch (error) {
-      next(error);
-    }
-  },
+  changePassword: asyncHandler(async (req, res) => {
+    await authService.changePassword(req.user.id, req.body);
+    return successResponse(res, null, "Đổi mật khẩu thành công");
+  }),
 };

@@ -24,6 +24,12 @@ export const authRepository = {
     });
   },
 
+  findFullById(id) {
+    return prisma.users.findUnique({
+      where: { id },
+    });
+  },
+
   createUser(data) {
     return prisma.users.create({
       data,
