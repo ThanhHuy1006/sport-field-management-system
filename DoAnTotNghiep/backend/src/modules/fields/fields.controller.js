@@ -9,7 +9,8 @@ import {
 export const fieldsController = {
   async getPublicFields(req, res, next) {
     try {
-      const result = await fieldsService.getPublicFields(req.query);
+      const query = req.validated?.query ?? req.query;
+      const result = await fieldsService.getPublicFields(query);
 
       return successResponse(
         res,
@@ -26,7 +27,8 @@ export const fieldsController = {
 
   async getPublicFieldDetail(req, res, next) {
     try {
-      const field = await fieldsService.getPublicFieldDetail(req.params.fieldId);
+      const { fieldId } = req.validated?.params ?? req.params;
+      const field = await fieldsService.getPublicFieldDetail(fieldId);
 
       return successResponse(
         res,
@@ -40,7 +42,8 @@ export const fieldsController = {
 
   async getPublicFieldImages(req, res, next) {
     try {
-      const images = await fieldsService.getPublicFieldImages(req.params.fieldId);
+      const { fieldId } = req.validated?.params ?? req.params;
+      const images = await fieldsService.getPublicFieldImages(fieldId);
 
       return successResponse(
         res,

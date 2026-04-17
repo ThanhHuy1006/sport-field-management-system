@@ -1,9 +1,9 @@
 import { fieldsRepository } from "./fields.repository.js";
-import { validatePublicFieldQuery } from "./fields.validator.js";
+import { NotFoundError } from "../../core/errors/index.js";
 
 export const fieldsService = {
   async getPublicFields(query) {
-    const filters = validatePublicFieldQuery(query);
+    const filters = query;
 
     const { items, total } = await fieldsRepository.findPublicFields(filters);
 
@@ -19,27 +19,22 @@ export const fieldsService = {
   },
 
   async getPublicFieldDetail(fieldId) {
-    const id = Number(fieldId);
-    if (Number.isNaN(id)) {
-      throw new Error("fieldId không hợp lệ");
-    }
-
-    const field = await fieldsRepository.findPublicFieldById(id);
+    const field = await fieldsRepository.findPublicFieldById(fieldId);
 
     if (!field) {
-      throw new Error("Không tìm thấy sân");
+      throw new NotFoundError("Không tìm thấy sân");
     }
 
     return field;
   },
 
   async getPublicFieldImages(fieldId) {
-    const id = Number(fieldId);
-    if (Number.isNaN(id)) {
-      throw new Error("fieldId không hợp lệ");
+    const field = await fieldsRepository.findPublicFieldById(fieldId);
+
+    if (!field) {
+      throw new NotFoundError("Không tìm thấy sân");
     }
 
-    const images = await fieldsRepository.findFieldImages(id);
-    return images;
+    return field.field_images || [];
   },
 };

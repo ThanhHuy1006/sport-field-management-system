@@ -25,3 +25,9 @@ export const DEFAULT_PAGINATION = {
   PAGE_SIZE: 10,
   MAX_PAGE_SIZE: 100,
 };
+export const FIELD_STATUS = {
+  PENDING: "pending",
+  ACTIVE: "active",
+  INACTIVE: "inactive",
+  MAINTENANCE: "maintenance",
+};

@@ -1,11 +1,12 @@
 import prisma from "../../config/prisma.js";
+import { FIELD_STATUS } from "../../config/constant.js";
 
 export const fieldsRepository = {
   async findPublicFields(filters) {
     const { page, limit, keyword, sport_type, minPrice, maxPrice } = filters;
 
     const where = {
-      status: "active", // nếu enum schema của anh là ACTIVE thì đổi lại cho khớp
+      status: FIELD_STATUS.ACTIVE,
     };
 
     if (keyword) {
@@ -52,7 +53,7 @@ export const fieldsRepository = {
     return prisma.fields.findFirst({
       where: {
         id: fieldId,
-        status: "active", // sửa lại nếu enum của anh khác
+        status: FIELD_STATUS.ACTIVE,
       },
       include: {
         field_images: {
@@ -64,13 +65,6 @@ export const fieldsRepository = {
           },
         },
       },
-    });
-  },
-
-  findFieldImages(fieldId) {
-    return prisma.field_images.findMany({
-      where: { field_id: fieldId },
-      orderBy: [{ is_primary: "desc" }, { order_no: "asc" }],
     });
   },
 };
