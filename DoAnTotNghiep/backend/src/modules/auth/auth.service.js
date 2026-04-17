@@ -1,78 +1,72 @@
 import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
-import { env } from "../../config/env.js";
 import { authRepository } from "./auth.repository.js";
+import { signAccessToken } from "../../config/jwt.js";
 import {
-  validateRegisterPayload,
-  validateLoginPayload,
-  validateChangePasswordPayload,
-} from "./auth.validator.js";
-
-function getJwtSecret() {
-  return env.JWT_SECRET || process.env.JWT_SECRET || process.env.JWT_ACCESS_SECRET;
-}
-
-function signToken(user) {
-  const secret = getJwtSecret();
-
-  if (!secret) {
-    throw new Error("JWT secret chưa được cấu hình");
-  }
-
-  return jwt.sign(
-    {
-      sub: user.id,
-      role: user.role,
-      email: user.email,
-    },
-    secret,
-    { expiresIn: env.JWT_EXPIRES_IN || "7d" }
-  );
-}
+  APP_ROLES,
+  USER_STATUS,
+  SECURITY,
+} from "../../config/constant.js";
+import {
+  AuthError,
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+} from "../../core/errors/index.js";
 
 export const authService = {
   async register(payload) {
-    const valid = validateRegisterPayload(payload);
-
-    const existingUser = await authRepository.findByEmail(valid.email);
+    const existingUser = await authRepository.findByEmail(payload.email);
     if (existingUser) {
-      throw new Error("Email đã tồn tại");
+      throw new ConflictError("Email đã tồn tại");
     }
 
-    const password_hash = await bcrypt.hash(valid.password, 10);
+    const password_hash = await bcrypt.hash(
+      payload.password,
+      SECURITY.BCRYPT_SALT_ROUNDS
+    );
 
     const user = await authRepository.createUser({
-      name: valid.name,
-      email: valid.email,
-      phone: valid.phone,
+      name: payload.name,
+      email: payload.email,
+      phone: payload.phone,
       password_hash,
-      role: "USER",
-      status: "active",
+      role: APP_ROLES.USER,
+      status: USER_STATUS.ACTIVE,
     });
 
-    const token = signToken(user);
+    const token = signAccessToken({
+      sub: user.id,
+      role: user.role,
+      email: user.email,
+    });
 
     return { user, token };
   },
 
   async login(payload) {
-    const valid = validateLoginPayload(payload);
-
-    const user = await authRepository.findByEmail(valid.email);
+    const user = await authRepository.findByEmail(payload.email);
     if (!user) {
-      throw new Error("Sai email hoặc mật khẩu");
+      throw new AuthError("Sai email hoặc mật khẩu");
     }
 
-    if (user.status === "locked" || user.status === "deleted") {
-      throw new Error("Tài khoản đã bị khóa hoặc không còn hoạt động");
+    if (user.status === USER_STATUS.DELETED) {
+      throw new ForbiddenError("Tài khoản đã bị xóa");
     }
 
-    const isMatch = await bcrypt.compare(valid.password, user.password_hash);
+    if (user.status === USER_STATUS.LOCKED) {
+      throw new ForbiddenError("Tài khoản đã bị khóa");
+    }
+
+    const isMatch = await bcrypt.compare(payload.password, user.password_hash);
     if (!isMatch) {
-      throw new Error("Sai email hoặc mật khẩu");
+      throw new AuthError("Sai email hoặc mật khẩu");
     }
 
-    const token = signToken(user);
+    const token = signAccessToken({
+      sub: user.id,
+      role: user.role,
+      email: user.email,
+    });
 
     return {
       token,
@@ -91,28 +85,29 @@ export const authService = {
   async getMe(userId) {
     const user = await authRepository.findById(userId);
     if (!user) {
-      throw new Error("Không tìm thấy người dùng");
+      throw new NotFoundError("Không tìm thấy người dùng");
     }
 
     return user;
   },
 
   async changePassword(userId, payload) {
-    const valid = validateChangePasswordPayload(payload);
-
     const user = await authRepository.findFullById(userId);
     if (!user) {
-      throw new Error("Không tìm thấy người dùng");
+      throw new NotFoundError("Không tìm thấy người dùng");
     }
 
-    const isMatch = await bcrypt.compare(valid.oldPassword, user.password_hash);
+    const isMatch = await bcrypt.compare(payload.oldPassword, user.password_hash);
     if (!isMatch) {
-      throw new Error("Mật khẩu cũ không đúng");
+      throw new AuthError("Mật khẩu cũ không đúng");
     }
 
-    const password_hash = await bcrypt.hash(valid.newPassword, 10);
-    await authRepository.updatePassword(userId, password_hash);
+    const password_hash = await bcrypt.hash(
+      payload.newPassword,
+      SECURITY.BCRYPT_SALT_ROUNDS
+    );
 
+    await authRepository.updatePassword(userId, password_hash);
     return true;
   },
 };

@@ -1,7 +1,7 @@
 import { Router } from "express";
 
 import authRoutes from "../modules/auth/auth.routes.js";
-import usersRoutes from "../modules/users/users.routes.js";
+// import usersRoutes from "../modules/users/users.routes.js";
 
 import fieldsRoutes from "../modules/fields/fields.routes.js";
 import publicSchedulesRoutes from "../modules/schedules/public.schedules.routes.js";
@@ -25,8 +25,8 @@ import ownerDashboardRoutes from "../modules/owners/owner.dashboard.routes.js";
 import ownerFieldsRoutes from "../modules/owners/owner.fields.routes.js";
 import ownerSchedulesRoutes from "../modules/owners/owner.schedules.routes.js";
 
-import ownerReportsRoutes from "../modules/reports/owner.reports.routes.js";
-import adminReportsRoutes from "../modules/reports/admin.reports.routes.js";
+// import ownerReportsRoutes from "../modules/reports/owner.reports.routes.js";
+// import adminReportsRoutes from "../modules/reports/admin.reports.routes.js";
 
 import adminRoutes from "../modules/admin/admin.routes.js";
 
@@ -34,7 +34,7 @@ const router = Router();
 
 // Auth / User
 router.use("/auth", authRoutes);
-router.use("/users", usersRoutes);
+// router.use("/users", usersRoutes);
 
 // Public fields + public schedules
 router.use("/fields", fieldsRoutes);
@@ -55,7 +55,7 @@ router.use("/owner", ownerProfileRoutes);
 router.use("/owner", ownerDashboardRoutes);
 router.use("/owner", ownerFieldsRoutes);
 router.use("/owner", ownerSchedulesRoutes);
-router.use("/owner/reports", ownerReportsRoutes);
+// router.use("/owner/reports", ownerReportsRoutes);
 
 // Shared/public voucher routes
 router.use("/vouchers", vouchersRoutes);
@@ -63,8 +63,8 @@ router.use("/vouchers", vouchersRoutes);
 // Notifications
 router.use("/notifications", notificationsRoutes);
 
-// Admin
-router.use("/admin", adminRoutes);
-router.use("/admin/reports", adminReportsRoutes);
+// // Admin
+// router.use("/admin", adminRoutes);
+// router.use("/admin/reports", adminReportsRoutes);
 
 export default router;

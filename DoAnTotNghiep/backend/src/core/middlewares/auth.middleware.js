@@ -1,5 +1,6 @@
-import jwt from "jsonwebtoken";
 import prisma from "../../config/prisma.js";
+import { verifyAccessToken } from "../../config/jwt.js";
+import { USER_STATUS } from "../../config/constant.js";
 import { AuthError, ForbiddenError } from "../errors/index.js";
 
 function extractBearerToken(req) {
@@ -18,10 +19,6 @@ function extractBearerToken(req) {
   return token;
 }
 
-function getJwtSecret() {
-  return process.env.JWT_SECRET || process.env.JWT_ACCESS_SECRET || null;
-}
-
 export async function requireAuth(req, res, next) {
   try {
     const token = extractBearerToken(req);
@@ -30,12 +27,7 @@ export async function requireAuth(req, res, next) {
       throw new AuthError("Bạn chưa đăng nhập");
     }
 
-    const secret = getJwtSecret();
-    if (!secret) {
-      throw new Error("JWT secret chưa được cấu hình");
-    }
-
-    const decoded = jwt.verify(token, secret);
+    const decoded = verifyAccessToken(token);
     const userId = decoded?.id ?? decoded?.userId ?? decoded?.sub;
 
     if (!userId) {
@@ -57,11 +49,11 @@ export async function requireAuth(req, res, next) {
       throw new AuthError("Người dùng không tồn tại");
     }
 
-    if (user.status === "deleted") {
+    if (user.status === USER_STATUS.DELETED) {
       throw new ForbiddenError("Tài khoản đã bị xóa");
     }
 
-    if (user.status === "locked") {
+    if (user.status === USER_STATUS.LOCKED) {
       throw new ForbiddenError("Tài khoản đã bị khóa");
     }
 
@@ -97,13 +89,7 @@ export async function optionalAuth(req, res, next) {
       return next();
     }
 
-    const secret = getJwtSecret();
-    if (!secret) {
-      req.user = null;
-      return next();
-    }
-
-    const decoded = jwt.verify(token, secret);
+    const decoded = verifyAccessToken(token);
     const userId = decoded?.id ?? decoded?.userId ?? decoded?.sub;
 
     if (!userId) {
@@ -122,7 +108,11 @@ export async function optionalAuth(req, res, next) {
       },
     });
 
-    if (!user || user.status === "deleted" || user.status === "locked") {
+    if (
+      !user ||
+      user.status === USER_STATUS.DELETED ||
+      user.status === USER_STATUS.LOCKED
+    ) {
       req.user = null;
       return next();
     }

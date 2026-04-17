@@ -1,4 +1,8 @@
 import prisma from "../../config/prisma.js";
+import {
+  APP_ROLES,
+  OWNER_PROFILE_STATUS,
+} from "../../config/constant.js";
 import { AuthError, ForbiddenError } from "../errors/index.js";
 
 export function requireRole(...allowedRoles) {
@@ -26,11 +30,11 @@ export function requireApprovedOwner() {
         throw new AuthError("Bạn chưa đăng nhập");
       }
 
-      if (req.user.role === "ADMIN") {
+      if (req.user.role === APP_ROLES.ADMIN) {
         return next();
       }
 
-      if (req.user.role !== "OWNER") {
+      if (req.user.role !== APP_ROLES.OWNER) {
         throw new ForbiddenError("Chỉ owner đã được duyệt mới được truy cập");
       }
 
@@ -49,7 +53,7 @@ export function requireApprovedOwner() {
         throw new ForbiddenError("Bạn chưa có hồ sơ owner");
       }
 
-      if (ownerProfile.status !== "approved") {
+      if (ownerProfile.status !== OWNER_PROFILE_STATUS.APPROVED) {
         throw new ForbiddenError("Hồ sơ owner của bạn chưa được duyệt");
       }
 

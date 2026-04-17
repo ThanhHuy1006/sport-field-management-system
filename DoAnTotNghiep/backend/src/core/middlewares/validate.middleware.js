@@ -1,9 +1,13 @@
-import { ValidationError } from "../errors/index.js";
+import { AppError, ValidationError } from "../errors/index.js";
 
 function runValidator(validator, value, sourceName) {
   try {
     return validator(value);
   } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+
     if (error instanceof Error) {
       throw new ValidationError(error.message, {
         source: sourceName,
