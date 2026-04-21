@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import {
@@ -13,8 +14,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { User, Settings, LogOut, LayoutDashboard, Building2, Shield, Heart, Clock } from "lucide-react"
+import { clearAuthSession, getStoredUser } from "@/features/auth/lib/auth-storage"
 
-type UserRole = "customer" | "owner" | "admin"
+type UserRole = "USER" | "OWNER" | "ADMIN"
 
 interface UserData {
   name: string
@@ -23,13 +25,25 @@ interface UserData {
   role: UserRole
 }
 
+function mapBackendRoleToUiRole(role?: string | null): UserRole {
+  if (role === "OWNER") return "OWNER"
+  if (role === "ADMIN") return "ADMIN"
+  return "USER"
+}
+
 export function UserNav() {
-  const [user] = useState<UserData>({
-    name: "Nguyễn Văn A",
-    email: "nguyenvana@example.com",
-    avatar: "/placeholder.svg",
-    role: "customer",
-  })
+  const router = useRouter()
+
+  const storedUser = getStoredUser()
+
+  const user = useMemo<UserData>(() => {
+    return {
+      name: storedUser?.name || "Người dùng",
+      email: storedUser?.email || "",
+      avatar: storedUser?.avatar_url || "/placeholder.svg",
+      role: mapBackendRoleToUiRole(storedUser?.role),
+    }
+  }, [storedUser])
 
   const getInitials = (name: string) => {
     return name
@@ -42,32 +56,32 @@ export function UserNav() {
 
   const getRoleLabel = (role: UserRole) => {
     switch (role) {
-      case "customer":
+      case "USER":
         return "Khách hàng"
-      case "owner":
+      case "OWNER":
         return "Chủ sân"
-      case "admin":
+      case "ADMIN":
         return "Quản trị viên"
     }
   }
 
   const getRoleLinks = () => {
     switch (user.role) {
-      case "customer":
+      case "USER":
         return [
           { href: "/profile", icon: User, label: "Hồ sơ của tôi" },
           { href: "/bookings", icon: Clock, label: "Lịch đặt sân" },
           { href: "/wishlist", icon: Heart, label: "Yêu thích" },
           { href: "/settings", icon: Settings, label: "Cài đặt" },
         ]
-      case "owner":
+      case "OWNER":
         return [
           { href: "/owner/dashboard", icon: LayoutDashboard, label: "Dashboard" },
           { href: "/owner/profile", icon: User, label: "Hồ sơ của tôi" },
           { href: "/owner/fields", icon: Building2, label: "Quản lý sân" },
           { href: "/owner/settings", icon: Settings, label: "Cài đặt" },
         ]
-      case "admin":
+      case "ADMIN":
         return [
           { href: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
           { href: "/admin/profile", icon: User, label: "Hồ sơ của tôi" },
@@ -75,6 +89,12 @@ export function UserNav() {
           { href: "/admin/settings", icon: Settings, label: "Cài đặt" },
         ]
     }
+  }
+
+  const handleLogout = () => {
+    clearAuthSession()
+    router.push("/login")
+    router.refresh()
   }
 
   return (
@@ -108,7 +128,10 @@ export function UserNav() {
           )
         })}
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="text-red-600 dark:text-red-400 cursor-pointer">
+        <DropdownMenuItem
+          className="text-red-600 dark:text-red-400 cursor-pointer"
+          onClick={handleLogout}
+        >
           <LogOut className="h-4 w-4 mr-2" />
           <span>Đăng xuất</span>
         </DropdownMenuItem>

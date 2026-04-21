@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { UserNav } from "./user-nav"
 import { ThemeToggle } from "./theme-toggle"
 import { Button } from "@/components/ui/button"
@@ -10,17 +10,49 @@ import { LayoutList, LayoutDashboard, Building2, Calendar, Users, ShieldCheck, F
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { NotificationsPanel } from "@/components/notifications-panel"
 import { useNotifications } from "@/hooks/use-notifications"
+import { getStoredAccessToken, getStoredUser } from "@/features/auth/lib/auth-storage"
 
-type UserRole = "customer" | "owner" | "admin" | null
+type UserRole = "USER" | "OWNER" | "ADMIN" | null
+
+function mapBackendRoleToUiRole(role?: string | null): UserRole {
+  if (role === "USER") return "USER"
+  if (role === "ADMIN") return "ADMIN"
+  if (role === "OWNER") return "OWNER"
+  return null
+}
 
 export function TopNav() {
   const [currentRole, setCurrentRole] = useState<UserRole>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications()
 
+  useEffect(() => {
+    const syncAuthState = () => {
+      const token = getStoredAccessToken()
+      const user = getStoredUser()
+
+      if (!token || !user) {
+        setCurrentRole(null)
+        return
+      }
+
+      setCurrentRole(mapBackendRoleToUiRole(user.role))
+    }
+
+    syncAuthState()
+
+    window.addEventListener("storage", syncAuthState)
+    window.addEventListener("focus", syncAuthState)
+
+    return () => {
+      window.removeEventListener("storage", syncAuthState)
+      window.removeEventListener("focus", syncAuthState)
+    }
+  }, [])
+
   const isLoggedIn = currentRole !== null
 
-  const getNavigationLinks = () => {
+  const navLinks = useMemo(() => {
     if (!isLoggedIn) {
       return [
         { href: "/", label: "Trang chủ", icon: null },
@@ -32,7 +64,7 @@ export function TopNav() {
     }
 
     switch (currentRole) {
-      case "customer":
+      case "USER":
         return [
           { href: "/", label: "Trang chủ", icon: null },
           { href: "/browse", label: "Danh sách sân", icon: LayoutList },
@@ -40,14 +72,14 @@ export function TopNav() {
           { href: "/bookings", label: "Đơn đặt sân", icon: Calendar },
           { href: "/help", label: "Trợ giúp", icon: FileText },
         ]
-      case "owner":
+      case "OWNER":
         return [
           { href: "/owner/dashboard", label: "Dashboard", icon: LayoutDashboard },
           { href: "/owner/fields", label: "Quản lý sân", icon: Building2 },
           { href: "/owner/bookings", label: "Đơn đặt", icon: Calendar },
           { href: "/owner/schedule", label: "Lịch trình", icon: Calendar },
         ]
-      case "admin":
+      case "ADMIN":
         return [
           { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
           { href: "/admin/users", label: "Users", icon: Users },
@@ -58,15 +90,12 @@ export function TopNav() {
       default:
         return []
     }
-  }
-
-  const navLinks = getNavigationLinks()
+  }, [currentRole, isLoggedIn])
 
   return (
     <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          {/* Logo Section */}
           <div className="flex items-center gap-8">
             <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
               <div className="relative w-10 h-10 flex items-center justify-center">
@@ -99,7 +128,6 @@ export function TopNav() {
             </div>
           </div>
 
-          {/* Actions Section */}
           <div className="flex items-center gap-2">
             {isLoggedIn ? (
               <>
@@ -135,7 +163,6 @@ export function TopNav() {
               </>
             )}
 
-            {/* Mobile Menu */}
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="lg:hidden">
@@ -149,7 +176,6 @@ export function TopNav() {
                     <span className="font-bold text-lg">HCMUT Sport</span>
                   </div>
 
-                  {/* Mobile navigation links */}
                   {navLinks.map((link) => {
                     const Icon = link.icon
                     return (

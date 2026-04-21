@@ -5,38 +5,59 @@ import type React from "react"
 import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
-import { Mail, Lock, ArrowLeft } from "lucide-react"
+import { Mail, Lock, ArrowLeft, AlertCircle } from "lucide-react"
+import { login } from "@/features/auth/services/auth.service"
+import { saveAuthSession } from "@/features/auth/lib/auth-storage"
 
 export default function LoginPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [rememberMe, setRememberMe] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState("")
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Login:", { email, password, rememberMe })
 
-    // In real app: authenticate and check user status from database
+    try {
+      setIsSubmitting(true)
+      setError("")
 
-    // Simulate different user types for testing
-    if (email.includes("owner")) {
-      // Mock: Check if owner status is pending
-      const mockStatus = "active" // Change to "pending_approval" or "rejected" to test
+      const result = await login({
+        email,
+        password,
+      })
 
-      if (mockStatus === "pending_approval") {
-        window.location.href = "/owner/pending"
-      } else if (mockStatus === "rejected") {
-        window.location.href = "/owner/rejected"
-      } else {
-        window.location.href = "/owner/dashboard"
+      saveAuthSession(result.data.token, result.data.user)
+
+      const redirect = searchParams.get("redirect")
+      if (redirect) {
+        router.push(redirect)
+        return
       }
-    } else if (email.includes("admin")) {
-      window.location.href = "/admin/dashboard"
-    } else {
-      window.location.href = "/browse"
+
+      if (result.data.user.role === "admin") {
+        router.push("/admin")
+        return
+      }
+
+      if (result.data.user.role === "owner") {
+        router.push("/owner")
+        return
+      }
+
+      router.push("/browse")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Đăng nhập thất bại")
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -58,6 +79,13 @@ export default function LoginPage() {
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
+            {error && (
+              <div className="flex items-start gap-2 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-600">
+                <AlertCircle className="w-4 h-4 mt-0.5" />
+                <span>{error}</span>
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">Địa Chỉ Email</label>
               <div className="relative">
@@ -103,8 +131,8 @@ export default function LoginPage() {
               </Link>
             </div>
 
-            <Button type="submit" className="w-full">
-              Đăng Nhập
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? "Đang đăng nhập..." : "Đăng Nhập"}
             </Button>
           </form>
 
