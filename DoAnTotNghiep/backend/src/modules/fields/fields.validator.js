@@ -30,11 +30,20 @@ export function validatePublicFieldQuery(query) {
     throw new ValidationError("maxPrice không hợp lệ");
   }
 
+  const sort = String(query.sort || "newest").trim();
+  const allowedSort = ["newest", "price_asc", "price_desc", "name", "rating"];
+
+  if (!allowedSort.includes(sort)) {
+    throw new ValidationError("sort không hợp lệ");
+  }
+
   return {
     page,
     limit,
-    keyword: query.keyword ? String(query.keyword).trim() : "",
-    sport_type: query.sport_type ? String(query.sport_type).trim() : "",
+    keyword: String(query.keyword ?? query.q ?? "").trim(),
+    sport_type: String(query.sport_type ?? query.sport ?? "").trim(),
+    district: String(query.district ?? "").trim(),
+    sort,
     minPrice,
     maxPrice,
   };

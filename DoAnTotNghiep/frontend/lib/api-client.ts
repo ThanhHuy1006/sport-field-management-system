@@ -7,21 +7,44 @@ type ApiErrorPayload = {
   errors?: unknown;
 };
 
+type QueryValue = string | number | boolean | null | undefined;
+type QueryParams = Record<string, QueryValue>;
+
+function buildQueryString(params?: QueryParams) {
+  if (!params) return "";
+
+  const searchParams = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") return;
+    searchParams.set(key, String(value));
+  });
+
+  const query = searchParams.toString();
+  return query ? `?${query}` : "";
+}
+
+type ApiRequestOptions = RequestInit & {
+  requireAuth?: boolean;
+};
+
 export async function apiRequest<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: ApiRequestOptions = {}
 ): Promise<T> {
+  const { requireAuth = true, ...fetchOptions } = options;
+
   const token =
-    typeof window !== "undefined"
+    typeof window !== "undefined" && requireAuth
       ? localStorage.getItem("accessToken")
       : null;
 
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
+    ...fetchOptions,
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.headers || {}),
+      ...(fetchOptions.headers || {}),
     },
     cache: "no-store",
   });
@@ -40,4 +63,15 @@ export async function apiRequest<T>(
   }
 
   return data as T;
+}
+
+export function apiGet<T>(
+  endpoint: string,
+  params?: QueryParams,
+  options: Omit<ApiRequestOptions, "method" | "body"> = {}
+) {
+  return apiRequest<T>(`${endpoint}${buildQueryString(params)}`, {
+    ...options,
+    method: "GET",
+  });
 }

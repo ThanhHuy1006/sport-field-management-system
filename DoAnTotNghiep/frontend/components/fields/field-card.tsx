@@ -11,8 +11,11 @@ interface FieldCardProps {
   viewMode?: "grid" | "list"
 }
 
-function getFieldImage(type: string, fallbackImage: string): string {
-  return FIELD_IMAGES[type] || fallbackImage
+// function getFieldImage(type: string, fallbackImage: string): string {
+//   return FIELD_IMAGES[type] || fallbackImage
+// }
+function getFieldImage(type: string, fallbackImage?: string | null): string {
+  return FIELD_IMAGES[type] || fallbackImage || "/placeholder.svg"
 }
 
 export function FieldCard({ field, viewMode = "grid" }: FieldCardProps) {
@@ -119,7 +122,8 @@ export function FieldCard({ field, viewMode = "grid" }: FieldCardProps) {
           <div className="flex items-center gap-1 text-sm text-muted-foreground mb-3">
             <Clock className="w-4 h-4" />
             <span>
-              {field.openTime} - {field.closeTime}
+              {/* {field.openTime} - {field.closeTime} */}
+              {field.openTime ?? "--:--"} - {field.closeTime ?? "--:--"}
             </span>
           </div>
 

@@ -5,11 +5,11 @@ export interface Field {
   rating: number
   reviews: number
   location: string
-  district: string
+  district: string | null
   price: number
-  image: string
-  openTime: string
-  closeTime: string
+  image: string | null
+  openTime: string | null
+  closeTime: string | null
   available: boolean
 }
 
