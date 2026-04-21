@@ -15,4 +15,24 @@ router.get("/", validateQuery(validatePublicFieldQuery), fieldsController.getPub
 router.get("/:fieldId", validateParams(validateFieldIdParams), fieldsController.getPublicFieldDetail);
 router.get("/:fieldId/images", validateParams(validateFieldIdParams), fieldsController.getPublicFieldImages);
 
+
+router.get(
+  "/:fieldId/owner-info",
+  validateParams(validateFieldIdParams),
+  fieldsController.getPublicFieldOwnerInfo
+);
+
+router.get(
+  "/:fieldId/reviews",
+  validateParams(validateFieldIdParams),
+  validateQuery(validatePublicFieldReviewsQuery),
+  fieldsController.getPublicFieldReviews
+);
+
+router.get(
+  "/:fieldId/availability-summary",
+  validateParams(validateFieldIdParams),
+  validateQuery(validateAvailabilitySummaryQuery),
+  fieldsController.getPublicFieldAvailabilitySummary
+);
 export default router;
