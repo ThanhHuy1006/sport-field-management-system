@@ -14,7 +14,9 @@ function getRatingInfo(field) {
   const count = ratings.length;
   const avg =
     count > 0
-      ? Number((ratings.reduce((sum, x) => sum + x, 0) / count).toFixed(1))
+      ? Number(
+          (ratings.reduce((sum, x) => sum + x, 0) / count).toFixed(1)
+        )
       : 0;
 
   return { avg, count };
@@ -23,15 +25,8 @@ function getRatingInfo(field) {
 function getOperatingTime(field) {
   const hours = field.operating_hours || [];
 
-  const openTimes = hours
-    .map((x) => x.open_time)
-    .filter(Boolean)
-    .sort();
-
-  const closeTimes = hours
-    .map((x) => x.close_time)
-    .filter(Boolean)
-    .sort();
+  const openTimes = hours.map((x) => x.open_time).filter(Boolean).sort();
+  const closeTimes = hours.map((x) => x.close_time).filter(Boolean).sort();
 
   return {
     openTime: openTimes[0] ?? null,
@@ -122,4 +117,33 @@ export function toFieldImageList(images) {
     is_primary: img.is_primary,
     order_no: img.order_no,
   }));
+}
+
+export function toFieldOwnerInfo(owner) {
+  return {
+    user_id: owner.user_id,
+    display_name: owner.display_name,
+    email: owner.email,
+    phone: owner.phone,
+    avatar_url: owner.avatar_url,
+    joined_at: owner.joined_at,
+    verified: owner.verified,
+    approved_at: owner.approved_at,
+  };
+}
+
+export function toFieldReviewListItem(review) {
+  return {
+    id: review.id,
+    rating: review.rating,
+    comment: review.comment,
+    reply_text: review.reply_text,
+    reply_at: review.reply_at,
+    created_at: review.created_at,
+    user: {
+      id: review.users?.id ?? null,
+      name: review.users?.name ?? "Người dùng",
+      avatar_url: review.users?.avatar_url ?? null,
+    },
+  };
 }

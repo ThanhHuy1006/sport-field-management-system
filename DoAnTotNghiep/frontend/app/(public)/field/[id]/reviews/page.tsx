@@ -1,153 +1,185 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { ArrowLeft, Star, ThumbsUp, Flag, ImageIcon } from 'lucide-react'
-import { Pagination } from "@/components/pagination"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { ArrowLeft, Star, ThumbsUp, Flag } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { getFieldDetail } from "@/features/fields/services/get-field-detail";
+import { getFieldReviews } from "@/features/fields/services/get-field-reviews";
 
-const mockReviews = [
-  {
-    id: 1,
-    author: "Nguyễn Văn A",
-    avatar: "/placeholder.svg",
-    rating: 5,
-    text: "Sân rất đẹp và chất lượng. Cỏ được chăm sóc tốt, đèn chiếu sáng đầy đủ. Chủ sân thân thiện và nhiệt tình.",
-    date: "2025-01-12",
-    helpful: 12,
-    verified: true,
-    images: ["/placeholder.svg", "/placeholder.svg"],
-    ownerReply: {
-      text: "Cảm ơn bạn đã tin tưởng và sử dụng dịch vụ! Rất mong được phục vụ bạn lần sau.",
-      date: "2025-01-13",
-    },
-  },
-  {
-    id: 2,
-    author: "Trần Thị B",
-    avatar: "/placeholder.svg",
-    rating: 4,
-    text: "Sân ổn, giá hợp lý. Tuy nhiên parking hơi chật vào giờ cao điểm.",
-    date: "2025-01-10",
-    helpful: 8,
-    verified: true,
-    images: [],
-  },
-  {
-    id: 3,
-    author: "Lê Văn C",
-    avatar: "/placeholder.svg",
-    rating: 5,
-    text: "Sân tuyệt vời! Đã đặt nhiều lần và luôn hài lòng. Phòng thay đồ sạch sẽ, có vòi sen nước nóng.",
-    date: "2025-01-08",
-    helpful: 15,
-    verified: true,
-    images: ["/placeholder.svg"],
-    ownerReply: {
-      text: "Cảm ơn bạn đã ủng hộ! Chúng tôi rất vui khi bạn hài lòng với dịch vụ.",
-      date: "2025-01-09",
-    },
-  },
-  {
-    id: 4,
-    author: "Phạm Thị D",
-    avatar: "/placeholder.svg",
-    rating: 3,
-    text: "Sân khá tốt nhưng cần bảo trì thêm. Có một số khu vực cỏ bị hư.",
-    date: "2025-01-05",
-    helpful: 5,
-    verified: false,
-    images: [],
-  },
-  {
-    id: 5,
-    author: "Hoàng Văn E",
-    avatar: "/placeholder.svg",
-    rating: 5,
-    text: "Perfect! Sân đẹp nhất khu vực. Booking dễ dàng, chủ sân confirm nhanh.",
-    date: "2025-01-03",
-    helpful: 20,
-    verified: true,
-    images: [],
-  },
-]
+type ReviewUi = {
+  id: number;
+  author: string;
+  avatar: string | null;
+  rating: number;
+  text: string;
+  date: string;
+  helpful: number;
+  verified: boolean;
+  images: string[];
+  ownerReply?: {
+    text: string;
+    date: string;
+  };
+};
 
-const mockFieldData = {
-  name: "Green Valley Soccer Field",
-  averageRating: 4.8,
-  totalReviews: 124,
-  ratingBreakdown: {
-    5: 89,
-    4: 25,
-    3: 7,
-    2: 2,
-    1: 1,
-  },
+function formatDate(value: string | null | undefined) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("vi-VN");
 }
 
-export default function FieldReviewsPage({ params }: { params: { id: string } }) {
-  const [currentPage, setCurrentPage] = useState(1)
-  const [sortBy, setSortBy] = useState("recent")
-  const [filterRating, setFilterRating] = useState("all")
-  const [showReportDialog, setShowReportDialog] = useState(false)
-  const [selectedReview, setSelectedReview] = useState<number | null>(null)
-  const [reportReason, setReportReason] = useState("")
-
-  const itemsPerPage = 10
-
-  // Filter and sort reviews
-  let filteredReviews = mockReviews.filter((review) => {
-    if (filterRating === "all") return true
-    return review.rating === parseInt(filterRating)
-  })
-
-  if (sortBy === "recent") {
-    filteredReviews.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-  } else if (sortBy === "helpful") {
-    filteredReviews.sort((a, b) => b.helpful - a.helpful)
-  } else if (sortBy === "highest") {
-    filteredReviews.sort((a, b) => b.rating - a.rating)
-  } else if (sortBy === "lowest") {
-    filteredReviews.sort((a, b) => a.rating - b.rating)
+function mapApiSort(sortBy: string) {
+  switch (sortBy) {
+    case "highest":
+      return "rating_desc";
+    case "lowest":
+      return "rating_asc";
+    case "oldest":
+      return "oldest";
+    case "recent":
+    default:
+      return "newest";
   }
+}
 
-  const totalPages = Math.ceil(filteredReviews.length / itemsPerPage)
-  const paginatedReviews = filteredReviews.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+export default function FieldReviewsPage() {
+  const params = useParams<{ id: string }>();
+  const fieldId = params?.id;
+
+  const [fieldName, setFieldName] = useState("Sân thể thao");
+  const [averageRating, setAverageRating] = useState(0);
+  const [totalReviews, setTotalReviews] = useState(0);
+  const [ratingBreakdown, setRatingBreakdown] = useState<Record<string, number>>({});
+  const [reviews, setReviews] = useState<ReviewUi[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState("recent");
+  const [filterRating, setFilterRating] = useState("all");
+  const [showReportDialog, setShowReportDialog] = useState(false);
+  const [selectedReview, setSelectedReview] = useState<number | null>(null);
+  const [reportReason, setReportReason] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [totalPages, setTotalPages] = useState(1);
+
+  const itemsPerPage = 10;
+
+  useEffect(() => {
+    if (!fieldId) return;
+
+    let cancelled = false;
+
+    async function fetchPageData() {
+      try {
+        setIsLoading(true);
+        setError("");
+
+        const [detailRes, reviewsRes] = await Promise.all([
+          getFieldDetail(fieldId),
+          getFieldReviews(fieldId, {
+            page: currentPage,
+            limit: itemsPerPage,
+            sort: mapApiSort(sortBy),
+            rating: filterRating === "all" ? undefined : Number(filterRating),
+          }),
+        ]);
+
+        if (cancelled) return;
+
+        setFieldName(detailRes.data.field_name ?? "Sân thể thao");
+
+        setAverageRating(reviewsRes.data.summary?.averageRating ?? 0);
+        setTotalReviews(reviewsRes.data.summary?.totalReviews ?? 0);
+        setRatingBreakdown(reviewsRes.data.summary?.ratingBreakdown ?? {});
+        setTotalPages(reviewsRes.data.pagination?.totalPages ?? 1);
+
+        const mappedReviews: ReviewUi[] = (reviewsRes.data.items ?? []).map((review) => ({
+          id: review.id,
+          author: review.user?.name ?? "Người dùng",
+          avatar: review.user?.avatar_url ?? "/placeholder.svg",
+          rating: review.rating ?? 0,
+          text: review.comment ?? "Không có nội dung đánh giá",
+          date: formatDate(review.created_at),
+          helpful: 0,
+          verified: true,
+          images: [],
+          ownerReply: review.reply_text
+            ? {
+                text: review.reply_text,
+                date: formatDate(review.reply_at),
+              }
+            : undefined,
+        }));
+
+        setReviews(mappedReviews);
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : "Không thể tải đánh giá");
+        setReviews([]);
+        setAverageRating(0);
+        setTotalReviews(0);
+        setRatingBreakdown({});
+        setTotalPages(1);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+
+    fetchPageData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fieldId, currentPage, sortBy, filterRating]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [sortBy, filterRating]);
+
+  const ratingRows = useMemo(() => [5, 4, 3, 2, 1], []);
 
   const handleHelpful = (reviewId: number) => {
-    console.log("[v0] Marking review as helpful:", reviewId)
-  }
+    console.log("Mark helpful:", reviewId);
+  };
 
   const handleReport = () => {
-    console.log("[v0] Reporting review:", selectedReview, reportReason)
-    setShowReportDialog(false)
-    setReportReason("")
+    console.log("Report review:", selectedReview, reportReason);
+    setShowReportDialog(false);
+    setReportReason("");
+  };
+
+  if (isLoading) {
+    return (
+      <main className="min-h-screen bg-background">
+        <div className="max-w-7xl mx-auto px-4 py-12 text-center">
+          <p className="text-lg text-muted-foreground">Đang tải đánh giá...</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (error) {
+    return (
+      <main className="min-h-screen bg-background">
+        <div className="max-w-7xl mx-auto px-4 py-12 text-center">
+          <h1 className="text-2xl font-bold">Không thể tải đánh giá</h1>
+          <p className="text-muted-foreground mt-2">{error}</p>
+          <Link href={`/field/${fieldId}`}>
+            <Button className="mt-4">Quay lại chi tiết sân</Button>
+          </Link>
+        </div>
+      </main>
+    );
   }
 
   return (
     <main className="min-h-screen bg-background">
-      {/* Header */}
       <header className="sticky top-0 z-50 bg-background border-b border-border">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href={`/field/${params.id}`} className="flex items-center gap-2 text-primary hover:text-primary/80">
+          <Link href={`/field/${fieldId}`} className="flex items-center gap-2 text-primary hover:text-primary/80">
             <ArrowLeft className="w-5 h-5" />
             Quay lại
           </Link>
@@ -157,208 +189,202 @@ export default function FieldReviewsPage({ params }: { params: { id: string } })
       </header>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Rating Summary */}
         <Card className="p-6 mb-8">
-          <h2 className="text-2xl font-bold mb-6">{mockFieldData.name}</h2>
+          <h2 className="text-2xl font-bold mb-6">{fieldName}</h2>
           <div className="grid md:grid-cols-2 gap-8">
-            {/* Overall Rating */}
             <div className="flex flex-col items-center justify-center text-center border-r border-border">
-              <div className="text-6xl font-bold text-primary mb-2">{mockFieldData.averageRating}</div>
+              <div className="text-6xl font-bold text-primary mb-2">{averageRating}</div>
               <div className="flex items-center gap-1 mb-2">
                 {[...Array(5)].map((_, i) => (
                   <Star
                     key={i}
                     className={`w-6 h-6 ${
-                      i < Math.round(mockFieldData.averageRating)
+                      i < Math.round(averageRating)
                         ? "fill-yellow-400 text-yellow-400"
                         : "text-muted-foreground"
                     }`}
                   />
                 ))}
               </div>
-              <p className="text-muted-foreground">Dựa trên {mockFieldData.totalReviews} đánh giá</p>
+              <p className="text-muted-foreground">Dựa trên {totalReviews} đánh giá</p>
             </div>
 
-            {/* Rating Breakdown */}
             <div className="space-y-3">
-              {[5, 4, 3, 2, 1].map((rating) => {
-                const count = mockFieldData.ratingBreakdown[rating as keyof typeof mockFieldData.ratingBreakdown]
-                const percentage = (count / mockFieldData.totalReviews) * 100
+              {ratingRows.map((rating) => {
+                const count = ratingBreakdown[String(rating)] ?? 0;
+                const percentage = totalReviews > 0 ? (count / totalReviews) * 100 : 0;
+
                 return (
                   <div key={rating} className="flex items-center gap-3">
-                    <span className="text-sm font-medium w-12">{rating} sao</span>
-                    <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
-                      <div className="bg-yellow-400 h-full transition-all" style={{ width: `${percentage}%` }} />
+                    <span className="w-3 text-sm">{rating}</span>
+                    <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                    <div className="flex-1 bg-muted rounded-full h-2">
+                      <div
+                        className="bg-yellow-400 h-2 rounded-full"
+                        style={{ width: `${percentage}%` }}
+                      />
                     </div>
-                    <span className="text-sm text-muted-foreground w-12 text-right">{count}</span>
+                    <span className="text-sm text-muted-foreground w-10">{count}</span>
                   </div>
-                )
+                );
               })}
             </div>
           </div>
         </Card>
 
-        {/* Filters and Sort */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          <Select value={filterRating} onValueChange={setFilterRating}>
-            <SelectTrigger className="w-full sm:w-48">
-              <SelectValue placeholder="Lọc theo số sao" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tất cả</SelectItem>
-              <SelectItem value="5">5 sao</SelectItem>
-              <SelectItem value="4">4 sao</SelectItem>
-              <SelectItem value="3">3 sao</SelectItem>
-              <SelectItem value="2">2 sao</SelectItem>
-              <SelectItem value="1">1 sao</SelectItem>
-            </SelectContent>
-          </Select>
+        <Card className="p-6 mb-8">
+          <div className="flex flex-col md:flex-row gap-4 justify-between">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={filterRating === "all" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilterRating("all")}
+              >
+                Tất cả
+              </Button>
+              {[5, 4, 3, 2, 1].map((rating) => (
+                <Button
+                  key={rating}
+                  variant={filterRating === String(rating) ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setFilterRating(String(rating))}
+                >
+                  {rating} sao
+                </Button>
+              ))}
+            </div>
 
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-full sm:w-48">
-              <SelectValue placeholder="Sắp xếp" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="recent">Mới nhất</SelectItem>
-              <SelectItem value="helpful">Hữu ích nhất</SelectItem>
-              <SelectItem value="highest">Đánh giá cao nhất</SelectItem>
-              <SelectItem value="lowest">Đánh giá thấp nhất</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+            <select
+              className="border border-border rounded-md px-3 py-2 bg-background"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+            >
+              <option value="recent">Mới nhất</option>
+              <option value="oldest">Cũ nhất</option>
+              <option value="highest">Điểm cao nhất</option>
+              <option value="lowest">Điểm thấp nhất</option>
+            </select>
+          </div>
+        </Card>
 
-        {/* Reviews List */}
-        <div className="space-y-6 mb-8">
-          {paginatedReviews.map((review) => (
-            <Card key={review.id} className="p-6">
-              {/* Review Header */}
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-start gap-3">
+        <div className="space-y-6">
+          {reviews.length > 0 ? (
+            reviews.map((review) => (
+              <Card key={review.id} className="p-6">
+                <div className="flex items-start gap-4">
                   <img
                     src={review.avatar || "/placeholder.svg"}
                     alt={review.author}
                     className="w-12 h-12 rounded-full object-cover"
                   />
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-bold text-foreground">{review.author}</h4>
-                      {review.verified && (
-                        <Badge variant="secondary" className="text-xs">
-                          Đã xác minh
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <div className="flex items-center gap-1">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`w-4 h-4 ${
-                              i < review.rating ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"
-                            }`}
-                          />
-                        ))}
+
+                  <div className="flex-1">
+                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-2 mb-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-bold">{review.author}</h3>
+                          {review.verified && (
+                            <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
+                              Đã xác thực
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1 mt-1">
+                          {[...Array(5)].map((_, i) => (
+                            <Star
+                              key={i}
+                              className={`w-4 h-4 ${
+                                i < review.rating
+                                  ? "fill-yellow-400 text-yellow-400"
+                                  : "text-muted-foreground"
+                              }`}
+                            />
+                          ))}
+                          <span className="text-sm text-muted-foreground ml-2">{review.date}</span>
+                        </div>
                       </div>
-                      <span className="text-sm text-muted-foreground">{review.date}</span>
+                    </div>
+
+                    <p className="text-muted-foreground mb-4">{review.text}</p>
+
+                    {review.ownerReply && (
+                      <div className="bg-muted rounded-lg p-4 mb-4">
+                        <p className="font-medium mb-1">Phản hồi từ chủ sân</p>
+                        <p className="text-muted-foreground">{review.ownerReply.text}</p>
+                        <p className="text-xs text-muted-foreground mt-2">{review.ownerReply.date}</p>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-4">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleHelpful(review.id)}
+                        className="gap-2"
+                      >
+                        <ThumbsUp className="w-4 h-4" />
+                        Hữu ích ({review.helpful})
+                      </Button>
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedReview(review.id);
+                          setShowReportDialog(true);
+                        }}
+                        className="gap-2"
+                      >
+                        <Flag className="w-4 h-4" />
+                        Báo cáo
+                      </Button>
                     </div>
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedReview(review.id)
-                    setShowReportDialog(true)
-                  }}
-                >
-                  <Flag className="w-4 h-4" />
-                </Button>
-              </div>
-
-              {/* Review Content */}
-              <p className="text-foreground mb-4">{review.text}</p>
-
-              {/* Review Images */}
-              {review.images.length > 0 && (
-                <div className="flex gap-2 mb-4">
-                  {review.images.map((img, idx) => (
-                    <img
-                      key={idx}
-                      src={img || "/placeholder.svg"}
-                      alt={`Review ${idx + 1}`}
-                      className="w-24 h-24 object-cover rounded-lg cursor-pointer hover:opacity-80 transition"
-                    />
-                  ))}
-                </div>
-              )}
-
-              {/* Review Actions */}
-              <div className="flex items-center gap-4 pt-4 border-t border-border">
-                <Button variant="ghost" size="sm" onClick={() => handleHelpful(review.id)}>
-                  <ThumbsUp className="w-4 h-4 mr-2" />
-                  Hữu ích ({review.helpful})
-                </Button>
-              </div>
-
-              {/* Owner Reply */}
-              {review.ownerReply && (
-                <div className="mt-4 ml-12 p-4 bg-muted rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Badge>Phản hồi từ chủ sân</Badge>
-                    <span className="text-sm text-muted-foreground">{review.ownerReply.date}</span>
-                  </div>
-                  <p className="text-foreground">{review.ownerReply.text}</p>
-                </div>
-              )}
+              </Card>
+            ))
+          ) : (
+            <Card className="p-6 text-center">
+              <p className="text-muted-foreground">Chưa có đánh giá nào phù hợp</p>
             </Card>
-          ))}
+          )}
         </div>
 
-        {/* Pagination */}
-        {filteredReviews.length > 0 && (
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-            itemsPerPage={itemsPerPage}
-            totalItems={filteredReviews.length}
-          />
+        {totalPages > 1 && (
+          <div className="flex justify-center gap-2 mt-8">
+            {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
+              <Button
+                key={page}
+                variant={page === currentPage ? "default" : "outline"}
+                onClick={() => setCurrentPage(page)}
+              >
+                {page}
+              </Button>
+            ))}
+          </div>
         )}
 
-        {filteredReviews.length === 0 && (
-          <Card className="p-12 text-center">
-            <p className="text-muted-foreground text-lg">Chưa có đánh giá nào</p>
-          </Card>
+        {showReportDialog && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[100]">
+            <Card className="w-full max-w-md p-6">
+              <h3 className="text-lg font-bold mb-4">Báo cáo đánh giá</h3>
+              <textarea
+                className="w-full min-h-[120px] border border-border rounded-md px-3 py-2 bg-background"
+                placeholder="Nhập lý do báo cáo..."
+                value={reportReason}
+                onChange={(e) => setReportReason(e.target.value)}
+              />
+              <div className="flex justify-end gap-2 mt-4">
+                <Button variant="outline" onClick={() => setShowReportDialog(false)}>
+                  Hủy
+                </Button>
+                <Button onClick={handleReport}>Gửi báo cáo</Button>
+              </div>
+            </Card>
+          </div>
         )}
       </div>
-
-      {/* Report Dialog */}
-      <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Báo cáo đánh giá</DialogTitle>
-            <DialogDescription>Vui lòng cho chúng tôi biết vấn đề với đánh giá này</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <Textarea
-              placeholder="Mô tả vấn đề..."
-              value={reportReason}
-              onChange={(e) => setReportReason(e.target.value)}
-              rows={4}
-            />
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowReportDialog(false)}>
-              Hủy
-            </Button>
-            <Button onClick={handleReport} disabled={!reportReason.trim()}>
-              Gửi báo cáo
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </main>
-  )
+  );
 }

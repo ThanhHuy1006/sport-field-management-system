@@ -7,14 +7,16 @@ import {
 import {
   validatePublicFieldQuery,
   validateFieldIdParams,
+  validatePublicFieldReviewsQuery,
 } from "./fields.validator.js";
 
 const router = Router();
 
-router.get("/", validateQuery(validatePublicFieldQuery), fieldsController.getPublicFields);
-router.get("/:fieldId", validateParams(validateFieldIdParams), fieldsController.getPublicFieldDetail);
-router.get("/:fieldId/images", validateParams(validateFieldIdParams), fieldsController.getPublicFieldImages);
-
+router.get(
+  "/",
+  validateQuery(validatePublicFieldQuery),
+  fieldsController.getPublicFields
+);
 
 router.get(
   "/:fieldId/owner-info",
@@ -30,9 +32,15 @@ router.get(
 );
 
 router.get(
-  "/:fieldId/availability-summary",
+  "/:fieldId/images",
   validateParams(validateFieldIdParams),
-  validateQuery(validateAvailabilitySummaryQuery),
-  fieldsController.getPublicFieldAvailabilitySummary
+  fieldsController.getPublicFieldImages
 );
+
+router.get(
+  "/:fieldId",
+  validateParams(validateFieldIdParams),
+  fieldsController.getPublicFieldDetail
+);
+
 export default router;

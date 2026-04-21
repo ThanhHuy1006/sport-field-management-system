@@ -4,6 +4,8 @@ import {
   toFieldListItem,
   toFieldDetail,
   toFieldImageList,
+  toFieldOwnerInfo,
+  toFieldReviewListItem,
 } from "./fields.mapper.js";
 
 export const fieldsController = {
@@ -49,6 +51,42 @@ export const fieldsController = {
         res,
         toFieldImageList(images),
         "Lấy ảnh sân thành công"
+      );
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async getPublicFieldOwnerInfo(req, res, next) {
+    try {
+      const { fieldId } = req.validated?.params ?? req.params;
+      const ownerInfo = await fieldsService.getPublicFieldOwnerInfo(fieldId);
+
+      return successResponse(
+        res,
+        toFieldOwnerInfo(ownerInfo),
+        "Lấy thông tin chủ sân thành công"
+      );
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async getPublicFieldReviews(req, res, next) {
+    try {
+      const { fieldId } = req.validated?.params ?? req.params;
+      const query = req.validated?.query ?? req.query;
+
+      const result = await fieldsService.getPublicFieldReviews(fieldId, query);
+
+      return successResponse(
+        res,
+        {
+          items: result.items.map(toFieldReviewListItem),
+          pagination: result.pagination,
+          summary: result.summary,
+        },
+        "Lấy danh sách đánh giá sân thành công"
       );
     } catch (error) {
       next(error);

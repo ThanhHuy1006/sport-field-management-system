@@ -18,6 +18,20 @@ function buildOrderBy(sort) {
   }
 }
 
+function buildReviewOrderBy(sort) {
+  switch (sort) {
+    case "oldest":
+      return { created_at: "asc" };
+    case "rating_desc":
+      return { rating: "desc" };
+    case "rating_asc":
+      return { rating: "asc" };
+    case "newest":
+    default:
+      return { created_at: "desc" };
+  }
+}
+
 export const fieldsRepository = {
   async findPublicFields(filters) {
     const {
@@ -106,5 +120,117 @@ export const fieldsRepository = {
         },
       },
     });
+  },
+
+  async findPublicFieldOwnerInfo(fieldId) {
+    const field = await prisma.fields.findFirst({
+      where: {
+        id: fieldId,
+        status: FIELD_STATUS.ACTIVE,
+      },
+      include: {
+        users: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            avatar_url: true,
+            created_at: true,
+            owner_profiles_owner_profiles_user_idTousers: {
+              select: {
+                business_name: true,
+                status: true,
+                approved_at: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!field) return null;
+
+    const owner = field.users;
+    const profile = owner?.owner_profiles_owner_profiles_user_idTousers;
+
+    return {
+      user_id: owner?.id ?? null,
+      display_name: profile?.business_name || owner?.name || "Chủ sân",
+      email: owner?.email ?? null,
+      phone: owner?.phone ?? null,
+      avatar_url: owner?.avatar_url ?? null,
+      joined_at: owner?.created_at ?? null,
+      verified: profile?.status === "approved",
+      approved_at: profile?.approved_at ?? null,
+    };
+   
+  },
+
+  async findPublicFieldReviews(fieldId, filters) {
+    const { page, limit, rating, sort } = filters;
+
+    const where = {
+      field_id: fieldId,
+      visible: true,
+      ...(rating ? { rating } : {}),
+    };
+
+    const [items, total, breakdown] = await Promise.all([
+      prisma.reviews.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: buildReviewOrderBy(sort),
+        include: {
+          users: {
+            select: {
+              id: true,
+              name: true,
+              avatar_url: true,
+            },
+          },
+        },
+      }),
+      prisma.reviews.count({ where }),
+      prisma.reviews.groupBy({
+        by: ["rating"],
+        where: {
+          field_id: fieldId,
+          visible: true,
+        },
+        _count: {
+          rating: true,
+        },
+      }),
+    ]);
+
+    const totalReviews = breakdown.reduce(
+      (sum, item) => sum + item._count.rating,
+      0
+    );
+
+    const totalScore = breakdown.reduce(
+      (sum, item) => sum + (item.rating || 0) * item._count.rating,
+      0
+    );
+
+    const ratingBreakdown = breakdown.reduce((acc, item) => {
+      acc[item.rating || 0] = item._count.rating;
+      return acc;
+    }, {});
+
+    return {
+      items,
+      total,
+      summary: {
+        averageRating:
+          totalReviews > 0
+            ? Number((totalScore / totalReviews).toFixed(1))
+            : 0,
+        totalReviews,
+        ratingBreakdown,
+      },
+    };
   },
 };
