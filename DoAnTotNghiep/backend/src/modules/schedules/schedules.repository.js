@@ -1,5 +1,14 @@
 import prisma from "../../config/prisma.js";
 
+const ACTIVE_BOOKING_STATUSES = [
+  "PENDING_CONFIRM",
+  "APPROVED",
+  "AWAITING_PAYMENT",
+  "PAID",
+  "COMPLETED",
+  "CHECKED_IN",
+];
+
 export const schedulesRepository = {
   findFieldById(fieldId) {
     return prisma.fields.findUnique({
@@ -50,6 +59,12 @@ export const schedulesRepository = {
     });
   },
 
+  deleteOperatingHour(id) {
+    return prisma.operating_hours.delete({
+      where: { id },
+    });
+  },
+
   findBlackoutByFieldAndDate(fieldId, startOfDay, endOfDay) {
     return prisma.blackout_dates.findFirst({
       where: {
@@ -87,12 +102,10 @@ export const schedulesRepository = {
     return prisma.bookings.findMany({
       where: {
         field_id: fieldId,
-        start_datetime: {
-          gte: startOfDay,
-          lte: endOfDay,
-        },
+        start_datetime: { lt: endOfDay },
+        end_datetime: { gt: startOfDay },
         status: {
-          in: ["PENDING_CONFIRM", "APPROVED", "AWAITING_PAYMENT", "PAID", "COMPLETED"],
+          in: ACTIVE_BOOKING_STATUSES,
         },
       },
       orderBy: { start_datetime: "asc" },

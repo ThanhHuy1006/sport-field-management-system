@@ -1,41 +1,48 @@
 import { Router } from "express";
 import { requireAuth } from "../../core/middlewares/auth.middleware.js";
-import { requireApprovedOwner } from "../../core/middlewares/role.middleware.js";
-import { validateBody } from "../../core/middlewares/validate.middleware.js";
+import {
+  requireRole,
+  requireApprovedOwner,
+} from "../../core/middlewares/role.middleware.js";
+import {
+  validateBody,
+  validateParams,
+} from "../../core/middlewares/validate.middleware.js";
 import { ownerSchedulesController } from "./owner.schedules.controller.js";
 import {
-  validateOperatingHoursPayload,
-  validateCreateBlackoutPayload,
+  validateFieldIdParam,
+  validateBlackoutDateIdParam,
+  validateOwnerOperatingHoursPayload,
+  validateOwnerBlackoutDatePayload,
 } from "./owner.schedules.validator.js";
 
 const router = Router();
 
-router.use(requireAuth, requireApprovedOwner());
+router.use(requireAuth, requireRole("OWNER"), requireApprovedOwner());
 
 router.get(
   "/fields/:fieldId/operating-hours",
-  ownerSchedulesController.getOperatingHours
+  validateParams(validateFieldIdParam),
+  ownerSchedulesController.getOwnerOperatingHours
 );
 
 router.put(
   "/fields/:fieldId/operating-hours",
-  validateBody(validateOperatingHoursPayload),
-  ownerSchedulesController.replaceOperatingHours
-);
-
-router.get(
-  "/fields/:fieldId/blackout-dates",
-  ownerSchedulesController.getBlackoutDates
+  validateParams(validateFieldIdParam),
+  validateBody(validateOwnerOperatingHoursPayload),
+  ownerSchedulesController.upsertOwnerOperatingHours
 );
 
 router.post(
   "/fields/:fieldId/blackout-dates",
-  validateBody(validateCreateBlackoutPayload),
+  validateParams(validateFieldIdParam),
+  validateBody(validateOwnerBlackoutDatePayload),
   ownerSchedulesController.createBlackoutDate
 );
 
 router.delete(
   "/blackout-dates/:blackoutDateId",
+  validateParams(validateBlackoutDateIdParam),
   ownerSchedulesController.deleteBlackoutDate
 );
 

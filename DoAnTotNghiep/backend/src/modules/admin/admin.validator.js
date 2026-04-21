@@ -1,6 +1,41 @@
 import { ValidationError } from "../../core/errors/index.js";
+import { USER_STATUS } from "../../config/constant.js";
 
-const USER_STATUSES = ["active", "locked", "deleted"];
+const USER_STATUSES = [
+  USER_STATUS.ACTIVE,
+  USER_STATUS.LOCKED,
+  USER_STATUS.DELETED,
+];
+
+export function validateAdminUserIdParams(params) {
+  const userId = Number(params.userId);
+
+  if (Number.isNaN(userId) || userId <= 0) {
+    throw new ValidationError("userId không hợp lệ");
+  }
+
+  return { userId };
+}
+
+export function validateAdminFieldIdParams(params) {
+  const fieldId = Number(params.fieldId);
+
+  if (Number.isNaN(fieldId) || fieldId <= 0) {
+    throw new ValidationError("fieldId không hợp lệ");
+  }
+
+  return { fieldId };
+}
+
+export function validateAdminBookingIdParams(params) {
+  const bookingId = Number(params.bookingId);
+
+  if (Number.isNaN(bookingId) || bookingId <= 0) {
+    throw new ValidationError("bookingId không hợp lệ");
+  }
+
+  return { bookingId };
+}
 
 export function validateUserStatusPayload(payload) {
   const status = String(payload.status || "").trim().toLowerCase();
@@ -12,22 +47,12 @@ export function validateUserStatusPayload(payload) {
   return { status };
 }
 
-export function validateRejectOwnerPayload(payload) {
-  const reason = payload.reason ? String(payload.reason).trim() : "";
+export function validateRejectOwnerRegistrationPayload(payload) {
+  const reject_reason = String(payload.reject_reason || "").trim();
 
-  if (!reason) {
-    throw new ValidationError("reason là bắt buộc");
+  if (!reject_reason) {
+    throw new ValidationError("reject_reason là bắt buộc");
   }
 
-  return { reason };
-}
-
-export function validateId(value, name = "id") {
-  const id = Number(value);
-
-  if (Number.isNaN(id) || id <= 0) {
-    throw new ValidationError(`${name} không hợp lệ`);
-  }
-
-  return id;
+  return { reject_reason };
 }

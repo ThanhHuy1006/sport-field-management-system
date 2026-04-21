@@ -6,6 +6,7 @@ import { ownerFieldsService } from "./owner.fields.service.js";
 export const ownerFieldsController = {
   getOwnerFields: asyncHandler(async (req, res) => {
     const items = await ownerFieldsService.getOwnerFields(req.user.id);
+
     return successResponse(
       res,
       items.map(toOwnerFieldResponse),
@@ -14,7 +15,9 @@ export const ownerFieldsController = {
   }),
 
   getOwnerFieldDetail: asyncHandler(async (req, res) => {
-    const item = await ownerFieldsService.getOwnerFieldDetail(req.user.id, req.params);
+    const { fieldId } = req.validated?.params ?? req.params;
+    const item = await ownerFieldsService.getOwnerFieldDetail(req.user.id, fieldId);
+
     return successResponse(
       res,
       toOwnerFieldResponse(item),
@@ -23,7 +26,9 @@ export const ownerFieldsController = {
   }),
 
   createOwnerField: asyncHandler(async (req, res) => {
-    const item = await ownerFieldsService.createOwnerField(req.user.id, req.body);
+    const payload = req.validated?.body ?? req.body;
+    const item = await ownerFieldsService.createOwnerField(req.user.id, payload);
+
     return createdResponse(
       res,
       toOwnerFieldResponse(item),
@@ -32,10 +37,13 @@ export const ownerFieldsController = {
   }),
 
   updateOwnerField: asyncHandler(async (req, res) => {
+    const { fieldId } = req.validated?.params ?? req.params;
+    const payload = req.validated?.body ?? req.body;
+
     const item = await ownerFieldsService.updateOwnerField(
       req.user.id,
-      req.params,
-      req.body
+      fieldId,
+      payload
     );
 
     return successResponse(
@@ -46,10 +54,13 @@ export const ownerFieldsController = {
   }),
 
   updateOwnerFieldStatus: asyncHandler(async (req, res) => {
+    const { fieldId } = req.validated?.params ?? req.params;
+    const payload = req.validated?.body ?? req.body;
+
     const item = await ownerFieldsService.updateOwnerFieldStatus(
       req.user.id,
-      req.params,
-      req.body
+      fieldId,
+      payload
     );
 
     return successResponse(

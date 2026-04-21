@@ -1,70 +1,60 @@
 import { reviewsRepository } from "./reviews.repository.js";
 import {
-  validateCreateReviewPayload,
-  validateUpdateReviewPayload,
-  validateReplyReviewPayload,
-} from "./reviews.validator.js";
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+} from "../../core/errors/index.js";
 
 export const reviewsService = {
   async createReview(userId, payload) {
-    const valid = validateCreateReviewPayload(payload);
-
     const booking = await reviewsRepository.findBookingForReview(
       userId,
-      valid.booking_id
+      payload.booking_id
     );
 
     if (!booking) {
-      throw new Error("Không tìm thấy booking");
+      throw new NotFoundError("Không tìm thấy booking");
     }
 
     if (!["PAID", "COMPLETED"].includes(booking.status)) {
-      throw new Error("Chỉ có thể đánh giá booking đã thanh toán hoặc hoàn thành");
+      throw new ForbiddenError(
+        "Chỉ có thể đánh giá booking đã thanh toán hoặc hoàn thành"
+      );
     }
 
-    const existed = await reviewsRepository.findReviewByBookingId(valid.booking_id);
+    const existed = await reviewsRepository.findReviewByBookingId(payload.booking_id);
     if (existed) {
-      throw new Error("Booking này đã được đánh giá trước đó");
+      throw new ConflictError("Booking này đã được đánh giá trước đó");
     }
 
     return reviewsRepository.createReview({
-      booking_id: valid.booking_id,
+      booking_id: payload.booking_id,
       field_id: booking.field_id,
       user_id: userId,
-      rating: valid.rating,
-      comment: valid.comment,
+      rating: payload.rating,
+      comment: payload.comment,
       visible: true,
     });
   },
 
   async updateMyReview(userId, reviewId, payload) {
-    const id = Number(reviewId);
-    if (Number.isNaN(id)) {
-      throw new Error("reviewId không hợp lệ");
-    }
+    const review = await reviewsRepository.findMyReviewById(userId, reviewId);
 
-    const review = await reviewsRepository.findMyReviewById(userId, id);
     if (!review) {
-      throw new Error("Không tìm thấy review");
+      throw new NotFoundError("Không tìm thấy review");
     }
 
-    const valid = validateUpdateReviewPayload(payload);
-
-    return reviewsRepository.updateMyReview(id, valid);
+    return reviewsRepository.updateMyReview(reviewId, payload);
   },
 
   async deleteMyReview(userId, reviewId) {
-    const id = Number(reviewId);
-    if (Number.isNaN(id)) {
-      throw new Error("reviewId không hợp lệ");
-    }
+    const review = await reviewsRepository.findMyReviewById(userId, reviewId);
 
-    const review = await reviewsRepository.findMyReviewById(userId, id);
     if (!review) {
-      throw new Error("Không tìm thấy review");
+      throw new NotFoundError("Không tìm thấy review");
     }
 
-    return reviewsRepository.hideMyReview(id);
+    return reviewsRepository.hideMyReview(reviewId);
   },
 
   async getOwnerReviews(ownerId) {
@@ -72,18 +62,12 @@ export const reviewsService = {
   },
 
   async replyOwnerReview(ownerId, reviewId, payload) {
-    const id = Number(reviewId);
-    if (Number.isNaN(id)) {
-      throw new Error("reviewId không hợp lệ");
-    }
+    const review = await reviewsRepository.findOwnerReviewById(ownerId, reviewId);
 
-    const review = await reviewsRepository.findOwnerReviewById(ownerId, id);
     if (!review) {
-      throw new Error("Không tìm thấy review");
+      throw new NotFoundError("Không tìm thấy review");
     }
 
-    const valid = validateReplyReviewPayload(payload);
-
-    return reviewsRepository.replyOwnerReview(id, valid.reply_text);
+    return reviewsRepository.replyOwnerReview(reviewId, payload.reply_text);
   },
 };

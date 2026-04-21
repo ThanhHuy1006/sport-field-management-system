@@ -1,4 +1,5 @@
 import prisma from "../../config/prisma.js";
+import { USER_STATUS } from "../../config/constant.js";
 
 export const notificationsRepository = {
   findMyNotifications(userId) {
@@ -51,7 +52,7 @@ export const notificationsRepository = {
   findAllActiveUsers() {
     return prisma.users.findMany({
       where: {
-        status: "active",
+        status: USER_STATUS.ACTIVE,
       },
       select: { id: true },
     });

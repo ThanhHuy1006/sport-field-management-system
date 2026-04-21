@@ -1,9 +1,13 @@
-export function validateNotificationId(value) {
-  const id = Number(value);
-  if (Number.isNaN(id) || id <= 0) {
-    throw new Error("notificationId không hợp lệ");
+import { ValidationError } from "../../core/errors/index.js";
+
+export function validateNotificationIdParams(params) {
+  const notificationId = Number(params.notificationId);
+
+  if (Number.isNaN(notificationId) || notificationId <= 0) {
+    throw new ValidationError("notificationId không hợp lệ");
   }
-  return id;
+
+  return { notificationId };
 }
 
 export function validateBroadcastPayload(payload) {
@@ -12,11 +16,11 @@ export function validateBroadcastPayload(payload) {
   const type = String(payload.type || "SYSTEM").trim().toUpperCase();
 
   if (!title) {
-    throw new Error("title là bắt buộc");
+    throw new ValidationError("title là bắt buộc");
   }
 
   if (!message) {
-    throw new Error("message là bắt buộc");
+    throw new ValidationError("message là bắt buộc");
   }
 
   return {

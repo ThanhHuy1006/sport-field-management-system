@@ -1,12 +1,17 @@
-import { successResponse } from "../../core/utils/response.js";
+import {
+  successResponse,
+  createdResponse,
+} from "../../core/utils/response.js";
 import { reviewsService } from "./reviews.service.js";
 import { toReviewResponse } from "./reviews.mapper.js";
 
 export const reviewsController = {
   async createReview(req, res, next) {
     try {
-      const item = await reviewsService.createReview(req.user.id, req.body);
-      return successResponse(res, toReviewResponse(item), "Tạo review thành công", 201);
+      const payload = req.validated?.body ?? req.body;
+      const item = await reviewsService.createReview(req.user.id, payload);
+
+      return createdResponse(res, toReviewResponse(item), "Tạo review thành công");
     } catch (error) {
       next(error);
     }
@@ -14,12 +19,20 @@ export const reviewsController = {
 
   async updateMyReview(req, res, next) {
     try {
+      const { reviewId } = req.validated?.params ?? req.params;
+      const payload = req.validated?.body ?? req.body;
+
       const item = await reviewsService.updateMyReview(
         req.user.id,
-        req.params.reviewId,
-        req.body
+        reviewId,
+        payload
       );
-      return successResponse(res, toReviewResponse(item), "Cập nhật review thành công");
+
+      return successResponse(
+        res,
+        toReviewResponse(item),
+        "Cập nhật review thành công"
+      );
     } catch (error) {
       next(error);
     }
@@ -27,7 +40,10 @@ export const reviewsController = {
 
   async deleteMyReview(req, res, next) {
     try {
-      await reviewsService.deleteMyReview(req.user.id, req.params.reviewId);
+      const { reviewId } = req.validated?.params ?? req.params;
+
+      await reviewsService.deleteMyReview(req.user.id, reviewId);
+
       return successResponse(res, null, "Ẩn review thành công");
     } catch (error) {
       next(error);
@@ -37,6 +53,7 @@ export const reviewsController = {
   async getOwnerReviews(req, res, next) {
     try {
       const items = await reviewsService.getOwnerReviews(req.user.id);
+
       return successResponse(
         res,
         items.map(toReviewResponse),
@@ -49,12 +66,20 @@ export const reviewsController = {
 
   async replyOwnerReview(req, res, next) {
     try {
+      const { reviewId } = req.validated?.params ?? req.params;
+      const payload = req.validated?.body ?? req.body;
+
       const item = await reviewsService.replyOwnerReview(
         req.user.id,
-        req.params.reviewId,
-        req.body
+        reviewId,
+        payload
       );
-      return successResponse(res, toReviewResponse(item), "Phản hồi review thành công");
+
+      return successResponse(
+        res,
+        toReviewResponse(item),
+        "Phản hồi review thành công"
+      );
     } catch (error) {
       next(error);
     }

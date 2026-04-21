@@ -9,7 +9,9 @@ import { ownerService } from "./owner.service.js";
 
 export const ownerController = {
   createOwnerRegistration: asyncHandler(async (req, res) => {
-    const item = await ownerService.createOwnerRegistration(req.user.id, req.body);
+    const payload = req.validated?.body ?? req.body;
+    const item = await ownerService.createOwnerRegistration(req.user.id, payload);
+
     return createdResponse(
       res,
       toOwnerRegistrationResponse(item),
@@ -19,6 +21,7 @@ export const ownerController = {
 
   getMyOwnerRegistration: asyncHandler(async (req, res) => {
     const item = await ownerService.getMyOwnerRegistration(req.user.id);
+
     return successResponse(
       res,
       toOwnerRegistrationResponse(item),
@@ -27,7 +30,9 @@ export const ownerController = {
   }),
 
   updateMyOwnerRegistration: asyncHandler(async (req, res) => {
-    const item = await ownerService.updateMyOwnerRegistration(req.user.id, req.body);
+    const payload = req.validated?.body ?? req.body;
+    const item = await ownerService.updateMyOwnerRegistration(req.user.id, payload);
+
     return successResponse(
       res,
       toOwnerRegistrationResponse(item),
@@ -37,6 +42,7 @@ export const ownerController = {
 
   getMyOwnerProfile: asyncHandler(async (req, res) => {
     const result = await ownerService.getMyOwnerProfile(req.user.id);
+
     return successResponse(
       res,
       toOwnerProfileResponse(result),
@@ -45,7 +51,9 @@ export const ownerController = {
   }),
 
   updateMyOwnerProfile: asyncHandler(async (req, res) => {
-    const result = await ownerService.updateMyOwnerProfile(req.user.id, req.body);
+    const payload = req.validated?.body ?? req.body;
+    const result = await ownerService.updateMyOwnerProfile(req.user.id, payload);
+
     return successResponse(
       res,
       toOwnerProfileResponse(result),
@@ -55,6 +63,7 @@ export const ownerController = {
 
   getOwnerDashboardSummary: asyncHandler(async (req, res) => {
     const data = await ownerService.getOwnerDashboardSummary(req.user.id);
+
     return successResponse(
       res,
       toOwnerDashboardSummary(data),

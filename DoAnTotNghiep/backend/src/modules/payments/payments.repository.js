@@ -15,7 +15,9 @@ export const paymentsRepository = {
         total_price: true,
         start_datetime: true,
         end_datetime: true,
-        payments: true,
+        payments: {
+          orderBy: { created_at: "desc" },
+        },
       },
     });
   },
@@ -26,6 +28,17 @@ export const paymentsRepository = {
         booking_id: bookingId,
         bookings: {
           user_id: userId,
+        },
+      },
+      include: {
+        bookings: {
+          select: {
+            id: true,
+            status: true,
+            total_price: true,
+            start_datetime: true,
+            end_datetime: true,
+          },
         },
       },
     });
@@ -39,6 +52,17 @@ export const paymentsRepository = {
           user_id: userId,
         },
       },
+      include: {
+        bookings: {
+          select: {
+            id: true,
+            status: true,
+            total_price: true,
+            start_datetime: true,
+            end_datetime: true,
+          },
+        },
+      },
     });
   },
 
@@ -48,48 +72,35 @@ export const paymentsRepository = {
         where: { booking_id: booking.id },
       });
 
+      const transaction_code = `PAY-${booking.id}-${Date.now()}`;
+
+      let payment;
+
       if (existed) {
-        const updated = await tx.payments.update({
+        payment = await tx.payments.update({
           where: { id: existed.id },
           data: {
             provider,
             amount: booking.total_price,
             currency: "VND",
             status: "pending",
-            transaction_code: `PAY-${booking.id}-${Date.now()}`,
+            transaction_code,
+            paid_at: null,
             raw_response: null,
           },
         });
-
-        if (booking.status === "APPROVED" || booking.status === "PAY_FAILED") {
-          await tx.bookings.update({
-            where: { id: booking.id },
-            data: { status: "AWAITING_PAYMENT" },
-          });
-
-          await tx.booking_status_history.create({
-            data: {
-              booking_id: booking.id,
-              from_status: booking.status,
-              to_status: "AWAITING_PAYMENT",
-              note: "Payment initiated",
-            },
-          });
-        }
-
-        return updated;
+      } else {
+        payment = await tx.payments.create({
+          data: {
+            booking_id: booking.id,
+            provider,
+            amount: booking.total_price,
+            currency: "VND",
+            transaction_code,
+            status: "pending",
+          },
+        });
       }
-
-      const payment = await tx.payments.create({
-        data: {
-          booking_id: booking.id,
-          provider,
-          amount: booking.total_price,
-          currency: "VND",
-          transaction_code: `PAY-${booking.id}-${Date.now()}`,
-          status: "pending",
-        },
-      });
 
       if (booking.status === "APPROVED" || booking.status === "PAY_FAILED") {
         await tx.bookings.update({
@@ -107,7 +118,20 @@ export const paymentsRepository = {
         });
       }
 
-      return payment;
+      return tx.payments.findUnique({
+        where: { id: payment.id },
+        include: {
+          bookings: {
+            select: {
+              id: true,
+              status: true,
+              total_price: true,
+              start_datetime: true,
+              end_datetime: true,
+            },
+          },
+        },
+      });
     });
   },
 
@@ -135,7 +159,7 @@ export const paymentsRepository = {
         },
       });
 
-      if (payment.bookings) {
+      if (payment.bookings && payment.bookings.status !== "PAID") {
         await tx.bookings.update({
           where: { id: payment.booking_id },
           data: {
@@ -153,7 +177,20 @@ export const paymentsRepository = {
         });
       }
 
-      return updatedPayment;
+      return tx.payments.findUnique({
+        where: { id: updatedPayment.id },
+        include: {
+          bookings: {
+            select: {
+              id: true,
+              status: true,
+              total_price: true,
+              start_datetime: true,
+              end_datetime: true,
+            },
+          },
+        },
+      });
     });
   },
 
@@ -180,7 +217,7 @@ export const paymentsRepository = {
         },
       });
 
-      if (payment.bookings) {
+      if (payment.bookings && payment.bookings.status !== "PAY_FAILED") {
         await tx.bookings.update({
           where: { id: payment.booking_id },
           data: {
@@ -198,7 +235,20 @@ export const paymentsRepository = {
         });
       }
 
-      return updatedPayment;
+      return tx.payments.findUnique({
+        where: { id: updatedPayment.id },
+        include: {
+          bookings: {
+            select: {
+              id: true,
+              status: true,
+              total_price: true,
+              start_datetime: true,
+              end_datetime: true,
+            },
+          },
+        },
+      });
     });
   },
 };

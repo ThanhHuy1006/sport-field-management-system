@@ -1,5 +1,30 @@
+import { ValidationError } from "../../core/errors/index.js";
+
 const ALLOWED_VOUCHER_TYPES = ["PERCENT", "FIXED"];
 const ALLOWED_VOUCHER_STATUSES = ["active", "inactive", "expired"];
+
+export function validateVoucherIdParams(params) {
+  const voucherId = Number(params.voucherId);
+
+  if (Number.isNaN(voucherId) || voucherId <= 0) {
+    throw new ValidationError("voucherId không hợp lệ");
+  }
+
+  return { voucherId };
+}
+
+export function validateAvailableVouchersQuery(query) {
+  const owner_id =
+    query.owner_id !== undefined && query.owner_id !== ""
+      ? Number(query.owner_id)
+      : null;
+
+  if (owner_id !== null && (Number.isNaN(owner_id) || owner_id <= 0)) {
+    throw new ValidationError("owner_id không hợp lệ");
+  }
+
+  return { owner_id };
+}
 
 export function validateVoucherCodePayload(payload) {
   const code = String(payload.code || "").trim().toUpperCase();
@@ -7,17 +32,21 @@ export function validateVoucherCodePayload(payload) {
   const owner_id = payload.owner_id ? Number(payload.owner_id) : null;
 
   if (!code) {
-    throw new Error("code là bắt buộc");
+    throw new ValidationError("code là bắt buộc");
   }
 
   if (Number.isNaN(order_amount) || order_amount < 0) {
-    throw new Error("order_amount không hợp lệ");
+    throw new ValidationError("order_amount không hợp lệ");
+  }
+
+  if (owner_id !== null && (Number.isNaN(owner_id) || owner_id <= 0)) {
+    throw new ValidationError("owner_id không hợp lệ");
   }
 
   return {
     code,
     order_amount,
-    owner_id: owner_id && !Number.isNaN(owner_id) ? owner_id : null,
+    owner_id,
   };
 }
 
@@ -40,48 +69,50 @@ export function validateCreateVoucherPayload(payload) {
       ? Number(payload.usage_limit_per_user)
       : 0;
 
-  if (!code) throw new Error("code là bắt buộc");
+  if (!code) {
+    throw new ValidationError("code là bắt buộc");
+  }
 
   if (!ALLOWED_VOUCHER_TYPES.includes(type)) {
-    throw new Error("type không hợp lệ");
+    throw new ValidationError("type không hợp lệ");
   }
 
   if (Number.isNaN(discount_value) || discount_value <= 0) {
-    throw new Error("discount_value phải > 0");
+    throw new ValidationError("discount_value phải > 0");
   }
 
   if (
     max_discount_amount !== null &&
     (Number.isNaN(max_discount_amount) || max_discount_amount < 0)
   ) {
-    throw new Error("max_discount_amount không hợp lệ");
+    throw new ValidationError("max_discount_amount không hợp lệ");
   }
 
   if (Number.isNaN(min_order_value) || min_order_value < 0) {
-    throw new Error("min_order_value không hợp lệ");
+    throw new ValidationError("min_order_value không hợp lệ");
   }
 
   if (Number.isNaN(usage_limit_total) || usage_limit_total < 0) {
-    throw new Error("usage_limit_total không hợp lệ");
+    throw new ValidationError("usage_limit_total không hợp lệ");
   }
 
   if (Number.isNaN(usage_limit_per_user) || usage_limit_per_user < 0) {
-    throw new Error("usage_limit_per_user không hợp lệ");
+    throw new ValidationError("usage_limit_per_user không hợp lệ");
   }
 
   if (!payload.start_date || !payload.end_date) {
-    throw new Error("start_date và end_date là bắt buộc");
+    throw new ValidationError("start_date và end_date là bắt buộc");
   }
 
   const start_date = new Date(payload.start_date);
   const end_date = new Date(payload.end_date);
 
   if (Number.isNaN(start_date.getTime()) || Number.isNaN(end_date.getTime())) {
-    throw new Error("start_date hoặc end_date không hợp lệ");
+    throw new ValidationError("start_date hoặc end_date không hợp lệ");
   }
 
   if (start_date > end_date) {
-    throw new Error("end_date phải lớn hơn hoặc bằng start_date");
+    throw new ValidationError("end_date phải lớn hơn hoặc bằng start_date");
   }
 
   return {
@@ -104,7 +135,7 @@ export function validateUpdateVoucherPayload(payload) {
   if (payload.discount_value !== undefined) {
     const value = Number(payload.discount_value);
     if (Number.isNaN(value) || value <= 0) {
-      throw new Error("discount_value phải > 0");
+      throw new ValidationError("discount_value phải > 0");
     }
     data.discount_value = value;
   }
@@ -114,16 +145,18 @@ export function validateUpdateVoucherPayload(payload) {
       payload.max_discount_amount === null
         ? null
         : Number(payload.max_discount_amount);
+
     if (value !== null && (Number.isNaN(value) || value < 0)) {
-      throw new Error("max_discount_amount không hợp lệ");
+      throw new ValidationError("max_discount_amount không hợp lệ");
     }
+
     data.max_discount_amount = value;
   }
 
   if (payload.min_order_value !== undefined) {
     const value = Number(payload.min_order_value);
     if (Number.isNaN(value) || value < 0) {
-      throw new Error("min_order_value không hợp lệ");
+      throw new ValidationError("min_order_value không hợp lệ");
     }
     data.min_order_value = value;
   }
@@ -131,7 +164,7 @@ export function validateUpdateVoucherPayload(payload) {
   if (payload.usage_limit_total !== undefined) {
     const value = Number(payload.usage_limit_total);
     if (Number.isNaN(value) || value < 0) {
-      throw new Error("usage_limit_total không hợp lệ");
+      throw new ValidationError("usage_limit_total không hợp lệ");
     }
     data.usage_limit_total = value;
   }
@@ -139,7 +172,7 @@ export function validateUpdateVoucherPayload(payload) {
   if (payload.usage_limit_per_user !== undefined) {
     const value = Number(payload.usage_limit_per_user);
     if (Number.isNaN(value) || value < 0) {
-      throw new Error("usage_limit_per_user không hợp lệ");
+      throw new ValidationError("usage_limit_per_user không hợp lệ");
     }
     data.usage_limit_per_user = value;
   }
@@ -147,7 +180,7 @@ export function validateUpdateVoucherPayload(payload) {
   if (payload.start_date !== undefined) {
     const value = new Date(payload.start_date);
     if (Number.isNaN(value.getTime())) {
-      throw new Error("start_date không hợp lệ");
+      throw new ValidationError("start_date không hợp lệ");
     }
     data.start_date = value;
   }
@@ -155,13 +188,17 @@ export function validateUpdateVoucherPayload(payload) {
   if (payload.end_date !== undefined) {
     const value = new Date(payload.end_date);
     if (Number.isNaN(value.getTime())) {
-      throw new Error("end_date không hợp lệ");
+      throw new ValidationError("end_date không hợp lệ");
     }
     data.end_date = value;
   }
 
   if (Object.keys(data).length === 0) {
-    throw new Error("Không có dữ liệu hợp lệ để cập nhật");
+    throw new ValidationError("Không có dữ liệu hợp lệ để cập nhật");
+  }
+
+  if (data.start_date && data.end_date && data.start_date > data.end_date) {
+    throw new ValidationError("end_date phải lớn hơn hoặc bằng start_date");
   }
 
   return data;
@@ -171,7 +208,7 @@ export function validateVoucherStatusPayload(payload) {
   const status = String(payload.status || "").trim().toLowerCase();
 
   if (!ALLOWED_VOUCHER_STATUSES.includes(status)) {
-    throw new Error("status không hợp lệ");
+    throw new ValidationError("status không hợp lệ");
   }
 
   return { status };

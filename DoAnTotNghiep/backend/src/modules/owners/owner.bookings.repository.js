@@ -1,56 +1,29 @@
 import prisma from "../../config/prisma.js";
 
 export const ownerBookingsRepository = {
-  findOwnerBookings(ownerId, filters = {}) {
-    const where = {
-      fields: {
-        owner_id: ownerId,
-      },
-    };
-
-    if (filters.status) {
-      where.status = filters.status;
-    }
-
-    if (filters.field_id) {
-      where.field_id = filters.field_id;
-    }
-
-    if (filters.date_from || filters.date_to) {
-      where.start_datetime = {};
-      if (filters.date_from) where.start_datetime.gte = filters.date_from;
-      if (filters.date_to) where.start_datetime.lte = filters.date_to;
-    }
-
+  findOwnerBookings(ownerId) {
     return prisma.bookings.findMany({
-      where,
+      where: {
+        fields: {
+          owner_id: ownerId,
+        },
+      },
       orderBy: { created_at: "desc" },
       include: {
-        users: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,
-            avatar_url: true,
-          },
-        },
         fields: {
           select: {
             id: true,
             field_name: true,
             address: true,
             sport_type: true,
-            owner_id: true,
           },
         },
-        payments: {
+        users: {
           select: {
             id: true,
-            provider: true,
-            amount: true,
-            status: true,
-            paid_at: true,
+            name: true,
+            email: true,
+            phone: true,
           },
         },
       },
@@ -66,15 +39,6 @@ export const ownerBookingsRepository = {
         },
       },
       include: {
-        users: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,
-            avatar_url: true,
-          },
-        },
         fields: {
           select: {
             id: true,
@@ -84,27 +48,16 @@ export const ownerBookingsRepository = {
             owner_id: true,
           },
         },
-        payments: true,
-        booking_status_history: {
-          orderBy: { changed_at: "desc" },
-        },
-      },
-    });
-  },
-
-  findMemberBookingById(userId, bookingId) {
-    return prisma.bookings.findFirst({
-      where: {
-        id: bookingId,
-        user_id: userId,
-      },
-      include: {
-        fields: {
+        users: {
           select: {
             id: true,
-            field_name: true,
-            owner_id: true,
+            name: true,
+            email: true,
+            phone: true,
           },
+        },
+        booking_status_history: {
+          orderBy: { changed_at: "desc" },
         },
       },
     });
@@ -135,11 +88,35 @@ export const ownerBookingsRepository = {
           booking_id: bookingId,
           from_status: booking.status,
           to_status: "APPROVED",
-          note: "Approved by owner",
+          reason: "Approved by owner",
         },
       });
 
-      return updated;
+      return tx.bookings.findUnique({
+        where: { id: updated.id },
+        include: {
+          fields: {
+            select: {
+              id: true,
+              field_name: true,
+              address: true,
+              sport_type: true,
+              owner_id: true,
+            },
+          },
+          users: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+            },
+          },
+          booking_status_history: {
+            orderBy: { changed_at: "desc" },
+          },
+        },
+      });
     });
   },
 
@@ -168,11 +145,35 @@ export const ownerBookingsRepository = {
           booking_id: bookingId,
           from_status: booking.status,
           to_status: "REJECTED",
-          note,
+          reason: note || "Rejected by owner",
         },
       });
 
-      return updated;
+      return tx.bookings.findUnique({
+        where: { id: updated.id },
+        include: {
+          fields: {
+            select: {
+              id: true,
+              field_name: true,
+              address: true,
+              sport_type: true,
+              owner_id: true,
+            },
+          },
+          users: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+            },
+          },
+          booking_status_history: {
+            orderBy: { changed_at: "desc" },
+          },
+        },
+      });
     });
   },
 
@@ -204,11 +205,35 @@ export const ownerBookingsRepository = {
           booking_id: bookingId,
           from_status: booking.status,
           to_status: "CHECKED_IN",
-          note,
+          reason: note,
         },
       });
 
-      return updated;
+      return tx.bookings.findUnique({
+        where: { id: updated.id },
+        include: {
+          fields: {
+            select: {
+              id: true,
+              field_name: true,
+              address: true,
+              sport_type: true,
+              owner_id: true,
+            },
+          },
+          users: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+            },
+          },
+          booking_status_history: {
+            orderBy: { changed_at: "desc" },
+          },
+        },
+      });
     });
   },
 
@@ -237,11 +262,35 @@ export const ownerBookingsRepository = {
           booking_id: bookingId,
           from_status: booking.status,
           to_status: "COMPLETED",
-          note,
+          reason: note,
         },
       });
 
-      return updated;
+      return tx.bookings.findUnique({
+        where: { id: updated.id },
+        include: {
+          fields: {
+            select: {
+              id: true,
+              field_name: true,
+              address: true,
+              sport_type: true,
+              owner_id: true,
+            },
+          },
+          users: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+            },
+          },
+          booking_status_history: {
+            orderBy: { changed_at: "desc" },
+          },
+        },
+      });
     });
   },
 };

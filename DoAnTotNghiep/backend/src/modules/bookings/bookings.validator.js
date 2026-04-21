@@ -1,29 +1,48 @@
+import { ValidationError } from "../../core/errors/index.js";
+
+function parseDateTime(value, fieldName) {
+  const raw = String(value || "").trim();
+
+  if (!raw) {
+    throw new ValidationError(`${fieldName} là bắt buộc`);
+  }
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new ValidationError(`${fieldName} không hợp lệ`);
+  }
+
+  return parsed;
+}
+
+export function validateBookingIdParams(params) {
+  const bookingId = Number(params.bookingId);
+
+  if (Number.isNaN(bookingId) || bookingId < 1) {
+    throw new ValidationError("bookingId không hợp lệ");
+  }
+
+  return { bookingId };
+}
+
 export function validateCheckAvailabilityPayload(payload) {
-  const { field_id, start_datetime, end_datetime } = payload;
+  const field_id = Number(payload.field_id);
 
-  if (!field_id || Number.isNaN(Number(field_id))) {
-    throw new Error("field_id không hợp lệ");
+  if (Number.isNaN(field_id) || field_id < 1) {
+    throw new ValidationError("field_id không hợp lệ");
   }
 
-  if (!start_datetime || !end_datetime) {
-    throw new Error("start_datetime và end_datetime là bắt buộc");
-  }
+  const start_datetime = parseDateTime(payload.start_datetime, "start_datetime");
+  const end_datetime = parseDateTime(payload.end_datetime, "end_datetime");
 
-  const start = new Date(start_datetime);
-  const end = new Date(end_datetime);
-
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-    throw new Error("start_datetime hoặc end_datetime không hợp lệ");
-  }
-
-  if (start >= end) {
-    throw new Error("end_datetime phải lớn hơn start_datetime");
+  if (start_datetime >= end_datetime) {
+    throw new ValidationError("end_datetime phải lớn hơn start_datetime");
   }
 
   return {
-    field_id: Number(field_id),
-    start_datetime: start,
-    end_datetime: end,
+    field_id,
+    start_datetime,
+    end_datetime,
   };
 }
 
@@ -55,7 +74,7 @@ export function validateCheckInQrPayload(payload) {
   const qr_token = String(payload?.qr_token || "").trim();
 
   if (!qr_token) {
-    throw new Error("qr_token là bắt buộc");
+    throw new ValidationError("qr_token là bắt buộc");
   }
 
   return { qr_token };

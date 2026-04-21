@@ -1,5 +1,14 @@
 import prisma from "../../config/prisma.js";
 
+const ACTIVE_BOOKING_STATUSES = [
+  "PENDING_CONFIRM",
+  "APPROVED",
+  "AWAITING_PAYMENT",
+  "PAID",
+  "CHECKED_IN",
+  "COMPLETED",
+];
+
 export const bookingsRepository = {
   findFieldById(fieldId) {
     return prisma.fields.findUnique({
@@ -14,6 +23,15 @@ export const bookingsRepository = {
         currency: true,
         min_duration_minutes: true,
         status: true,
+      },
+    });
+  },
+
+  findOperatingHourByFieldAndDay(fieldId, dayOfWeek) {
+    return prisma.operating_hours.findFirst({
+      where: {
+        field_id: fieldId,
+        day_of_week: dayOfWeek,
       },
     });
   },
@@ -35,14 +53,7 @@ export const bookingsRepository = {
         start_datetime: { lt: end },
         end_datetime: { gt: start },
         status: {
-          in: [
-            "PENDING_CONFIRM",
-            "APPROVED",
-            "AWAITING_PAYMENT",
-            "PAID",
-            "CHECKED_IN",
-            "COMPLETED",
-          ],
+          in: ACTIVE_BOOKING_STATUSES,
         },
       },
       orderBy: { start_datetime: "asc" },
@@ -78,7 +89,24 @@ export const bookingsRepository = {
         },
       });
 
-      return booking;
+      return tx.bookings.findUnique({
+        where: { id: booking.id },
+        include: {
+          fields: {
+            select: {
+              id: true,
+              field_name: true,
+              address: true,
+              sport_type: true,
+              base_price_per_hour: true,
+              currency: true,
+            },
+          },
+          booking_status_history: {
+            orderBy: { changed_at: "desc" },
+          },
+        },
+      });
     });
   },
 

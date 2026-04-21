@@ -1,38 +1,72 @@
 import { asyncHandler } from "../../core/utils/asyncHandler.js";
-import { successResponse } from "../../core/utils/response.js";
+import {
+  successResponse,
+  createdResponse,
+} from "../../core/utils/response.js";
+import {
+  toOwnerOperatingHourResponse,
+  toOwnerBlackoutDateResponse,
+} from "./owner.schedules.mapper.js";
 import { ownerSchedulesService } from "./owner.schedules.service.js";
 
 export const ownerSchedulesController = {
-  getOperatingHours: asyncHandler(async (req, res) => {
-    const items = await ownerSchedulesService.getOperatingHours(req.user.id, req.params);
-    return successResponse(res, items, "Lấy operating hours thành công");
-  }),
+  getOwnerOperatingHours: asyncHandler(async (req, res) => {
+    const { fieldId } = req.validated?.params ?? req.params;
 
-  replaceOperatingHours: asyncHandler(async (req, res) => {
-    const items = await ownerSchedulesService.replaceOperatingHours(
+    const items = await ownerSchedulesService.getOwnerOperatingHours(
       req.user.id,
-      req.params,
-      req.body
+      fieldId
     );
-    return successResponse(res, items, "Cập nhật operating hours thành công");
+
+    return successResponse(
+      res,
+      items.map(toOwnerOperatingHourResponse),
+      "Lấy giờ hoạt động thành công"
+    );
   }),
 
-  getBlackoutDates: asyncHandler(async (req, res) => {
-    const items = await ownerSchedulesService.getBlackoutDates(req.user.id, req.params);
-    return successResponse(res, items, "Lấy blackout dates thành công");
+  upsertOwnerOperatingHours: asyncHandler(async (req, res) => {
+    const { fieldId } = req.validated?.params ?? req.params;
+    const payload = req.validated?.body ?? req.body;
+
+    const item = await ownerSchedulesService.upsertOwnerOperatingHours(
+      req.user.id,
+      fieldId,
+      payload
+    );
+
+    return successResponse(
+      res,
+      toOwnerOperatingHourResponse(item),
+      "Cập nhật giờ hoạt động thành công"
+    );
   }),
 
   createBlackoutDate: asyncHandler(async (req, res) => {
+    const { fieldId } = req.validated?.params ?? req.params;
+    const payload = req.validated?.body ?? req.body;
+
     const item = await ownerSchedulesService.createBlackoutDate(
       req.user.id,
-      req.params,
-      req.body
+      fieldId,
+      payload
     );
-    return successResponse(res, item, "Tạo blackout date thành công", 201);
+
+    return createdResponse(
+      res,
+      toOwnerBlackoutDateResponse(item),
+      "Tạo ngày khóa thành công"
+    );
   }),
 
   deleteBlackoutDate: asyncHandler(async (req, res) => {
-    const item = await ownerSchedulesService.deleteBlackoutDate(req.user.id, req.params);
-    return successResponse(res, item, "Xóa blackout date thành công");
+    const { blackoutDateId } = req.validated?.params ?? req.params;
+
+    await ownerSchedulesService.deleteBlackoutDate(
+      req.user.id,
+      blackoutDateId
+    );
+
+    return successResponse(res, null, "Xóa ngày khóa thành công");
   }),
 };

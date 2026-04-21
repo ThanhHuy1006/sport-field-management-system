@@ -1,16 +1,20 @@
-import { successResponse } from "../../core/utils/response.js";
+import {
+  successResponse,
+  createdResponse,
+} from "../../core/utils/response.js";
 import { paymentsService } from "./payments.service.js";
-// import { toPaymentResponse } from "./payments.mapper.js";
+import { toPaymentResponse } from "./payments.mapper.js";
 
 export const paymentsController = {
   async createPayment(req, res, next) {
     try {
-      const payment = await paymentsService.createPayment(req.user.id, req.body);
-      return successResponse(
+      const payload = req.validated?.body ?? req.body;
+      const payment = await paymentsService.createPayment(req.user.id, payload);
+
+      return createdResponse(
         res,
         toPaymentResponse(payment),
-        "Tạo payment thành công",
-        201
+        "Tạo payment thành công"
       );
     } catch (error) {
       next(error);
@@ -19,10 +23,12 @@ export const paymentsController = {
 
   async getPaymentByBooking(req, res, next) {
     try {
+      const { bookingId } = req.validated?.params ?? req.params;
       const payment = await paymentsService.getPaymentByBooking(
         req.user.id,
-        req.params.bookingId
+        bookingId
       );
+
       return successResponse(
         res,
         toPaymentResponse(payment),
@@ -35,10 +41,12 @@ export const paymentsController = {
 
   async getPaymentDetail(req, res, next) {
     try {
+      const { paymentId } = req.validated?.params ?? req.params;
       const payment = await paymentsService.getPaymentDetail(
         req.user.id,
-        req.params.paymentId
+        paymentId
       );
+
       return successResponse(
         res,
         toPaymentResponse(payment),
@@ -51,10 +59,12 @@ export const paymentsController = {
 
   async simulateSuccess(req, res, next) {
     try {
+      const { paymentId } = req.validated?.params ?? req.params;
       const payment = await paymentsService.simulateSuccess(
         req.user.id,
-        req.params.paymentId
+        paymentId
       );
+
       return successResponse(
         res,
         toPaymentResponse(payment),
@@ -67,10 +77,12 @@ export const paymentsController = {
 
   async simulateFailed(req, res, next) {
     try {
+      const { paymentId } = req.validated?.params ?? req.params;
       const payment = await paymentsService.simulateFailed(
         req.user.id,
-        req.params.paymentId
+        paymentId
       );
+
       return successResponse(
         res,
         toPaymentResponse(payment),

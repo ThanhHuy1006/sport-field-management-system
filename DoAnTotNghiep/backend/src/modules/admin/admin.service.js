@@ -2,12 +2,8 @@ import {
   ConflictError,
   NotFoundError,
 } from "../../core/errors/index.js";
+import { FIELD_STATUS, OWNER_PROFILE_STATUS } from "../../config/constant.js";
 import { adminRepository } from "./admin.repository.js";
-import {
-  validateUserStatusPayload,
-  validateRejectOwnerPayload,
-  validateId,
-} from "./admin.validator.js";
 
 export const adminService = {
   async getUsers() {
@@ -15,8 +11,7 @@ export const adminService = {
   },
 
   async getUserDetail(userId) {
-    const id = validateId(userId, "userId");
-    const user = await adminRepository.findUserById(id);
+    const user = await adminRepository.findUserById(userId);
 
     if (!user) {
       throw new NotFoundError("Không tìm thấy user");
@@ -26,15 +21,17 @@ export const adminService = {
   },
 
   async updateUserStatus(userId, payload) {
-    const id = validateId(userId, "userId");
-    const valid = validateUserStatusPayload(payload);
+    const user = await adminRepository.findUserById(userId);
 
-    const user = await adminRepository.findUserById(id);
     if (!user) {
       throw new NotFoundError("Không tìm thấy user");
     }
 
-    return adminRepository.updateUserStatus(id, valid.status);
+    if (user.status === payload.status) {
+      throw new ConflictError("User đã ở trạng thái này");
+    }
+
+    return adminRepository.updateUserStatus(userId, payload.status);
   },
 
   async getOwnerRegistrations() {
@@ -42,8 +39,7 @@ export const adminService = {
   },
 
   async getOwnerRegistrationDetail(userId) {
-    const id = validateId(userId, "userId");
-    const item = await adminRepository.findOwnerRegistrationByUserId(id);
+    const item = await adminRepository.findOwnerRegistrationByUserId(userId);
 
     if (!item) {
       throw new NotFoundError("Không tìm thấy hồ sơ owner");
@@ -53,35 +49,35 @@ export const adminService = {
   },
 
   async approveOwnerRegistration(adminId, userId) {
-    const id = validateId(userId, "userId");
-    const item = await adminRepository.findOwnerRegistrationByUserId(id);
+    const item = await adminRepository.findOwnerRegistrationByUserId(userId);
 
     if (!item) {
       throw new NotFoundError("Không tìm thấy hồ sơ owner");
     }
 
-    if (item.status !== "pending") {
+    if (item.status !== OWNER_PROFILE_STATUS.PENDING) {
       throw new ConflictError("Chỉ hồ sơ pending mới được duyệt");
     }
 
-    return adminRepository.approveOwnerRegistration(adminId, id);
+    return adminRepository.approveOwnerRegistration(adminId, userId);
   },
 
   async rejectOwnerRegistration(adminId, userId, payload) {
-    const id = validateId(userId, "userId");
-    const valid = validateRejectOwnerPayload(payload);
-
-    const item = await adminRepository.findOwnerRegistrationByUserId(id);
+    const item = await adminRepository.findOwnerRegistrationByUserId(userId);
 
     if (!item) {
       throw new NotFoundError("Không tìm thấy hồ sơ owner");
     }
 
-    if (item.status !== "pending") {
+    if (item.status !== OWNER_PROFILE_STATUS.PENDING) {
       throw new ConflictError("Chỉ hồ sơ pending mới được từ chối");
     }
 
-    return adminRepository.rejectOwnerRegistration(adminId, id, valid.reason);
+    return adminRepository.rejectOwnerRegistration(
+      adminId,
+      userId,
+      payload.reject_reason
+    );
   },
 
   async getAdminFields() {
@@ -89,33 +85,31 @@ export const adminService = {
   },
 
   async approveField(fieldId) {
-    const id = validateId(fieldId, "fieldId");
-    const field = await adminRepository.findFieldById(id);
+    const field = await adminRepository.findFieldById(fieldId);
 
     if (!field) {
       throw new NotFoundError("Không tìm thấy sân");
     }
 
-    if (field.status !== "pending") {
+    if (field.status !== FIELD_STATUS.PENDING) {
       throw new ConflictError("Chỉ sân pending mới được duyệt");
     }
 
-    return adminRepository.updateFieldStatus(id, "active");
+    return adminRepository.updateFieldStatus(fieldId, FIELD_STATUS.ACTIVE);
   },
 
   async rejectField(fieldId) {
-    const id = validateId(fieldId, "fieldId");
-    const field = await adminRepository.findFieldById(id);
+    const field = await adminRepository.findFieldById(fieldId);
 
     if (!field) {
       throw new NotFoundError("Không tìm thấy sân");
     }
 
-    if (field.status !== "pending") {
+    if (field.status !== FIELD_STATUS.PENDING) {
       throw new ConflictError("Chỉ sân pending mới được từ chối");
     }
 
-    return adminRepository.updateFieldStatus(id, "hidden");
+    return adminRepository.updateFieldStatus(fieldId, FIELD_STATUS.INACTIVE);
   },
 
   async getAdminBookings() {
@@ -123,13 +117,41 @@ export const adminService = {
   },
 
   async getAdminBookingDetail(bookingId) {
-    const id = validateId(bookingId, "bookingId");
-    const booking = await adminRepository.findAdminBookingById(id);
+    const booking = await adminRepository.findAdminBookingById(bookingId);
 
     if (!booking) {
       throw new NotFoundError("Không tìm thấy booking");
     }
 
     return booking;
+  },
+
+  async getAdminDashboardSummary() {
+    const [
+      totalUsers,
+      totalApprovedOwners,
+      totalFields,
+      totalBookings,
+      revenueItems,
+    ] = await Promise.all([
+      adminRepository.countUsers(),
+      adminRepository.countApprovedOwners(),
+      adminRepository.countFields(),
+      adminRepository.countBookings(),
+      adminRepository.findRevenueBookings(),
+    ]);
+
+    const totalRevenue = revenueItems.reduce(
+      (sum, item) => sum + Number(item.total_price || 0),
+      0
+    );
+
+    return {
+      total_users: totalUsers,
+      total_approved_owners: totalApprovedOwners,
+      total_fields: totalFields,
+      total_bookings: totalBookings,
+      total_revenue: totalRevenue,
+    };
   },
 };

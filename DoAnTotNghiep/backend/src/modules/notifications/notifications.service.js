@@ -1,8 +1,8 @@
 import { notificationsRepository } from "./notifications.repository.js";
 import {
-  validateNotificationId,
-  validateBroadcastPayload,
-} from "./notifications.validator.js";
+  NotFoundError,
+  ValidationError,
+} from "../../core/errors/index.js";
 
 export const notificationsService = {
   async getMyNotifications(userId) {
@@ -10,18 +10,20 @@ export const notificationsService = {
   },
 
   async markAsRead(userId, notificationId) {
-    const id = validateNotificationId(notificationId);
+    const item = await notificationsRepository.findMyNotificationById(
+      userId,
+      notificationId
+    );
 
-    const item = await notificationsRepository.findMyNotificationById(userId, id);
     if (!item) {
-      throw new Error("Không tìm thấy notification");
+      throw new NotFoundError("Không tìm thấy notification");
     }
 
     if (item.is_read) {
       return item;
     }
 
-    return notificationsRepository.markAsRead(id);
+    return notificationsRepository.markAsRead(notificationId);
   },
 
   async markAllAsRead(userId) {
@@ -30,29 +32,30 @@ export const notificationsService = {
   },
 
   async deleteMyNotification(userId, notificationId) {
-    const id = validateNotificationId(notificationId);
+    const item = await notificationsRepository.findMyNotificationById(
+      userId,
+      notificationId
+    );
 
-    const item = await notificationsRepository.findMyNotificationById(userId, id);
     if (!item) {
-      throw new Error("Không tìm thấy notification");
+      throw new NotFoundError("Không tìm thấy notification");
     }
 
-    return notificationsRepository.deleteMyNotification(id);
+    return notificationsRepository.deleteMyNotification(notificationId);
   },
 
   async broadcastNotification(payload) {
-    const valid = validateBroadcastPayload(payload);
-
     const users = await notificationsRepository.findAllActiveUsers();
+
     if (!users.length) {
-      throw new Error("Không có user active để gửi thông báo");
+      throw new ValidationError("Không có user active để gửi thông báo");
     }
 
-    await notificationsRepository.createManyNotifications(users, valid);
+    await notificationsRepository.createManyNotifications(users, payload);
 
     return {
       sent_count: users.length,
-      ...valid,
+      ...payload,
     };
   },
 };

@@ -1,10 +1,10 @@
 import { vouchersRepository } from "./vouchers.repository.js";
 import {
-  validateVoucherCodePayload,
-  validateCreateVoucherPayload,
-  validateUpdateVoucherPayload,
-  validateVoucherStatusPayload,
-} from "./vouchers.validator.js";
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+  ValidationError,
+} from "../../core/errors/index.js";
 
 function calcDiscount(voucher, orderAmount) {
   if (voucher.type === "FIXED") {
@@ -29,32 +29,31 @@ function calcDiscount(voucher, orderAmount) {
 
 export const vouchersService = {
   async validateVoucher(userId, payload) {
-    const valid = validateVoucherCodePayload(payload);
+    const voucher = await vouchersRepository.findByCode(payload.code);
 
-    const voucher = await vouchersRepository.findByCode(valid.code);
     if (!voucher) {
-      throw new Error("Không tìm thấy voucher");
+      throw new NotFoundError("Không tìm thấy voucher");
     }
 
     const today = new Date();
 
     if (voucher.status !== "active") {
-      throw new Error("Voucher hiện không khả dụng");
+      throw new ForbiddenError("Voucher hiện không khả dụng");
     }
 
     if (voucher.start_date > today || voucher.end_date < today) {
-      throw new Error("Voucher không còn trong thời gian hiệu lực");
+      throw new ForbiddenError("Voucher không còn trong thời gian hiệu lực");
     }
 
     if (
       voucher.min_order_value !== null &&
-      Number(valid.order_amount) < Number(voucher.min_order_value)
+      Number(payload.order_amount) < Number(voucher.min_order_value)
     ) {
-      throw new Error("Chưa đạt giá trị đơn tối thiểu để áp voucher");
+      throw new ValidationError("Chưa đạt giá trị đơn tối thiểu để áp voucher");
     }
 
-    if (valid.owner_id && voucher.owner_id && voucher.owner_id !== valid.owner_id) {
-      throw new Error("Voucher không áp dụng cho owner này");
+    if (payload.owner_id && voucher.owner_id && voucher.owner_id !== payload.owner_id) {
+      throw new ForbiddenError("Voucher không áp dụng cho owner này");
     }
 
     if (
@@ -63,8 +62,9 @@ export const vouchersService = {
       Number(voucher.usage_limit_total) > 0
     ) {
       const totalUsed = await vouchersRepository.countVoucherUsageTotal(voucher.id);
+
       if (totalUsed >= Number(voucher.usage_limit_total)) {
-        throw new Error("Voucher đã hết lượt sử dụng");
+        throw new ForbiddenError("Voucher đã hết lượt sử dụng");
       }
     }
 
@@ -77,17 +77,18 @@ export const vouchersService = {
         voucher.id,
         userId
       );
+
       if (usedByUser >= Number(voucher.usage_limit_per_user)) {
-        throw new Error("Bạn đã dùng hết lượt áp dụng voucher này");
+        throw new ForbiddenError("Bạn đã dùng hết lượt áp dụng voucher này");
       }
     }
 
-    const discount_amount = calcDiscount(voucher, Number(valid.order_amount));
-    const final_amount = Math.max(Number(valid.order_amount) - discount_amount, 0);
+    const discount_amount = calcDiscount(voucher, Number(payload.order_amount));
+    const final_amount = Math.max(Number(payload.order_amount) - discount_amount, 0);
 
     return {
       voucher,
-      order_amount: Number(valid.order_amount),
+      order_amount: Number(payload.order_amount),
       discount_amount,
       final_amount,
     };
@@ -102,47 +103,46 @@ export const vouchersService = {
   },
 
   async getOwnerVoucherDetail(ownerId, voucherId) {
-    const id = Number(voucherId);
-    if (Number.isNaN(id)) throw new Error("voucherId không hợp lệ");
+    const voucher = await vouchersRepository.findOwnerVoucherById(ownerId, voucherId);
 
-    const voucher = await vouchersRepository.findOwnerVoucherById(ownerId, id);
-    if (!voucher) throw new Error("Không tìm thấy voucher");
+    if (!voucher) {
+      throw new NotFoundError("Không tìm thấy voucher");
+    }
 
     return voucher;
   },
 
   async createOwnerVoucher(ownerId, createdBy, payload) {
-    const valid = validateCreateVoucherPayload(payload);
+    const existed = await vouchersRepository.findByCode(payload.code);
 
-    const existed = await vouchersRepository.findByCode(valid.code);
     if (existed) {
-      throw new Error("Code voucher đã tồn tại");
+      throw new ConflictError("Code voucher đã tồn tại");
     }
 
-    return vouchersRepository.createOwnerVoucher(ownerId, createdBy, valid);
+    return vouchersRepository.createOwnerVoucher(ownerId, createdBy, payload);
   },
 
   async updateOwnerVoucher(ownerId, voucherId, payload) {
-    const id = Number(voucherId);
-    if (Number.isNaN(id)) throw new Error("voucherId không hợp lệ");
+    const voucher = await vouchersRepository.findOwnerVoucherById(ownerId, voucherId);
 
-    const voucher = await vouchersRepository.findOwnerVoucherById(ownerId, id);
-    if (!voucher) throw new Error("Không tìm thấy voucher");
+    if (!voucher) {
+      throw new NotFoundError("Không tìm thấy voucher");
+    }
 
-    const valid = validateUpdateVoucherPayload(payload);
-
-    return vouchersRepository.updateOwnerVoucher(id, valid);
+    return vouchersRepository.updateOwnerVoucher(voucherId, payload);
   },
 
   async updateOwnerVoucherStatus(ownerId, voucherId, payload) {
-    const id = Number(voucherId);
-    if (Number.isNaN(id)) throw new Error("voucherId không hợp lệ");
+    const voucher = await vouchersRepository.findOwnerVoucherById(ownerId, voucherId);
 
-    const voucher = await vouchersRepository.findOwnerVoucherById(ownerId, id);
-    if (!voucher) throw new Error("Không tìm thấy voucher");
+    if (!voucher) {
+      throw new NotFoundError("Không tìm thấy voucher");
+    }
 
-    const valid = validateVoucherStatusPayload(payload);
+    if (voucher.status === payload.status) {
+      throw new ConflictError("Voucher đã ở trạng thái này");
+    }
 
-    return vouchersRepository.updateOwnerVoucherStatus(id, valid.status);
+    return vouchersRepository.updateOwnerVoucherStatus(voucherId, payload.status);
   },
 };

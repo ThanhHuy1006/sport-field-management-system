@@ -1,4 +1,7 @@
-import { successResponse } from "../../core/utils/response.js";
+import {
+  successResponse,
+  createdResponse,
+} from "../../core/utils/response.js";
 import { schedulesService } from "./schedules.service.js";
 import {
   toAvailabilityResponse,
@@ -8,10 +11,10 @@ import {
 export const schedulesController = {
   async getPublicAvailability(req, res, next) {
     try {
-      const result = await schedulesService.getPublicAvailability(
-        req.params.fieldId,
-        req.query
-      );
+      const { fieldId } = req.validated?.params ?? req.params;
+      const query = req.validated?.query ?? req.query;
+
+      const result = await schedulesService.getPublicAvailability(fieldId, query);
 
       return successResponse(
         res,
@@ -25,8 +28,10 @@ export const schedulesController = {
 
   async getOwnerOperatingHours(req, res, next) {
     try {
+      const { fieldId } = req.validated?.params ?? req.params;
+
       const items = await schedulesService.getOwnerOperatingHours(
-        req.params.fieldId,
+        fieldId,
         req.user
       );
 
@@ -42,9 +47,12 @@ export const schedulesController = {
 
   async upsertOwnerOperatingHours(req, res, next) {
     try {
+      const { fieldId } = req.validated?.params ?? req.params;
+      const payload = req.validated?.body ?? req.body;
+
       const item = await schedulesService.upsertOwnerOperatingHours(
-        req.params.fieldId,
-        req.body,
+        fieldId,
+        payload,
         req.user
       );
 
@@ -60,13 +68,16 @@ export const schedulesController = {
 
   async createBlackoutDate(req, res, next) {
     try {
+      const { fieldId } = req.validated?.params ?? req.params;
+      const payload = req.validated?.body ?? req.body;
+
       const item = await schedulesService.createBlackoutDate(
-        req.params.fieldId,
-        req.body,
+        fieldId,
+        payload,
         req.user
       );
 
-      return successResponse(res, item, "Tạo ngày khóa thành công", 201);
+      return createdResponse(res, item, "Tạo ngày khóa thành công");
     } catch (error) {
       next(error);
     }
@@ -74,10 +85,9 @@ export const schedulesController = {
 
   async deleteBlackoutDate(req, res, next) {
     try {
-      await schedulesService.deleteBlackoutDate(
-        req.params.blackoutDateId,
-        req.user
-      );
+      const { blackoutDateId } = req.validated?.params ?? req.params;
+
+      await schedulesService.deleteBlackoutDate(blackoutDateId, req.user);
 
       return successResponse(res, null, "Xóa ngày khóa thành công");
     } catch (error) {

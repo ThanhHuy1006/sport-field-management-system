@@ -1,6 +1,14 @@
 import { ValidationError } from "../../core/errors/index.js";
 
-export function validateOwnerFieldIdParam(params) {
+function isValidDateString(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function isValidTimeString(value) {
+  return /^\d{2}:\d{2}$/.test(value);
+}
+
+export function validateFieldIdParam(params) {
   const fieldId = Number(params.fieldId);
 
   if (Number.isNaN(fieldId) || fieldId <= 0) {
@@ -20,63 +28,57 @@ export function validateBlackoutDateIdParam(params) {
   return { blackoutDateId };
 }
 
-export function validateOperatingHoursPayload(payload) {
-  if (!Array.isArray(payload)) {
-    throw new ValidationError("Payload operating hours phải là mảng");
+export function validateOwnerOperatingHoursPayload(payload) {
+  const day_of_week = Number(payload.day_of_week);
+  const is_closed = Boolean(payload.is_closed);
+  const open_time = payload.open_time ? String(payload.open_time).trim() : null;
+  const close_time = payload.close_time ? String(payload.close_time).trim() : null;
+
+  if (Number.isNaN(day_of_week) || day_of_week < 0 || day_of_week > 6) {
+    throw new ValidationError("day_of_week phải từ 0 đến 6");
   }
 
-  const normalized = payload.map((item, index) => {
-    const day_of_week = Number(item.day_of_week);
-    const open_time = String(item.open_time || "").trim();
-    const close_time = String(item.close_time || "").trim();
-    const is_closed = Boolean(item.is_closed);
-
-    if (Number.isNaN(day_of_week) || day_of_week < 0 || day_of_week > 6) {
-      throw new ValidationError(`day_of_week không hợp lệ tại phần tử ${index}`);
+  if (!is_closed) {
+    if (!open_time || !close_time) {
+      throw new ValidationError("open_time và close_time là bắt buộc khi không đóng cửa");
     }
 
-    if (!is_closed) {
-      if (!open_time || !close_time) {
-        throw new ValidationError(`open_time và close_time là bắt buộc tại phần tử ${index}`);
-      }
-
-      if (open_time >= close_time) {
-        throw new ValidationError(`open_time phải nhỏ hơn close_time tại phần tử ${index}`);
-      }
+    if (!isValidTimeString(open_time) || !isValidTimeString(close_time)) {
+      throw new ValidationError("open_time và close_time phải có định dạng HH:mm");
     }
 
-    return {
-      day_of_week,
-      open_time: is_closed ? null : open_time,
-      close_time: is_closed ? null : close_time,
-      is_closed,
-    };
-  });
-
-  const uniqueDays = new Set(normalized.map((x) => x.day_of_week));
-  if (uniqueDays.size !== normalized.length) {
-    throw new ValidationError("Mỗi day_of_week chỉ được xuất hiện 1 lần");
-  }
-
-  return normalized;
-}
-
-export function validateCreateBlackoutPayload(payload) {
-  const start_datetime = new Date(payload.start_datetime);
-  const end_datetime = new Date(payload.end_datetime);
-  const reason = payload.reason ? String(payload.reason).trim() : null;
-
-  if (Number.isNaN(start_datetime.getTime()) || Number.isNaN(end_datetime.getTime())) {
-    throw new ValidationError("start_datetime hoặc end_datetime không hợp lệ");
-  }
-
-  if (start_datetime >= end_datetime) {
-    throw new ValidationError("end_datetime phải lớn hơn start_datetime");
+    if (open_time >= close_time) {
+      throw new ValidationError("open_time phải nhỏ hơn close_time");
+    }
   }
 
   return {
-    start_datetime,
-    end_datetime,
+    day_of_week,
+    open_time: is_closed ? null : open_time,
+    close_time: is_closed ? null : close_time,
+    is_closed,
+  };
+}
+
+export function validateOwnerBlackoutDatePayload(payload) {
+  const date = String(payload.date || "").trim();
+  const reason = payload.reason ? String(payload.reason).trim() : null;
+
+  if (!date) {
+    throw new ValidationError("date là bắt buộc");
+  }
+
+  if (!isValidDateString(date)) {
+    throw new ValidationError("date không hợp lệ");
+  }
+
+  const parsed = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new ValidationError("date không hợp lệ");
+  }
+
+  return {
+    date,
     reason,
   };
 }

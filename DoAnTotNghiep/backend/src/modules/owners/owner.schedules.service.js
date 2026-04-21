@@ -1,70 +1,114 @@
-import { NotFoundError } from "../../core/errors/index.js";
-import { ownerSchedulesRepository } from "./owner.schedules.repository.js";
 import {
-  validateOwnerFieldIdParam,
-  validateBlackoutDateIdParam,
-  validateOperatingHoursPayload,
-  validateCreateBlackoutPayload,
-} from "./owner.schedules.validator.js";
+  ConflictError,
+  NotFoundError,
+} from "../../core/errors/index.js";
+import { ownerSchedulesRepository } from "./owner.schedules.repository.js";
+
+function startOfDay(dateStr) {
+  return new Date(`${dateStr}T00:00:00`);
+}
+
+function endOfDay(dateStr) {
+  return new Date(`${dateStr}T23:59:59`);
+}
+
+async function ensureOwnerField(ownerId, fieldId) {
+  const field = await ownerSchedulesRepository.findOwnerFieldById(ownerId, fieldId);
+
+  if (!field) {
+    throw new NotFoundError("Không tìm thấy sân của owner");
+  }
+
+  return field;
+}
 
 export const ownerSchedulesService = {
-  async getOperatingHours(ownerId, params) {
-    const { fieldId } = validateOwnerFieldIdParam(params);
+  async getOwnerOperatingHours(ownerId, fieldId) {
+    await ensureOwnerField(ownerId, fieldId);
 
-    const field = await ownerSchedulesRepository.findOwnerFieldById(ownerId, fieldId);
-    if (!field) {
-      throw new NotFoundError("Không tìm thấy sân của owner");
-    }
+    const existing = await ownerSchedulesRepository.findOperatingHoursByField(fieldId);
+    const byDay = new Map(existing.map((item) => [item.day_of_week, item]));
 
-    return ownerSchedulesRepository.findOperatingHoursByFieldId(fieldId);
+    return Array.from({ length: 7 }, (_, day) => {
+      const item = byDay.get(day);
+
+      if (item) {
+        return {
+          ...item,
+          is_closed: false,
+        };
+      }
+
+      return {
+        id: null,
+        field_id: fieldId,
+        day_of_week: day,
+        open_time: null,
+        close_time: null,
+        is_closed: true,
+      };
+    });
   },
 
-  async replaceOperatingHours(ownerId, params, payload) {
-    const { fieldId } = validateOwnerFieldIdParam(params);
+  async upsertOwnerOperatingHours(ownerId, fieldId, payload) {
+    await ensureOwnerField(ownerId, fieldId);
 
-    const field = await ownerSchedulesRepository.findOwnerFieldById(ownerId, fieldId);
-    if (!field) {
-      throw new NotFoundError("Không tìm thấy sân của owner");
+    const existed = await ownerSchedulesRepository.findOperatingHourByFieldAndDay(
+      fieldId,
+      payload.day_of_week
+    );
+
+    if (payload.is_closed) {
+      if (existed) {
+        await ownerSchedulesRepository.deleteOperatingHour(existed.id);
+      }
+
+      return {
+        id: existed?.id ?? null,
+        field_id: fieldId,
+        day_of_week: payload.day_of_week,
+        open_time: null,
+        close_time: null,
+        is_closed: true,
+      };
     }
 
-    const valid = validateOperatingHoursPayload(payload);
-    return ownerSchedulesRepository.replaceOperatingHours(fieldId, valid);
+    const item = existed
+      ? await ownerSchedulesRepository.updateOperatingHour(existed.id, payload)
+      : await ownerSchedulesRepository.createOperatingHour(fieldId, payload);
+
+    return {
+      ...item,
+      is_closed: false,
+    };
   },
 
-  async getBlackoutDates(ownerId, params) {
-    const { fieldId } = validateOwnerFieldIdParam(params);
+  async createBlackoutDate(ownerId, fieldId, payload) {
+    await ensureOwnerField(ownerId, fieldId);
 
-    const field = await ownerSchedulesRepository.findOwnerFieldById(ownerId, fieldId);
-    if (!field) {
-      throw new NotFoundError("Không tìm thấy sân của owner");
+    const existed = await ownerSchedulesRepository.findBlackoutByFieldAndDate(
+      fieldId,
+      startOfDay(payload.date),
+      endOfDay(payload.date)
+    );
+
+    if (existed) {
+      throw new ConflictError("Ngày này đã bị khóa trước đó");
     }
 
-    return ownerSchedulesRepository.findBlackoutDatesByFieldId(fieldId);
+    return ownerSchedulesRepository.createBlackoutDate(fieldId, payload);
   },
 
-  async createBlackoutDate(ownerId, params, payload) {
-    const { fieldId } = validateOwnerFieldIdParam(params);
-
-    const field = await ownerSchedulesRepository.findOwnerFieldById(ownerId, fieldId);
-    if (!field) {
-      throw new NotFoundError("Không tìm thấy sân của owner");
-    }
-
-    const valid = validateCreateBlackoutPayload(payload);
-    return ownerSchedulesRepository.createBlackoutDate(fieldId, valid);
-  },
-
-  async deleteBlackoutDate(ownerId, params) {
-    const { blackoutDateId } = validateBlackoutDateIdParam(params);
-
-    const item = await ownerSchedulesRepository.findOwnerBlackoutDateById(
-      ownerId,
+  async deleteBlackoutDate(ownerId, blackoutDateId) {
+    const blackoutDate = await ownerSchedulesRepository.findBlackoutDateById(
       blackoutDateId
     );
 
-    if (!item) {
-      throw new NotFoundError("Không tìm thấy blackout date của owner");
+    if (!blackoutDate) {
+      throw new NotFoundError("Không tìm thấy ngày khóa");
     }
+
+    await ensureOwnerField(ownerId, blackoutDate.field_id);
 
     return ownerSchedulesRepository.deleteBlackoutDate(blackoutDateId);
   },

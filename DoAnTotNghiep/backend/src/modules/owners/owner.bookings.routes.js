@@ -1,57 +1,64 @@
 import { Router } from "express";
 import { requireAuth } from "../../core/middlewares/auth.middleware.js";
-import { requireApprovedOwner } from "../../core/middlewares/role.middleware.js";
-import { validateBody, validateQuery } from "../../core/middlewares/validate.middleware.js";
+import {
+  requireRole,
+  requireApprovedOwner,
+} from "../../core/middlewares/role.middleware.js";
+import {
+  validateBody,
+  validateParams,
+} from "../../core/middlewares/validate.middleware.js";
 import { ownerBookingsController } from "./owner.bookings.controller.js";
 import {
-  validateOwnerBookingsQuery,
-  validateRejectOwnerBookingPayload,
-  validateCompleteOwnerBookingPayload,
+  validateBookingIdParam,
+  validateRejectBookingPayload,
   validateManualCheckInPayload,
   validateCheckInQrPayload,
+  validateCompleteBookingPayload,
 } from "./owner.bookings.validator.js";
 
 const router = Router();
 
-router.use(requireAuth, requireApprovedOwner());
+router.use(requireAuth, requireRole("OWNER"), requireApprovedOwner());
+
+router.get("/", ownerBookingsController.getOwnerBookings);
 
 router.get(
-  "/bookings",
-  validateQuery(validateOwnerBookingsQuery),
-  ownerBookingsController.getOwnerBookings
-);
-
-router.get(
-  "/bookings/:bookingId",
+  "/:bookingId",
+  validateParams(validateBookingIdParam),
   ownerBookingsController.getOwnerBookingDetail
 );
 
 router.patch(
-  "/bookings/:bookingId/approve",
+  "/:bookingId/approve",
+  validateParams(validateBookingIdParam),
   ownerBookingsController.approveOwnerBooking
 );
 
 router.patch(
-  "/bookings/:bookingId/reject",
-  validateBody(validateRejectOwnerBookingPayload),
+  "/:bookingId/reject",
+  validateParams(validateBookingIdParam),
+  validateBody(validateRejectBookingPayload),
   ownerBookingsController.rejectOwnerBooking
 );
 
 router.patch(
-  "/bookings/:bookingId/check-in",
+  "/:bookingId/check-in",
+  validateParams(validateBookingIdParam),
   validateBody(validateManualCheckInPayload),
   ownerBookingsController.checkInOwnerBooking
 );
 
 router.post(
-  "/bookings/check-in/scan",
+  "/check-in/scan",
   validateBody(validateCheckInQrPayload),
   ownerBookingsController.scanOwnerBookingQr
 );
 
 router.patch(
-  "/bookings/:bookingId/complete",
-  validateBody(validateCompleteOwnerBookingPayload),
+  "/:bookingId/complete",
+  validateParams(validateBookingIdParam),
+  validateBody(validateCompleteBookingPayload),
   ownerBookingsController.completeOwnerBooking
 );
 

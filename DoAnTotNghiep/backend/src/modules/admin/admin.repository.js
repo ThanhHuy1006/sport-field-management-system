@@ -1,4 +1,9 @@
 import prisma from "../../config/prisma.js";
+import {
+  FIELD_STATUS,
+  OWNER_PROFILE_STATUS,
+  USER_STATUS,
+} from "../../config/constant.js";
 
 export const adminRepository = {
   findUsers() {
@@ -38,7 +43,14 @@ export const adminRepository = {
         status: true,
         created_at: true,
         updated_at: true,
-        owner_profiles_owner_profiles_user_idTousers: true,
+        owner_profiles_owner_profiles_user_idTousers: {
+          select: {
+            status: true,
+            business_name: true,
+            approved_at: true,
+            reject_reason: true,
+          },
+        },
       },
     });
   },
@@ -51,8 +63,20 @@ export const adminRepository = {
         id: true,
         name: true,
         email: true,
+        phone: true,
+        avatar_url: true,
         role: true,
         status: true,
+        created_at: true,
+        updated_at: true,
+        owner_profiles_owner_profiles_user_idTousers: {
+          select: {
+            status: true,
+            business_name: true,
+            approved_at: true,
+            reject_reason: true,
+          },
+        },
       },
     });
   },
@@ -109,36 +133,76 @@ export const adminRepository = {
 
   approveOwnerRegistration(adminId, userId) {
     return prisma.$transaction(async (tx) => {
-      const profile = await tx.owner_profiles.update({
+      await tx.users.update({
+        where: { id: userId },
+        data: {
+          role: "OWNER",
+          status: USER_STATUS.ACTIVE,
+        },
+      });
+
+      await tx.owner_profiles.update({
         where: { user_id: userId },
         data: {
-          status: "approved",
+          status: OWNER_PROFILE_STATUS.APPROVED,
           reject_reason: null,
           approved_by: adminId,
           approved_at: new Date(),
         },
       });
 
-      await tx.users.update({
-        where: { id: userId },
-        data: {
-          role: "OWNER",
-          status: "active",
+      return tx.owner_profiles.findUnique({
+        where: { user_id: userId },
+        include: {
+          users_owner_profiles_user_idTousers: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+              role: true,
+              status: true,
+            },
+          },
+          users_owner_profiles_approved_byTousers: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
         },
       });
-
-      return profile;
     });
   },
 
-  rejectOwnerRegistration(adminId, userId, reason) {
+  rejectOwnerRegistration(adminId, userId, rejectReason) {
     return prisma.owner_profiles.update({
       where: { user_id: userId },
       data: {
-        status: "rejected",
-        reject_reason: reason,
+        status: OWNER_PROFILE_STATUS.REJECTED,
+        reject_reason: rejectReason,
         approved_by: adminId,
-        approved_at: new Date(),
+        approved_at: null,
+      },
+      include: {
+        users_owner_profiles_user_idTousers: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            role: true,
+            status: true,
+          },
+        },
+        users_owner_profiles_approved_byTousers: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
       },
     });
   },
@@ -165,6 +229,19 @@ export const adminRepository = {
   findFieldById(fieldId) {
     return prisma.fields.findUnique({
       where: { id: fieldId },
+      include: {
+        users: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        field_images: {
+          orderBy: [{ is_primary: "desc" }, { order_no: "asc" }],
+          take: 1,
+        },
+      },
     });
   },
 
@@ -172,6 +249,19 @@ export const adminRepository = {
     return prisma.fields.update({
       where: { id: fieldId },
       data: { status },
+      include: {
+        users: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        field_images: {
+          orderBy: [{ is_primary: "desc" }, { order_no: "asc" }],
+          take: 1,
+        },
+      },
     });
   },
 
@@ -225,6 +315,39 @@ export const adminRepository = {
           orderBy: { changed_at: "desc" },
         },
         payments: true,
+      },
+    });
+  },
+
+  countUsers() {
+    return prisma.users.count();
+  },
+
+  countApprovedOwners() {
+    return prisma.owner_profiles.count({
+      where: {
+        status: OWNER_PROFILE_STATUS.APPROVED,
+      },
+    });
+  },
+
+  countFields() {
+    return prisma.fields.count();
+  },
+
+  countBookings() {
+    return prisma.bookings.count();
+  },
+
+  findRevenueBookings() {
+    return prisma.bookings.findMany({
+      where: {
+        status: {
+          in: ["PAID", "COMPLETED"],
+        },
+      },
+      select: {
+        total_price: true,
       },
     });
   },

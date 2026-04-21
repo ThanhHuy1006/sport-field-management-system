@@ -1,13 +1,9 @@
 import {
   ConflictError,
+  ForbiddenError,
   NotFoundError,
 } from "../../core/errors/index.js";
 import { ownerRepository } from "./owner.repository.js";
-import {
-  validateOwnerRegistrationPayload,
-  validateOwnerRegistrationUpdatePayload,
-  validateOwnerProfileUpdatePayload,
-} from "./owner.validator.js";
 
 function getMonthRange() {
   const now = new Date();
@@ -18,14 +14,13 @@ function getMonthRange() {
 
 export const ownerService = {
   async createOwnerRegistration(userId, payload) {
-    const valid = validateOwnerRegistrationPayload(payload);
-
     const existing = await ownerRepository.findOwnerProfileByUserId(userId);
+
     if (existing) {
       throw new ConflictError("Bạn đã có hồ sơ đăng ký owner");
     }
 
-    return ownerRepository.createOwnerRegistration(userId, valid.business_name);
+    return ownerRepository.createOwnerRegistration(userId, payload.business_name);
   },
 
   async getMyOwnerRegistration(userId) {
@@ -45,9 +40,13 @@ export const ownerService = {
       throw new NotFoundError("Bạn chưa có hồ sơ đăng ký owner");
     }
 
-    const valid = validateOwnerRegistrationUpdatePayload(payload);
+    if (ownerProfile.status === "approved") {
+      throw new ForbiddenError(
+        "Hồ sơ owner đã được duyệt, không thể cập nhật lại đăng ký"
+      );
+    }
 
-    return ownerRepository.updateOwnerRegistration(userId, valid);
+    return ownerRepository.updateOwnerRegistration(userId, payload);
   },
 
   async getMyOwnerProfile(userId) {
@@ -69,8 +68,7 @@ export const ownerService = {
       throw new NotFoundError("Không tìm thấy user");
     }
 
-    const valid = validateOwnerProfileUpdatePayload(payload);
-    const updatedUser = await ownerRepository.updateUserProfile(userId, valid);
+    const updatedUser = await ownerRepository.updateUserProfile(userId, payload);
     const ownerProfile = await ownerRepository.findOwnerProfileByUserId(userId);
 
     return {

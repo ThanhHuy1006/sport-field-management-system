@@ -48,6 +48,7 @@ export const reviewsRepository = {
       where: {
         id: reviewId,
         user_id: userId,
+        visible: true,
       },
       include: {
         users: {
@@ -129,6 +130,7 @@ export const reviewsRepository = {
     return prisma.reviews.findFirst({
       where: {
         id: reviewId,
+        visible: true,
         fields: {
           owner_id: ownerId,
         },

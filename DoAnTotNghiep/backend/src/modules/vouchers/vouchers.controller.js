@@ -1,44 +1,22 @@
-import { successResponse } from "../../core/utils/response.js";
+import {
+  successResponse,
+  createdResponse,
+} from "../../core/utils/response.js";
 import { vouchersService } from "./vouchers.service.js";
-
-function mapVoucher(item) {
-  if (!item) return null;
-
-  return {
-    id: item.id,
-    owner_id: item.owner_id,
-    created_by: item.created_by,
-    code: item.code,
-    type: item.type,
-    discount_value: item.discount_value ? Number(item.discount_value) : null,
-    max_discount_amount: item.max_discount_amount
-      ? Number(item.max_discount_amount)
-      : null,
-    min_order_value: item.min_order_value
-      ? Number(item.min_order_value)
-      : null,
-    usage_limit_total: item.usage_limit_total,
-    usage_limit_per_user: item.usage_limit_per_user,
-    start_date: item.start_date,
-    end_date: item.end_date,
-    status: item.status,
-    created_at: item.created_at,
-  };
-}
+import {
+  toVoucherResponse,
+  toVoucherValidationResponse,
+} from "./vouchers.mapper.js";
 
 export const vouchersController = {
   async validateVoucher(req, res, next) {
     try {
-      const result = await vouchersService.validateVoucher(req.user.id, req.body);
+      const payload = req.validated?.body ?? req.body;
+      const result = await vouchersService.validateVoucher(req.user.id, payload);
 
       return successResponse(
         res,
-        {
-          voucher: mapVoucher(result.voucher),
-          order_amount: result.order_amount,
-          discount_amount: result.discount_amount,
-          final_amount: result.final_amount,
-        },
+        toVoucherValidationResponse(result),
         "Validate voucher thành công"
       );
     } catch (error) {
@@ -48,12 +26,12 @@ export const vouchersController = {
 
   async getAvailableVouchers(req, res, next) {
     try {
-      const ownerId = req.query.owner_id ? Number(req.query.owner_id) : null;
-      const items = await vouchersService.getAvailableVouchers(ownerId);
+      const query = req.validated?.query ?? req.query;
+      const items = await vouchersService.getAvailableVouchers(query.owner_id);
 
       return successResponse(
         res,
-        items.map(mapVoucher),
+        items.map(toVoucherResponse),
         "Lấy danh sách voucher khả dụng thành công"
       );
     } catch (error) {
@@ -67,7 +45,7 @@ export const vouchersController = {
 
       return successResponse(
         res,
-        items.map(mapVoucher),
+        items.map(toVoucherResponse),
         "Lấy danh sách voucher của owner thành công"
       );
     } catch (error) {
@@ -77,12 +55,18 @@ export const vouchersController = {
 
   async getOwnerVoucherDetail(req, res, next) {
     try {
+      const { voucherId } = req.validated?.params ?? req.params;
+
       const item = await vouchersService.getOwnerVoucherDetail(
         req.user.id,
-        req.params.voucherId
+        voucherId
       );
 
-      return successResponse(res, mapVoucher(item), "Lấy chi tiết voucher thành công");
+      return successResponse(
+        res,
+        toVoucherResponse(item),
+        "Lấy chi tiết voucher thành công"
+      );
     } catch (error) {
       next(error);
     }
@@ -90,13 +74,19 @@ export const vouchersController = {
 
   async createOwnerVoucher(req, res, next) {
     try {
+      const payload = req.validated?.body ?? req.body;
+
       const item = await vouchersService.createOwnerVoucher(
         req.user.id,
         req.user.id,
-        req.body
+        payload
       );
 
-      return successResponse(res, mapVoucher(item), "Tạo voucher thành công", 201);
+      return createdResponse(
+        res,
+        toVoucherResponse(item),
+        "Tạo voucher thành công"
+      );
     } catch (error) {
       next(error);
     }
@@ -104,13 +94,20 @@ export const vouchersController = {
 
   async updateOwnerVoucher(req, res, next) {
     try {
+      const { voucherId } = req.validated?.params ?? req.params;
+      const payload = req.validated?.body ?? req.body;
+
       const item = await vouchersService.updateOwnerVoucher(
         req.user.id,
-        req.params.voucherId,
-        req.body
+        voucherId,
+        payload
       );
 
-      return successResponse(res, mapVoucher(item), "Cập nhật voucher thành công");
+      return successResponse(
+        res,
+        toVoucherResponse(item),
+        "Cập nhật voucher thành công"
+      );
     } catch (error) {
       next(error);
     }
@@ -118,15 +115,18 @@ export const vouchersController = {
 
   async updateOwnerVoucherStatus(req, res, next) {
     try {
+      const { voucherId } = req.validated?.params ?? req.params;
+      const payload = req.validated?.body ?? req.body;
+
       const item = await vouchersService.updateOwnerVoucherStatus(
         req.user.id,
-        req.params.voucherId,
-        req.body
+        voucherId,
+        payload
       );
 
       return successResponse(
         res,
-        mapVoucher(item),
+        toVoucherResponse(item),
         "Cập nhật trạng thái voucher thành công"
       );
     } catch (error) {

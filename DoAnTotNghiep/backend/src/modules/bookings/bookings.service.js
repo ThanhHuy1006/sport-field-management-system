@@ -1,13 +1,12 @@
 import jwt from "jsonwebtoken";
 import { bookingsRepository } from "./bookings.repository.js";
 import {
-  validateCheckAvailabilityPayload,
-  validateCreateBookingPayload,
-  validateRejectBookingPayload,
-  validateManualCheckInPayload,
-  validateCheckInQrPayload,
-  validateCompleteBookingPayload,
-} from "./bookings.validator.js";
+  AuthError,
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+  ValidationError,
+} from "../../core/errors/index.js";
 
 const CHECKIN_EARLY_MINUTES = 30;
 const CHECKIN_LATE_MINUTES = 60;
@@ -16,12 +15,26 @@ function diffMinutes(start, end) {
   return Math.floor((end.getTime() - start.getTime()) / 60000);
 }
 
-function isSameDate(a, b) {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
+function getDayOfWeek(date) {
+  return date.getDay();
+}
+
+function combineDateAndTime(date, timeStr) {
+  const iso = date.toISOString().slice(0, 10);
+  return new Date(`${iso}T${timeStr}`);
+}
+
+function isWithinOperatingHours(start, end, operatingHour) {
+  const open = combineDateAndTime(start, operatingHour.open_time);
+  const close = combineDateAndTime(start, operatingHour.close_time);
+
+  return start >= open && end <= close;
+}
+
+function assertFutureBooking(startDatetime) {
+  if (startDatetime <= new Date()) {
+    throw new ValidationError("Không thể đặt sân ở thời điểm đã qua");
+  }
 }
 
 function assertCheckInWindow(startDatetime) {
@@ -32,59 +45,79 @@ function assertCheckInWindow(startDatetime) {
   const closeWindow = new Date(start.getTime() + CHECKIN_LATE_MINUTES * 60 * 1000);
 
   if (now < openWindow) {
-    throw new Error("Chưa tới thời gian cho phép check-in");
+    throw new ForbiddenError("Chưa tới thời gian cho phép check-in");
   }
 
   if (now > closeWindow) {
-    throw new Error("Đã quá thời gian cho phép check-in");
+    throw new ForbiddenError("Đã quá thời gian cho phép check-in");
   }
 }
 
 function assertCanCheckInBooking(booking) {
   if (!booking) {
-    throw new Error("Không tìm thấy booking");
+    throw new NotFoundError("Không tìm thấy booking");
   }
 
   if (!["APPROVED", "PAID"].includes(booking.status)) {
-    throw new Error("Booking hiện không thể check-in");
+    throw new ForbiddenError("Booking hiện không thể check-in");
   }
 
   if (booking.checked_in_at) {
-    throw new Error("Booking đã được check-in trước đó");
+    throw new ConflictError("Booking đã được check-in trước đó");
   }
 
   assertCheckInWindow(booking.start_datetime);
 }
 
+async function assertBookableField(valid) {
+  const field = await bookingsRepository.findFieldById(valid.field_id);
+  if (!field) {
+    throw new NotFoundError("Không tìm thấy sân");
+  }
+
+  if (field.status !== "active") {
+    throw new ForbiddenError("Sân hiện không khả dụng");
+  }
+
+  const duration = diffMinutes(valid.start_datetime, valid.end_datetime);
+
+  if (duration <= 0) {
+    throw new ValidationError("Khoảng thời gian đặt không hợp lệ");
+  }
+
+  if (duration % field.min_duration_minutes !== 0) {
+    throw new ValidationError(
+      `Thời lượng đặt phải chia hết cho ${field.min_duration_minutes} phút`
+    );
+  }
+
+  assertFutureBooking(valid.start_datetime);
+
+  const dayOfWeek = getDayOfWeek(valid.start_datetime);
+  const operatingHour = await bookingsRepository.findOperatingHourByFieldAndDay(
+    field.id,
+    dayOfWeek
+  );
+
+  if (!operatingHour) {
+    throw new ForbiddenError("Sân không hoạt động vào ngày này");
+  }
+
+  if (!isWithinOperatingHours(valid.start_datetime, valid.end_datetime, operatingHour)) {
+    throw new ForbiddenError("Khung giờ đặt nằm ngoài giờ hoạt động của sân");
+  }
+
+  return field;
+}
+
 export const bookingsService = {
   async checkAvailability(payload) {
-    const valid = validateCheckAvailabilityPayload(payload);
-
-    const field = await bookingsRepository.findFieldById(valid.field_id);
-    if (!field) {
-      throw new Error("Không tìm thấy sân");
-    }
-
-    if (field.status !== "active") {
-      throw new Error("Sân hiện không khả dụng");
-    }
-
-    const duration = diffMinutes(valid.start_datetime, valid.end_datetime);
-
-    if (duration <= 0) {
-      throw new Error("Khoảng thời gian đặt không hợp lệ");
-    }
-
-    if (duration % field.min_duration_minutes !== 0) {
-      throw new Error(
-        `Thời lượng đặt phải chia hết cho ${field.min_duration_minutes} phút`
-      );
-    }
+    const field = await assertBookableField(payload);
 
     const blackout = await bookingsRepository.findBlackoutByFieldAndRange(
       field.id,
-      valid.start_datetime,
-      valid.end_datetime
+      payload.start_datetime,
+      payload.end_datetime
     );
 
     if (blackout) {
@@ -96,8 +129,8 @@ export const bookingsService = {
 
     const conflicts = await bookingsRepository.findConflictingBookings(
       field.id,
-      valid.start_datetime,
-      valid.end_datetime
+      payload.start_datetime,
+      payload.end_datetime
     );
 
     if (conflicts.length > 0) {
@@ -108,6 +141,7 @@ export const bookingsService = {
       };
     }
 
+    const duration = diffMinutes(payload.start_datetime, payload.end_datetime);
     const total_price = (duration / 60) * Number(field.base_price_per_hour);
 
     return {
@@ -118,19 +152,18 @@ export const bookingsService = {
   },
 
   async createBooking(userId, payload) {
-    const valid = validateCreateBookingPayload(payload);
+    const availability = await this.checkAvailability(payload);
 
-    const availability = await this.checkAvailability(valid);
     if (!availability.available) {
-      throw new Error(availability.reason || "Khung giờ không khả dụng");
+      throw new ConflictError(availability.reason || "Khung giờ không khả dụng");
     }
 
     const booking = await bookingsRepository.createBookingWithHistory({
-      field_id: valid.field_id,
+      field_id: payload.field_id,
       user_id: userId,
-      start_datetime: valid.start_datetime,
-      end_datetime: valid.end_datetime,
-      notes: valid.notes,
+      start_datetime: payload.start_datetime,
+      end_datetime: payload.end_datetime,
+      notes: payload.notes,
       total_price: availability.total_price,
       status: "PENDING_CONFIRM",
     });
@@ -143,58 +176,43 @@ export const bookingsService = {
   },
 
   async getMyBookingDetail(userId, bookingId) {
-    const id = Number(bookingId);
-    if (Number.isNaN(id)) {
-      throw new Error("bookingId không hợp lệ");
-    }
-
-    const booking = await bookingsRepository.findMyBookingById(userId, id);
+    const booking = await bookingsRepository.findMyBookingById(userId, bookingId);
     if (!booking) {
-      throw new Error("Không tìm thấy booking");
+      throw new NotFoundError("Không tìm thấy booking");
     }
 
     return booking;
   },
 
   async cancelMyBooking(userId, bookingId) {
-    const id = Number(bookingId);
-    if (Number.isNaN(id)) {
-      throw new Error("bookingId không hợp lệ");
-    }
-
-    const booking = await bookingsRepository.findMyBookingById(userId, id);
+    const booking = await bookingsRepository.findMyBookingById(userId, bookingId);
     if (!booking) {
-      throw new Error("Không tìm thấy booking");
+      throw new NotFoundError("Không tìm thấy booking");
     }
 
     if (!["PENDING_CONFIRM", "APPROVED", "AWAITING_PAYMENT"].includes(booking.status)) {
-      throw new Error("Booking hiện không thể hủy");
+      throw new ForbiddenError("Booking hiện không thể hủy");
     }
 
-    if (!isSameDate(new Date(), booking.start_datetime)) {
-      // để policy sâu hơn sau
+    if (new Date() >= new Date(booking.start_datetime)) {
+      throw new ForbiddenError("Không thể hủy booking đã bắt đầu hoặc đã qua");
     }
 
-    return bookingsRepository.cancelMyBooking(userId, id);
+    return bookingsRepository.cancelMyBooking(userId, bookingId);
   },
 
   async getMyBookingCheckInQr(userId, bookingId) {
-    const id = Number(bookingId);
-    if (Number.isNaN(id) || id <= 0) {
-      throw new Error("bookingId không hợp lệ");
-    }
-
-    const booking = await bookingsRepository.findMyBookingById(userId, id);
+    const booking = await bookingsRepository.findMyBookingById(userId, bookingId);
     if (!booking) {
-      throw new Error("Không tìm thấy booking");
+      throw new NotFoundError("Không tìm thấy booking");
     }
 
     if (!["APPROVED", "PAID"].includes(booking.status)) {
-      throw new Error("Booking hiện chưa thể tạo mã check-in");
+      throw new ForbiddenError("Booking hiện chưa thể tạo mã check-in");
     }
 
     if (booking.checked_in_at) {
-      throw new Error("Booking đã được check-in");
+      throw new ConflictError("Booking đã được check-in");
     }
 
     const secret = process.env.CHECKIN_QR_SECRET;
@@ -231,83 +249,57 @@ export const bookingsService = {
   },
 
   async getOwnerBookingDetail(ownerId, bookingId) {
-    const id = Number(bookingId);
-    if (Number.isNaN(id)) {
-      throw new Error("bookingId không hợp lệ");
-    }
-
-    const booking = await bookingsRepository.findOwnerBookingById(ownerId, id);
+    const booking = await bookingsRepository.findOwnerBookingById(ownerId, bookingId);
     if (!booking) {
-      throw new Error("Không tìm thấy booking");
+      throw new NotFoundError("Không tìm thấy booking");
     }
 
     return booking;
   },
 
   async approveOwnerBooking(ownerId, bookingId) {
-    const id = Number(bookingId);
-    if (Number.isNaN(id)) {
-      throw new Error("bookingId không hợp lệ");
-    }
-
-    const booking = await bookingsRepository.findOwnerBookingById(ownerId, id);
+    const booking = await bookingsRepository.findOwnerBookingById(ownerId, bookingId);
     if (!booking) {
-      throw new Error("Không tìm thấy booking");
+      throw new NotFoundError("Không tìm thấy booking");
     }
 
     if (booking.status !== "PENDING_CONFIRM") {
-      throw new Error("Chỉ booking đang chờ xác nhận mới được duyệt");
+      throw new ForbiddenError("Chỉ booking đang chờ xác nhận mới được duyệt");
     }
 
-    return bookingsRepository.approveOwnerBooking(ownerId, id);
+    return bookingsRepository.approveOwnerBooking(ownerId, bookingId);
   },
 
   async rejectOwnerBooking(ownerId, bookingId, payload) {
-    const id = Number(bookingId);
-    if (Number.isNaN(id)) {
-      throw new Error("bookingId không hợp lệ");
-    }
-
-    const booking = await bookingsRepository.findOwnerBookingById(ownerId, id);
+    const booking = await bookingsRepository.findOwnerBookingById(ownerId, bookingId);
     if (!booking) {
-      throw new Error("Không tìm thấy booking");
+      throw new NotFoundError("Không tìm thấy booking");
     }
 
     if (booking.status !== "PENDING_CONFIRM") {
-      throw new Error("Chỉ booking đang chờ xác nhận mới được từ chối");
+      throw new ForbiddenError("Chỉ booking đang chờ xác nhận mới được từ chối");
     }
 
-    const valid = validateRejectBookingPayload(payload);
-
-    return bookingsRepository.rejectOwnerBooking(ownerId, id, valid.note);
+    return bookingsRepository.rejectOwnerBooking(ownerId, bookingId, payload.note);
   },
 
   async checkInOwnerBooking(ownerId, bookingId, payload) {
-    const id = Number(bookingId);
-    if (Number.isNaN(id)) {
-      throw new Error("bookingId không hợp lệ");
-    }
-
-    const booking = await bookingsRepository.findOwnerBookingById(ownerId, id);
+    const booking = await bookingsRepository.findOwnerBookingById(ownerId, bookingId);
     if (!booking) {
-      throw new Error("Không tìm thấy booking");
+      throw new NotFoundError("Không tìm thấy booking");
     }
 
     assertCanCheckInBooking(booking);
 
-    const valid = validateManualCheckInPayload(payload);
-
     return bookingsRepository.markOwnerBookingCheckedIn(
       ownerId,
-      id,
+      bookingId,
       "MANUAL",
-      valid.note
+      payload.note
     );
   },
 
   async scanOwnerBookingQr(ownerId, payload) {
-    const valid = validateCheckInQrPayload(payload);
-
     const secret = process.env.CHECKIN_QR_SECRET;
     if (!secret) {
       throw new Error("CHECKIN_QR_SECRET chưa được cấu hình");
@@ -315,23 +307,23 @@ export const bookingsService = {
 
     let decoded;
     try {
-      decoded = jwt.verify(valid.qr_token, secret);
+      decoded = jwt.verify(payload.qr_token, secret);
     } catch {
-      throw new Error("QR token không hợp lệ hoặc đã hết hạn");
+      throw new AuthError("QR token không hợp lệ hoặc đã hết hạn");
     }
 
     if (decoded?.type !== "BOOKING_CHECKIN") {
-      throw new Error("QR token không đúng loại");
+      throw new ValidationError("QR token không đúng loại");
     }
 
     const bookingId = Number(decoded.bookingId);
     if (Number.isNaN(bookingId) || bookingId <= 0) {
-      throw new Error("QR token không hợp lệ");
+      throw new ValidationError("QR token không hợp lệ");
     }
 
     const booking = await bookingsRepository.findOwnerBookingById(ownerId, bookingId);
     if (!booking) {
-      throw new Error("Không tìm thấy booking thuộc owner này");
+      throw new NotFoundError("Không tìm thấy booking thuộc owner này");
     }
 
     assertCanCheckInBooking(booking);
@@ -345,22 +337,15 @@ export const bookingsService = {
   },
 
   async completeOwnerBooking(ownerId, bookingId, payload) {
-    const id = Number(bookingId);
-    if (Number.isNaN(id)) {
-      throw new Error("bookingId không hợp lệ");
-    }
-
-    const booking = await bookingsRepository.findOwnerBookingById(ownerId, id);
+    const booking = await bookingsRepository.findOwnerBookingById(ownerId, bookingId);
     if (!booking) {
-      throw new Error("Không tìm thấy booking");
+      throw new NotFoundError("Không tìm thấy booking");
     }
 
     if (booking.status !== "CHECKED_IN") {
-      throw new Error("Chỉ booking đã CHECKED_IN mới được chuyển COMPLETED");
+      throw new ForbiddenError("Chỉ booking đã CHECKED_IN mới được chuyển COMPLETED");
     }
 
-    const valid = validateCompleteBookingPayload(payload);
-
-    return bookingsRepository.completeOwnerBooking(ownerId, id, valid.note);
+    return bookingsRepository.completeOwnerBooking(ownerId, bookingId, payload.note);
   },
 };
