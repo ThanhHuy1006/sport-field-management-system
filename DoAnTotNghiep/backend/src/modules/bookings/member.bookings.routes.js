@@ -4,18 +4,26 @@ import { requireAuth } from "../../core/middlewares/auth.middleware.js";
 import {
   validateBody,
   validateParams,
+  validateQuery,
 } from "../../core/middlewares/validate.middleware.js";
 import {
   validateBookingIdParams,
   validateCheckAvailabilityPayload,
   validateCreateBookingPayload,
+  validateBookingListQuery,
+  validateAvailabilitySlotsQuery,
 } from "./bookings.validator.js";
 
 const router = Router();
 
+router.get(
+  "/availability-slots",
+  validateQuery(validateAvailabilitySlotsQuery),
+  bookingsController.getAvailabilitySlots
+);
+
 router.post(
   "/check-availability",
-  requireAuth,
   validateBody(validateCheckAvailabilityPayload),
   bookingsController.checkAvailability
 );
@@ -27,7 +35,12 @@ router.post(
   bookingsController.createBooking
 );
 
-router.get("/my", requireAuth, bookingsController.getMyBookings);
+router.get(
+  "/my",
+  requireAuth,
+  validateQuery(validateBookingListQuery),
+  bookingsController.getMyBookings
+);
 
 router.get(
   "/my/:bookingId",

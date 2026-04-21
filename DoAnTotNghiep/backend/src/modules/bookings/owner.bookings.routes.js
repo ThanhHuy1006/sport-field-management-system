@@ -5,6 +5,7 @@ import { requireApprovedOwner } from "../../core/middlewares/role.middleware.js"
 import {
   validateBody,
   validateParams,
+  validateQuery,
 } from "../../core/middlewares/validate.middleware.js";
 import {
   validateBookingIdParams,
@@ -12,13 +13,18 @@ import {
   validateManualCheckInPayload,
   validateCheckInQrPayload,
   validateCompleteBookingPayload,
+  validateBookingListQuery,
 } from "./bookings.validator.js";
 
 const router = Router();
 
 router.use(requireAuth, requireApprovedOwner());
 
-router.get("/", bookingsController.getOwnerBookings);
+router.get(
+  "/",
+  validateQuery(validateBookingListQuery),
+  bookingsController.getOwnerBookings
+);
 
 router.get(
   "/:bookingId",

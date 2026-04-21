@@ -15,6 +15,16 @@ function parseDateTime(value, fieldName) {
   return parsed;
 }
 
+function parsePositiveInt(value, fieldName, { min = 1, max = Number.MAX_SAFE_INTEGER } = {}) {
+  const num = Number(value);
+
+  if (Number.isNaN(num) || num < min || num > max || !Number.isInteger(num)) {
+    throw new ValidationError(`${fieldName} không hợp lệ`);
+  }
+
+  return num;
+}
+
 export function validateBookingIdParams(params) {
   const bookingId = Number(params.bookingId);
 
@@ -83,5 +93,58 @@ export function validateCheckInQrPayload(payload) {
 export function validateCompleteBookingPayload(payload) {
   return {
     note: payload?.note ? String(payload.note).trim() : "Completed by owner",
+  };
+}
+
+export function validateBookingListQuery(query) {
+  const page = parsePositiveInt(query.page ?? 1, "page", { min: 1, max: 100000 });
+  const limit = parsePositiveInt(query.limit ?? 10, "limit", { min: 1, max: 100 });
+
+  const allowedStatuses = [
+    "PENDING_CONFIRM",
+    "APPROVED",
+    "AWAITING_PAYMENT",
+    "PAID",
+    "REJECTED",
+    "CANCELLED",
+    "COMPLETED",
+    "PAY_FAILED",
+    "CHECKED_IN",
+  ];
+
+  const status = query.status ? String(query.status).trim() : "";
+
+  if (status && !allowedStatuses.includes(status)) {
+    throw new ValidationError("status không hợp lệ");
+  }
+
+  return {
+    page,
+    limit,
+    status: status || undefined,
+  };
+}
+
+export function validateAvailabilitySlotsQuery(query) {
+  const field_id = parsePositiveInt(query.field_id, "field_id", { min: 1 });
+
+  const date = String(query.date || "").trim();
+  if (!date) {
+    throw new ValidationError("date là bắt buộc");
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new ValidationError("date phải có định dạng YYYY-MM-DD");
+  }
+
+  const duration_minutes =
+    query.duration_minutes !== undefined && query.duration_minutes !== ""
+      ? parsePositiveInt(query.duration_minutes, "duration_minutes", { min: 1, max: 1440 })
+      : undefined;
+
+  return {
+    field_id,
+    date,
+    duration_minutes,
   };
 }

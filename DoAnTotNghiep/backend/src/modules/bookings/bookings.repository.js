@@ -1,4 +1,5 @@
 import prisma from "../../config/prisma.js";
+import { ConflictError } from "../../core/errors/index.js";
 
 const ACTIVE_BOOKING_STATUSES = [
   "PENDING_CONFIRM",
@@ -6,8 +7,98 @@ const ACTIVE_BOOKING_STATUSES = [
   "AWAITING_PAYMENT",
   "PAID",
   "CHECKED_IN",
-  "COMPLETED",
 ];
+
+const memberFieldSelect = {
+  id: true,
+  field_name: true,
+  address: true,
+  sport_type: true,
+  base_price_per_hour: true,
+  currency: true,
+  owner_id: true,
+};
+
+const ownerFieldSelect = {
+  id: true,
+  field_name: true,
+  address: true,
+  sport_type: true,
+  owner_id: true,
+};
+
+const userSelect = {
+  id: true,
+  name: true,
+  email: true,
+  phone: true,
+};
+
+function buildListWhere(baseWhere, status) {
+  return {
+    ...baseWhere,
+    ...(status ? { status } : {}),
+  };
+}
+
+function memberBookingDetailInclude() {
+  return {
+    fields: {
+      select: memberFieldSelect,
+    },
+    booking_status_history: {
+      orderBy: { changed_at: "desc" },
+    },
+  };
+}
+
+function ownerBookingDetailInclude() {
+  return {
+    fields: {
+      select: ownerFieldSelect,
+    },
+    users: {
+      select: userSelect,
+    },
+    booking_status_history: {
+      orderBy: { changed_at: "desc" },
+    },
+  };
+}
+
+async function hydrateMemberBooking(tx, bookingId) {
+  return tx.bookings.findUnique({
+    where: { id: bookingId },
+    include: memberBookingDetailInclude(),
+  });
+}
+
+async function hydrateOwnerBooking(tx, bookingId) {
+  return tx.bookings.findUnique({
+    where: { id: bookingId },
+    include: ownerBookingDetailInclude(),
+  });
+}
+
+async function findConflictingBookingsTx(tx, fieldId, start, end) {
+  return tx.bookings.findMany({
+    where: {
+      field_id: fieldId,
+      start_datetime: { lt: end },
+      end_datetime: { gt: start },
+      status: {
+        in: ACTIVE_BOOKING_STATUSES,
+      },
+    },
+    orderBy: { start_datetime: "asc" },
+    select: {
+      id: true,
+      start_datetime: true,
+      end_datetime: true,
+      status: true,
+    },
+  });
+}
 
 export const bookingsRepository = {
   findFieldById(fieldId) {
@@ -46,6 +137,23 @@ export const bookingsRepository = {
     });
   },
 
+  findBlackoutsByFieldAndDate(fieldId, dayStart, dayEnd) {
+    return prisma.blackout_dates.findMany({
+      where: {
+        field_id: fieldId,
+        start_datetime: { lt: dayEnd },
+        end_datetime: { gt: dayStart },
+      },
+      orderBy: { start_datetime: "asc" },
+      select: {
+        id: true,
+        start_datetime: true,
+        end_datetime: true,
+        reason: true,
+      },
+    });
+  },
+
   findConflictingBookings(fieldId, start, end) {
     return prisma.bookings.findMany({
       where: {
@@ -66,8 +174,39 @@ export const bookingsRepository = {
     });
   },
 
+  findBookingsByFieldAndDate(fieldId, dayStart, dayEnd) {
+    return prisma.bookings.findMany({
+      where: {
+        field_id: fieldId,
+        start_datetime: { lt: dayEnd },
+        end_datetime: { gt: dayStart },
+        status: {
+          in: ACTIVE_BOOKING_STATUSES,
+        },
+      },
+      orderBy: { start_datetime: "asc" },
+      select: {
+        id: true,
+        start_datetime: true,
+        end_datetime: true,
+        status: true,
+      },
+    });
+  },
+
   createBookingWithHistory(data) {
     return prisma.$transaction(async (tx) => {
+      const conflicts = await findConflictingBookingsTx(
+        tx,
+        data.field_id,
+        data.start_datetime,
+        data.end_datetime
+      );
+
+      if (conflicts.length > 0) {
+        throw new ConflictError("Khung giờ đã được đặt");
+      }
+
       const booking = await tx.bookings.create({
         data: {
           field_id: data.field_id,
@@ -89,44 +228,27 @@ export const bookingsRepository = {
         },
       });
 
-      return tx.bookings.findUnique({
-        where: { id: booking.id },
-        include: {
-          fields: {
-            select: {
-              id: true,
-              field_name: true,
-              address: true,
-              sport_type: true,
-              base_price_per_hour: true,
-              currency: true,
-            },
-          },
-          booking_status_history: {
-            orderBy: { changed_at: "desc" },
-          },
-        },
-      });
+      return hydrateMemberBooking(tx, booking.id);
     });
   },
 
-  findMyBookings(userId) {
-    return prisma.bookings.findMany({
-      where: { user_id: userId },
-      orderBy: { created_at: "desc" },
-      include: {
-        fields: {
-          select: {
-            id: true,
-            field_name: true,
-            address: true,
-            sport_type: true,
-            base_price_per_hour: true,
-            currency: true,
+  findMyBookings(userId, filters) {
+    const where = buildListWhere({ user_id: userId }, filters.status);
+
+    return Promise.all([
+      prisma.bookings.findMany({
+        where,
+        orderBy: { created_at: "desc" },
+        skip: (filters.page - 1) * filters.limit,
+        take: filters.limit,
+        include: {
+          fields: {
+            select: memberFieldSelect,
           },
         },
-      },
-    });
+      }),
+      prisma.bookings.count({ where }),
+    ]).then(([items, total]) => ({ items, total }));
   },
 
   findMyBookingById(userId, bookingId) {
@@ -135,22 +257,7 @@ export const bookingsRepository = {
         id: bookingId,
         user_id: userId,
       },
-      include: {
-        fields: {
-          select: {
-            id: true,
-            field_name: true,
-            address: true,
-            sport_type: true,
-            base_price_per_hour: true,
-            currency: true,
-            owner_id: true,
-          },
-        },
-        booking_status_history: {
-          orderBy: { changed_at: "desc" },
-        },
-      },
+      include: memberBookingDetailInclude(),
     });
   },
 
@@ -165,7 +272,7 @@ export const bookingsRepository = {
 
       if (!booking) return null;
 
-      const updated = await tx.bookings.update({
+      await tx.bookings.update({
         where: { id: bookingId },
         data: {
           status: "CANCELLED",
@@ -181,37 +288,37 @@ export const bookingsRepository = {
         },
       });
 
-      return updated;
+      return hydrateMemberBooking(tx, bookingId);
     });
   },
 
-  findOwnerBookings(ownerId) {
-    return prisma.bookings.findMany({
-      where: {
+  findOwnerBookings(ownerId, filters) {
+    const where = buildListWhere(
+      {
         fields: {
           owner_id: ownerId,
         },
       },
-      orderBy: { created_at: "desc" },
-      include: {
-        fields: {
-          select: {
-            id: true,
-            field_name: true,
-            address: true,
-            sport_type: true,
+      filters.status
+    );
+
+    return Promise.all([
+      prisma.bookings.findMany({
+        where,
+        orderBy: { created_at: "desc" },
+        skip: (filters.page - 1) * filters.limit,
+        take: filters.limit,
+        include: {
+          fields: {
+            select: ownerFieldSelect,
+          },
+          users: {
+            select: userSelect,
           },
         },
-        users: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,
-          },
-        },
-      },
-    });
+      }),
+      prisma.bookings.count({ where }),
+    ]).then(([items, total]) => ({ items, total }));
   },
 
   findOwnerBookingById(ownerId, bookingId) {
@@ -222,28 +329,7 @@ export const bookingsRepository = {
           owner_id: ownerId,
         },
       },
-      include: {
-        fields: {
-          select: {
-            id: true,
-            field_name: true,
-            address: true,
-            sport_type: true,
-            owner_id: true,
-          },
-        },
-        users: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,
-          },
-        },
-        booking_status_history: {
-          orderBy: { changed_at: "desc" },
-        },
-      },
+      include: ownerBookingDetailInclude(),
     });
   },
 
@@ -260,7 +346,7 @@ export const bookingsRepository = {
 
       if (!booking) return null;
 
-      const updated = await tx.bookings.update({
+      await tx.bookings.update({
         where: { id: bookingId },
         data: {
           status: "APPROVED",
@@ -276,7 +362,7 @@ export const bookingsRepository = {
         },
       });
 
-      return updated;
+      return hydrateOwnerBooking(tx, bookingId);
     });
   },
 
@@ -293,7 +379,7 @@ export const bookingsRepository = {
 
       if (!booking) return null;
 
-      const updated = await tx.bookings.update({
+      await tx.bookings.update({
         where: { id: bookingId },
         data: {
           status: "REJECTED",
@@ -309,7 +395,7 @@ export const bookingsRepository = {
         },
       });
 
-      return updated;
+      return hydrateOwnerBooking(tx, bookingId);
     });
   },
 
@@ -326,7 +412,7 @@ export const bookingsRepository = {
 
       if (!booking) return null;
 
-      const updated = await tx.bookings.update({
+      await tx.bookings.update({
         where: { id: bookingId },
         data: {
           status: "CHECKED_IN",
@@ -345,7 +431,7 @@ export const bookingsRepository = {
         },
       });
 
-      return updated;
+      return hydrateOwnerBooking(tx, bookingId);
     });
   },
 
@@ -362,7 +448,7 @@ export const bookingsRepository = {
 
       if (!booking) return null;
 
-      const updated = await tx.bookings.update({
+      await tx.bookings.update({
         where: { id: bookingId },
         data: {
           status: "COMPLETED",
@@ -378,7 +464,7 @@ export const bookingsRepository = {
         },
       });
 
-      return updated;
+      return hydrateOwnerBooking(tx, bookingId);
     });
   },
 };

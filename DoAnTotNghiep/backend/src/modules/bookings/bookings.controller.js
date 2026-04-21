@@ -5,6 +5,7 @@ import {
 } from "../../core/utils/response.js";
 import { bookingsService } from "./bookings.service.js";
 import {
+  toAvailabilitySlot,
   toBookingListItem,
   toBookingDetail,
   toOwnerBookingListItem,
@@ -12,6 +13,20 @@ import {
 } from "./bookings.mapper.js";
 
 export const bookingsController = {
+  getAvailabilitySlots: asyncHandler(async (req, res) => {
+    const query = req.validated?.query ?? req.query;
+    const result = await bookingsService.getAvailabilitySlots(query);
+
+    return successResponse(
+      res,
+      {
+        ...result,
+        slots: result.slots.map(toAvailabilitySlot),
+      },
+      "Lấy danh sách khung giờ khả dụng thành công"
+    );
+  }),
+
   checkAvailability: asyncHandler(async (req, res) => {
     const payload = req.validated?.body ?? req.body;
     const result = await bookingsService.checkAvailability(payload);
@@ -21,21 +36,32 @@ export const bookingsController = {
   createBooking: asyncHandler(async (req, res) => {
     const payload = req.validated?.body ?? req.body;
     const booking = await bookingsService.createBooking(req.user.id, payload);
-    return createdResponse(res, toBookingDetail(booking), "Tạo booking thành công");
+    return createdResponse(
+      res,
+      toBookingDetail(booking),
+      "Tạo booking thành công"
+    );
   }),
 
   getMyBookings: asyncHandler(async (req, res) => {
-    const items = await bookingsService.getMyBookings(req.user.id);
+    const query = req.validated?.query ?? req.query;
+    const result = await bookingsService.getMyBookings(req.user.id, query);
     return successResponse(
       res,
-      items.map(toBookingListItem),
+      {
+        items: result.items.map(toBookingListItem),
+        pagination: result.pagination,
+      },
       "Lấy danh sách booking thành công"
     );
   }),
 
   getMyBookingDetail: asyncHandler(async (req, res) => {
     const { bookingId } = req.validated?.params ?? req.params;
-    const item = await bookingsService.getMyBookingDetail(req.user.id, bookingId);
+    const item = await bookingsService.getMyBookingDetail(
+      req.user.id,
+      bookingId
+    );
     return successResponse(
       res,
       toBookingDetail(item),
@@ -46,27 +72,41 @@ export const bookingsController = {
   cancelMyBooking: asyncHandler(async (req, res) => {
     const { bookingId } = req.validated?.params ?? req.params;
     const item = await bookingsService.cancelMyBooking(req.user.id, bookingId);
-    return successResponse(res, item, "Hủy booking thành công");
+    return successResponse(
+      res,
+      toBookingDetail(item),
+      "Hủy booking thành công"
+    );
   }),
 
   getMyBookingCheckInQr: asyncHandler(async (req, res) => {
     const { bookingId } = req.validated?.params ?? req.params;
-    const data = await bookingsService.getMyBookingCheckInQr(req.user.id, bookingId);
+    const data = await bookingsService.getMyBookingCheckInQr(
+      req.user.id,
+      bookingId
+    );
     return successResponse(res, data, "Lấy mã check-in QR thành công");
   }),
 
   getOwnerBookings: asyncHandler(async (req, res) => {
-    const items = await bookingsService.getOwnerBookings(req.user.id);
+    const query = req.validated?.query ?? req.query;
+    const result = await bookingsService.getOwnerBookings(req.user.id, query);
     return successResponse(
       res,
-      items.map(toOwnerBookingListItem),
+      {
+        items: result.items.map(toOwnerBookingListItem),
+        pagination: result.pagination,
+      },
       "Lấy danh sách booking của owner thành công"
     );
   }),
 
   getOwnerBookingDetail: asyncHandler(async (req, res) => {
     const { bookingId } = req.validated?.params ?? req.params;
-    const item = await bookingsService.getOwnerBookingDetail(req.user.id, bookingId);
+    const item = await bookingsService.getOwnerBookingDetail(
+      req.user.id,
+      bookingId
+    );
     return successResponse(
       res,
       toOwnerBookingDetail(item),
@@ -76,8 +116,15 @@ export const bookingsController = {
 
   approveOwnerBooking: asyncHandler(async (req, res) => {
     const { bookingId } = req.validated?.params ?? req.params;
-    const item = await bookingsService.approveOwnerBooking(req.user.id, bookingId);
-    return successResponse(res, item, "Duyệt booking thành công");
+    const item = await bookingsService.approveOwnerBooking(
+      req.user.id,
+      bookingId
+    );
+    return successResponse(
+      res,
+      toOwnerBookingDetail(item),
+      "Duyệt booking thành công"
+    );
   }),
 
   rejectOwnerBooking: asyncHandler(async (req, res) => {
@@ -88,7 +135,11 @@ export const bookingsController = {
       bookingId,
       payload
     );
-    return successResponse(res, item, "Từ chối booking thành công");
+    return successResponse(
+      res,
+      toOwnerBookingDetail(item),
+      "Từ chối booking thành công"
+    );
   }),
 
   checkInOwnerBooking: asyncHandler(async (req, res) => {
@@ -99,13 +150,21 @@ export const bookingsController = {
       bookingId,
       payload
     );
-    return successResponse(res, item, "Check-in booking thành công");
+    return successResponse(
+      res,
+      toOwnerBookingDetail(item),
+      "Check-in booking thành công"
+    );
   }),
 
   scanOwnerBookingQr: asyncHandler(async (req, res) => {
     const payload = req.validated?.body ?? req.body;
     const item = await bookingsService.scanOwnerBookingQr(req.user.id, payload);
-    return successResponse(res, item, "Quét QR check-in thành công");
+    return successResponse(
+      res,
+      toOwnerBookingDetail(item),
+      "Quét QR check-in thành công"
+    );
   }),
 
   completeOwnerBooking: asyncHandler(async (req, res) => {
@@ -116,6 +175,10 @@ export const bookingsController = {
       bookingId,
       payload
     );
-    return successResponse(res, item, "Hoàn tất booking thành công");
+    return successResponse(
+      res,
+      toOwnerBookingDetail(item),
+      "Hoàn tất booking thành công"
+    );
   }),
 };

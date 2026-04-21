@@ -54,7 +54,7 @@ export function toBookingDetail(item) {
       from_status: h.from_status,
       to_status: h.to_status,
       changed_at: h.changed_at,
-      reason: h.reason ?? h.note ?? null,
+      reason: h.reason ?? null,
     })),
   };
 }
@@ -127,7 +127,19 @@ export function toOwnerBookingDetail(item) {
       from_status: h.from_status,
       to_status: h.to_status,
       changed_at: h.changed_at,
-      reason: h.reason ?? h.note ?? null,
+      reason: h.reason ?? null,
     })),
+  };
+}
+
+export function toAvailabilitySlot(item) {
+  return {
+    start_datetime: item.start_datetime,
+    end_datetime: item.end_datetime,
+    start_time: item.start_time,
+    end_time: item.end_time,
+    available: item.available,
+    reason: item.reason ?? null,
+    booking_status: item.booking_status ?? null,
   };
 }
