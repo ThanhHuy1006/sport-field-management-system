@@ -3,7 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Check, AlertCircle, Clock, CalendarDays } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  AlertCircle,
+  Clock,
+  CalendarDays,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -97,7 +103,9 @@ export default function BookingPage() {
         setField(mapFieldDetailToUi(result.data));
       } catch (err) {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : "Không thể tải thông tin sân");
+        setError(
+          err instanceof Error ? err.message : "Không thể tải thông tin sân",
+        );
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -132,10 +140,15 @@ export default function BookingPage() {
         if (cancelled) return;
 
         setSlots(result.data.slots ?? []);
+        ///debug
+        console.log("AVAILABILITY RESPONSE:", result.data);
+        console.log("SLOTS:", result.data.slots);
       } catch (err) {
         if (cancelled) return;
         setSlots([]);
-        setError(err instanceof Error ? err.message : "Không thể tải khung giờ");
+        setError(
+          err instanceof Error ? err.message : "Không thể tải khung giờ",
+        );
       } finally {
         if (!cancelled) setSlotsLoading(false);
       }
@@ -186,13 +199,30 @@ export default function BookingPage() {
 
     try {
       setError("");
-
-      const result = await createBooking({
+      console.log("DURATION HOURS UI:", bookingData.durationHours);
+      console.log("SELECTED SLOT:", bookingData.selectedSlot);
+      console.log("CREATE BOOKING PAYLOAD:", {
         field_id: field.id,
         start_datetime: bookingData.selectedSlot.start_datetime,
         end_datetime: bookingData.selectedSlot.end_datetime,
         notes: bookingData.notes || null,
       });
+
+      // const result = await createBooking({
+      //   field_id: field.id,
+      //   start_datetime: bookingData.selectedSlot.start_datetime,
+      //   end_datetime: bookingData.selectedSlot.end_datetime,
+      //   notes: bookingData.notes || null,
+      // });
+      const result = await createBooking({
+        field_id: field.id,
+        start_datetime: bookingData.selectedSlot.start_datetime,
+        end_datetime: bookingData.selectedSlot.end_datetime,
+        contact_name: bookingData.fullName || null,
+        contact_email: bookingData.email || null,
+        contact_phone: bookingData.phone || null,
+        notes: bookingData.notes || null,
+});
 
       setCreatedBooking({
         id: result.data.id,
@@ -204,7 +234,7 @@ export default function BookingPage() {
       setError(
         err instanceof Error
           ? err.message
-          : "Tạo booking thất bại. Có thể bạn cần đăng nhập trước."
+          : "Tạo booking thất bại. Có thể bạn cần đăng nhập trước.",
       );
     }
   };
@@ -213,7 +243,9 @@ export default function BookingPage() {
     return (
       <main className="min-h-screen bg-background">
         <div className="max-w-4xl mx-auto px-4 py-12 text-center">
-          <p className="text-lg text-muted-foreground">Đang tải trang đặt sân...</p>
+          <p className="text-lg text-muted-foreground">
+            Đang tải trang đặt sân...
+          </p>
         </div>
       </main>
     );
@@ -239,7 +271,10 @@ export default function BookingPage() {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 bg-background border-b border-border">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center gap-4">
-          <Link href={`/field/${field.id}`} className="text-primary hover:text-primary/80">
+          <Link
+            href={`/field/${field.id}`}
+            className="text-primary hover:text-primary/80"
+          >
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <h1 className="text-xl font-bold">Hoàn tất đặt sân</h1>
@@ -259,7 +294,9 @@ export default function BookingPage() {
                 <div className="flex flex-col items-center">
                   <div
                     className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition ${
-                      s.num <= step ? "bg-primary text-white" : "bg-muted text-muted-foreground"
+                      s.num <= step
+                        ? "bg-primary text-white"
+                        : "bg-muted text-muted-foreground"
                     }`}
                   >
                     {s.num < step ? <Check className="w-5 h-5" /> : s.num}
@@ -267,7 +304,9 @@ export default function BookingPage() {
                   <span className="text-xs mt-2 text-center">{s.label}</span>
                 </div>
                 {idx < 3 && (
-                  <div className={`flex-1 h-1 mx-2 ${s.num < step ? "bg-primary" : "bg-muted"}`} />
+                  <div
+                    className={`flex-1 h-1 mx-2 ${s.num < step ? "bg-primary" : "bg-muted"}`}
+                  />
                 )}
               </div>
             ))}
@@ -288,7 +327,9 @@ export default function BookingPage() {
                 <h2 className="text-xl font-semibold mb-6">Chọn ngày và giờ</h2>
 
                 <div className="mb-6">
-                  <label className="block text-sm font-medium mb-2">Ngày đặt</label>
+                  <label className="block text-sm font-medium mb-2">
+                    Ngày đặt
+                  </label>
                   <input
                     type="date"
                     className="w-full border border-border rounded-md px-3 py-2 bg-background"
@@ -299,21 +340,32 @@ export default function BookingPage() {
                 </div>
 
                 <div className="mb-6">
-                  <label className="block text-sm font-medium mb-2">Thời lượng</label>
+                  <label className="block text-sm font-medium mb-2">
+                    Thời lượng
+                  </label>
                   <div className="flex items-center gap-4">
-                    <Button variant="outline" onClick={() => handleDurationChange(-1)} disabled={bookingData.durationHours <= 1}>
+                    <Button
+                      variant="outline"
+                      onClick={() => handleDurationChange(-1)}
+                      disabled={bookingData.durationHours <= 1}
+                    >
                       -
                     </Button>
                     <span className="text-xl font-semibold w-20 text-center">
                       {bookingData.durationHours} giờ
                     </span>
-                    <Button variant="outline" onClick={() => handleDurationChange(1)} disabled={bookingData.durationHours >= 4}>
+                    <Button
+                      variant="outline"
+                      onClick={() => handleDurationChange(1)}
+                      disabled={bookingData.durationHours >= 4}
+                    >
                       +
                     </Button>
                   </div>
                   {bookingData.selectedSlot && (
                     <p className="text-sm text-muted-foreground mt-2">
-                      Từ {bookingData.selectedSlot.start_time} đến {selectedEndTime}
+                      Từ {bookingData.selectedSlot.start_time} đến{" "}
+                      {selectedEndTime}
                     </p>
                   )}
                 </div>
@@ -340,7 +392,8 @@ export default function BookingPage() {
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                       {slots.map((slot) => {
                         const isSelected =
-                          bookingData.selectedSlot?.start_datetime === slot.start_datetime;
+                          bookingData.selectedSlot?.start_datetime ===
+                          slot.start_datetime;
 
                         return (
                           <button
@@ -356,15 +409,17 @@ export default function BookingPage() {
                               isSelected
                                 ? "border-primary bg-primary/10 text-primary"
                                 : slot.available
-                                ? "border-border hover:border-primary/50"
-                                : "border-border bg-muted text-muted-foreground cursor-not-allowed"
+                                  ? "border-border hover:border-primary/50"
+                                  : "border-border bg-muted text-muted-foreground cursor-not-allowed"
                             }`}
                             title={slot.reason ?? ""}
                           >
                             <div className="font-medium">{slot.start_time}</div>
                             <div className="text-xs mt-1">{slot.end_time}</div>
                             {!slot.available && (
-                              <div className="text-[10px] mt-1">{slot.reason ?? "Không khả dụng"}</div>
+                              <div className="text-[10px] mt-1">
+                                {slot.reason ?? "Không khả dụng"}
+                              </div>
                             )}
                           </button>
                         );
@@ -386,7 +441,9 @@ export default function BookingPage() {
 
             {step === 2 && (
               <Card className="p-6">
-                <h2 className="text-xl font-semibold mb-6">Thông tin người đặt</h2>
+                <h2 className="text-xl font-semibold mb-6">
+                  Thông tin người đặt
+                </h2>
 
                 <div className="grid gap-4">
                   <input
@@ -394,7 +451,10 @@ export default function BookingPage() {
                     placeholder="Họ và tên"
                     value={bookingData.fullName}
                     onChange={(e) =>
-                      setBookingData((prev) => ({ ...prev, fullName: e.target.value }))
+                      setBookingData((prev) => ({
+                        ...prev,
+                        fullName: e.target.value,
+                      }))
                     }
                   />
                   <input
@@ -402,7 +462,10 @@ export default function BookingPage() {
                     placeholder="Email"
                     value={bookingData.email}
                     onChange={(e) =>
-                      setBookingData((prev) => ({ ...prev, email: e.target.value }))
+                      setBookingData((prev) => ({
+                        ...prev,
+                        email: e.target.value,
+                      }))
                     }
                   />
                   <input
@@ -410,7 +473,10 @@ export default function BookingPage() {
                     placeholder="Số điện thoại"
                     value={bookingData.phone}
                     onChange={(e) =>
-                      setBookingData((prev) => ({ ...prev, phone: e.target.value }))
+                      setBookingData((prev) => ({
+                        ...prev,
+                        phone: e.target.value,
+                      }))
                     }
                   />
                   <textarea
@@ -418,7 +484,10 @@ export default function BookingPage() {
                     placeholder="Ghi chú"
                     value={bookingData.notes}
                     onChange={(e) =>
-                      setBookingData((prev) => ({ ...prev, notes: e.target.value }))
+                      setBookingData((prev) => ({
+                        ...prev,
+                        notes: e.target.value,
+                      }))
                     }
                   />
                 </div>
@@ -448,12 +517,15 @@ export default function BookingPage() {
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Giờ</span>
                     <span className="font-medium">
-                      {bookingData.selectedSlot?.start_time} - {bookingData.selectedSlot?.end_time}
+                      {bookingData.selectedSlot?.start_time} -{" "}
+                      {bookingData.selectedSlot?.end_time}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Thời lượng</span>
-                    <span className="font-medium">{bookingData.durationHours} giờ</span>
+                    <span className="font-medium">
+                      {bookingData.durationHours} giờ
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Người đặt</span>
@@ -466,8 +538,9 @@ export default function BookingPage() {
                 <Alert className="mt-6">
                   <Clock className="h-4 w-4" />
                   <AlertDescription>
-                    Bản backend hiện tại chỉ lưu booking thật. Thông tin voucher/payment nâng cao sẽ nối sau.
-                    Nếu chưa đăng nhập, tạo booking sẽ bị từ chối.
+                    Bản backend hiện tại chỉ lưu booking thật. Thông tin
+                    voucher/payment nâng cao sẽ nối sau. Nếu chưa đăng nhập, tạo
+                    booking sẽ bị từ chối.
                   </AlertDescription>
                 </Alert>
 
@@ -475,7 +548,9 @@ export default function BookingPage() {
                   <Button variant="outline" onClick={() => setStep(2)}>
                     Quay lại
                   </Button>
-                  <Button onClick={handleCreateBooking}>Xác nhận đặt sân</Button>
+                  <Button onClick={handleCreateBooking}>
+                    Xác nhận đặt sân
+                  </Button>
                 </div>
               </Card>
             )}
@@ -524,7 +599,9 @@ export default function BookingPage() {
               />
 
               <h3 className="text-lg font-bold mb-2">{field.name}</h3>
-              <p className="text-sm text-muted-foreground mb-4">{field.location}</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                {field.location}
+              </p>
 
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
@@ -535,19 +612,27 @@ export default function BookingPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Giá / giờ</span>
-                  <span className="font-medium">{formatCurrency(field.pricePerHour)} VND</span>
+                  <span className="font-medium">
+                    {formatCurrency(field.pricePerHour)} VND
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Tạm tính</span>
-                  <span className="font-medium">{formatCurrency(subtotal)} VND</span>
+                  <span className="font-medium">
+                    {formatCurrency(subtotal)} VND
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Phí dịch vụ</span>
-                  <span className="font-medium">{formatCurrency(serviceFee)} VND</span>
+                  <span className="font-medium">
+                    {formatCurrency(serviceFee)} VND
+                  </span>
                 </div>
                 <div className="flex justify-between border-t border-border pt-3 text-base">
                   <span className="font-semibold">Tổng cộng</span>
-                  <span className="font-bold text-primary">{formatCurrency(finalAmount)} VND</span>
+                  <span className="font-bold text-primary">
+                    {formatCurrency(finalAmount)} VND
+                  </span>
                 </div>
               </div>
             </Card>

@@ -57,6 +57,9 @@ model bookings {
   total_price            Decimal?                 @db.Decimal(12, 2)
   voucher_id             Int?
   notes                  String?                  @db.VarChar(255)
+  contact_name           String?                  @db.VarChar(120)
+  contact_email          String?                  @db.VarChar(160)
+  contact_phone          String?                  @db.VarChar(30)
   created_at             DateTime?                @default(now()) @db.DateTime(0)
   updated_at             DateTime?                @default(now()) @db.DateTime(0)
   booking_status_history booking_status_history[]
@@ -64,9 +67,9 @@ model bookings {
   users                  users                    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_booking_user")
   payments               payments?
   reviews                reviews[]
-  checked_in_at  DateTime? @db.DateTime(0)
-  checked_in_by  Int?
-  checkin_method String?   @db.VarChar(20)
+  checked_in_at          DateTime?                @db.DateTime(0)
+  checked_in_by          Int?
+  checkin_method         String?                  @db.VarChar(20)
 
   @@index([field_id], map: "fk_booking_field")
   @@index([user_id], map: "fk_booking_user")
@@ -105,36 +108,36 @@ model field_images {
 }
 
 model fields {
-  id                   Int                @id @default(autoincrement())
-  owner_id             Int
-  field_name           String?            @db.VarChar(160)
-  sport_type           String?            @db.VarChar(40)
-  description          String?            @db.Text
+  id          Int     @id @default(autoincrement())
+  owner_id    Int
+  field_name  String? @db.VarChar(160)
+  sport_type  String? @db.VarChar(40)
+  description String? @db.Text
 
-  address              String?            @db.VarChar(255) // full address
-  address_line         String?            @db.VarChar(160) // số nhà, tên đường
-  ward                 String?            @db.VarChar(100)
-  district             String?            @db.VarChar(100)
-  province             String?            @db.VarChar(100)
+  address      String? @db.VarChar(255) // full address
+  address_line String? @db.VarChar(160) // số nhà, tên đường
+  ward         String? @db.VarChar(100)
+  district     String? @db.VarChar(100)
+  province     String? @db.VarChar(100)
 
-  latitude             Decimal?           @db.Decimal(10, 6)
-  longitude            Decimal?           @db.Decimal(10, 6)
-  base_price_per_hour  Decimal?           @db.Decimal(12, 2)
-  currency             String?            @default("VND") @db.VarChar(8)
-  status               fields_status      @default(pending)
-  min_duration_minutes Int?               @default(60)
+  latitude             Decimal?      @db.Decimal(10, 6)
+  longitude            Decimal?      @db.Decimal(10, 6)
+  base_price_per_hour  Decimal?      @db.Decimal(12, 2)
+  currency             String?       @default("VND") @db.VarChar(8)
+  status               fields_status @default(pending)
+  min_duration_minutes Int?          @default(60)
   max_players          Int?
-  created_at           DateTime?          @default(now()) @db.DateTime(0)
-  updated_at           DateTime?          @default(now()) @db.DateTime(0)
+  created_at           DateTime?     @default(now()) @db.DateTime(0)
+  updated_at           DateTime?     @default(now()) @db.DateTime(0)
 
-  blackout_dates       blackout_dates[]
-  bookings             bookings[]
-  field_facilities     field_facilities[]
-  field_images         field_images[]
-  users                users              @relation(fields: [owner_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_field_owner")
-  operating_hours      operating_hours[]
-  reports_daily        reports_daily[]
-  reviews              reviews[]
+  blackout_dates   blackout_dates[]
+  bookings         bookings[]
+  field_facilities field_facilities[]
+  field_images     field_images[]
+  users            users              @relation(fields: [owner_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_field_owner")
+  operating_hours  operating_hours[]
+  reports_daily    reports_daily[]
+  reviews          reviews[]
 
   @@index([owner_id], map: "fk_field_owner")
   @@index([province])
@@ -167,21 +170,20 @@ model operating_hours {
 }
 
 model owner_profiles {
-  user_id        Int          @id
-  business_name  String?      @db.VarChar(160)
-  tax_code       String?      @db.VarChar(50)
-  address        String?      @db.VarChar(255)
-  status         owner_status @default(pending)          // trạng thái: pending/approved/rejected
-  reject_reason  String?      @db.VarChar(255)           // lý do từ chối cho màn /owner/rejected
-  approved_by    Int?
-  approved_at    DateTime?    @db.DateTime(0)
-  users_owner_profiles_approved_byTousers users? @relation("owner_profiles_approved_byTousers", fields: [approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ownerprofile_admin")
-  users_owner_profiles_user_idTousers     users  @relation("owner_profiles_user_idTousers", fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ownerprofile_user")
-  license_url  String? @db.VarChar(255)
-  id_front_url String? @db.VarChar(255)
-  id_back_url  String? @db.VarChar(255)
-  created_at DateTime? @default(now()) @db.DateTime(0)///add ngày tạo
-
+  user_id                                 Int          @id
+  business_name                           String?      @db.VarChar(160)
+  tax_code                                String?      @db.VarChar(50)
+  address                                 String?      @db.VarChar(255)
+  status                                  owner_status @default(pending) // trạng thái: pending/approved/rejected
+  reject_reason                           String?      @db.VarChar(255) // lý do từ chối cho màn /owner/rejected
+  approved_by                             Int?
+  approved_at                             DateTime?    @db.DateTime(0)
+  users_owner_profiles_approved_byTousers users?       @relation("owner_profiles_approved_byTousers", fields: [approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ownerprofile_admin")
+  users_owner_profiles_user_idTousers     users        @relation("owner_profiles_user_idTousers", fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ownerprofile_user")
+  license_url                             String?      @db.VarChar(255)
+  id_front_url                            String?      @db.VarChar(255)
+  id_back_url                             String?      @db.VarChar(255)
+  created_at                              DateTime?    @default(now()) @db.DateTime(0) ///add ngày tạo
 
   @@index([approved_by], map: "fk_ownerprofile_admin")
 }
@@ -235,8 +237,8 @@ model reviews {
   rating     Int?
   comment    String?   @db.Text
   visible    Boolean?  @default(true)
-  reply_text String?   @db.Text          // owner reply nội dung
-  reply_at   DateTime?                   // thời gian owner reply
+  reply_text String?   @db.Text // owner reply nội dung
+  reply_at   DateTime? // thời gian owner reply
   created_at DateTime? @default(now()) @db.DateTime(0)
   bookings   bookings  @relation(fields: [booking_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_review_booking")
   fields     fields    @relation(fields: [field_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_review_field")
@@ -275,7 +277,7 @@ model users {
   email                                            String                   @unique(map: "email") @db.VarChar(160)
   password_hash                                    String                   @db.VarChar(255)
   phone                                            String?                  @db.VarChar(30)
-  avatar_url                                       String?                  @db.VarChar(500)    // phục vụ avatar profile
+  avatar_url                                       String?                  @db.VarChar(500) // phục vụ avatar profile
   role                                             users_role
   status                                           users_status?            @default(active)
   created_at                                       DateTime?                @default(now()) @db.DateTime(0)
@@ -333,7 +335,7 @@ enum payments_provider {
   MOMO
   ZALOPAY
   ONSITE
-  BANK_TRANSFER  // thêm cho luồng chuyển khoản ngân hàng
+  BANK_TRANSFER // thêm cho luồng chuyển khoản ngân hàng
 }
 
 enum vouchers_type {

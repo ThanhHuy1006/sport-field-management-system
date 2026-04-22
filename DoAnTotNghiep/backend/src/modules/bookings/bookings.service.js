@@ -25,7 +25,7 @@ function pad2(n) {
 
 function formatLocalDate(date) {
   return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(
-    date.getDate()
+    date.getDate(),
   )}`;
 }
 
@@ -69,10 +69,10 @@ function assertCheckInWindow(startDatetime) {
   const start = new Date(startDatetime);
 
   const openWindow = new Date(
-    start.getTime() - CHECKIN_EARLY_MINUTES * 60 * 1000
+    start.getTime() - CHECKIN_EARLY_MINUTES * 60 * 1000,
   );
   const closeWindow = new Date(
-    start.getTime() + CHECKIN_LATE_MINUTES * 60 * 1000
+    start.getTime() + CHECKIN_LATE_MINUTES * 60 * 1000,
   );
 
   if (now < openWindow) {
@@ -119,7 +119,7 @@ async function assertBookableField(valid) {
 
   if (duration % minDuration !== 0) {
     throw new ValidationError(
-      `Thời lượng đặt phải chia hết cho ${minDuration} phút`
+      `Thời lượng đặt phải chia hết cho ${minDuration} phút`,
     );
   }
 
@@ -128,7 +128,7 @@ async function assertBookableField(valid) {
   const dayOfWeek = getDayOfWeek(valid.start_datetime);
   const operatingHour = await bookingsRepository.findOperatingHourByFieldAndDay(
     field.id,
-    dayOfWeek
+    dayOfWeek,
   );
 
   if (!operatingHour) {
@@ -136,7 +136,11 @@ async function assertBookableField(valid) {
   }
 
   if (
-    !isWithinOperatingHours(valid.start_datetime, valid.end_datetime, operatingHour)
+    !isWithinOperatingHours(
+      valid.start_datetime,
+      valid.end_datetime,
+      operatingHour,
+    )
   ) {
     throw new ForbiddenError("Khung giờ đặt nằm ngoài giờ hoạt động của sân");
   }
@@ -165,7 +169,7 @@ export const bookingsService = {
 
     if (durationMinutes % minDuration !== 0) {
       throw new ValidationError(
-        `duration_minutes phải chia hết cho ${minDuration}`
+        `duration_minutes phải chia hết cho ${minDuration}`,
       );
     }
 
@@ -173,10 +177,11 @@ export const bookingsService = {
     const dayEnd = startOfNextLocalDay(query.date);
     const dayOfWeek = getDayOfWeek(dayStart);
 
-    const operatingHour = await bookingsRepository.findOperatingHourByFieldAndDay(
-      field.id,
-      dayOfWeek
-    );
+    const operatingHour =
+      await bookingsRepository.findOperatingHourByFieldAndDay(
+        field.id,
+        dayOfWeek,
+      );
 
     if (!operatingHour) {
       return {
@@ -192,12 +197,19 @@ export const bookingsService = {
     }
 
     const [blackouts, bookings] = await Promise.all([
-      bookingsRepository.findBlackoutsByFieldAndDate(field.id, dayStart, dayEnd),
+      bookingsRepository.findBlackoutsByFieldAndDate(
+        field.id,
+        dayStart,
+        dayEnd,
+      ),
       bookingsRepository.findBookingsByFieldAndDate(field.id, dayStart, dayEnd),
     ]);
 
     const open = combineDateStringAndTime(query.date, operatingHour.open_time);
-    const close = combineDateStringAndTime(query.date, operatingHour.close_time);
+    const close = combineDateStringAndTime(
+      query.date,
+      operatingHour.close_time,
+    );
 
     const slots = [];
     for (
@@ -213,8 +225,8 @@ export const bookingsService = {
           slotStart,
           slotEnd,
           new Date(item.start_datetime),
-          new Date(item.end_datetime)
-        )
+          new Date(item.end_datetime),
+        ),
       );
 
       const conflict = bookings.find((item) =>
@@ -222,8 +234,8 @@ export const bookingsService = {
           slotStart,
           slotEnd,
           new Date(item.start_datetime),
-          new Date(item.end_datetime)
-        )
+          new Date(item.end_datetime),
+        ),
       );
 
       let available = true;
@@ -268,7 +280,7 @@ export const bookingsService = {
     const blackout = await bookingsRepository.findBlackoutByFieldAndRange(
       field.id,
       payload.start_datetime,
-      payload.end_datetime
+      payload.end_datetime,
     );
 
     if (blackout) {
@@ -281,7 +293,7 @@ export const bookingsService = {
     const conflicts = await bookingsRepository.findConflictingBookings(
       field.id,
       payload.start_datetime,
-      payload.end_datetime
+      payload.end_datetime,
     );
 
     if (conflicts.length > 0) {
@@ -307,16 +319,28 @@ export const bookingsService = {
 
     if (!availability.available) {
       throw new ConflictError(
-        availability.reason || "Khung giờ không khả dụng"
+        availability.reason || "Khung giờ không khả dụng",
       );
     }
 
+    // const booking = await bookingsRepository.createBookingWithHistory({
+    //   field_id: payload.field_id,
+    //   user_id: userId,
+    //   start_datetime: payload.start_datetime,
+    //   end_datetime: payload.end_datetime,
+    //   notes: payload.notes,
+    //   total_price: availability.total_price,
+    //   status: "PENDING_CONFIRM",
+    // });
     const booking = await bookingsRepository.createBookingWithHistory({
       field_id: payload.field_id,
       user_id: userId,
       start_datetime: payload.start_datetime,
       end_datetime: payload.end_datetime,
       notes: payload.notes,
+      contact_name: payload.contact_name,
+      contact_email: payload.contact_email,
+      contact_phone: payload.contact_phone,
       total_price: availability.total_price,
       status: "PENDING_CONFIRM",
     });
@@ -325,7 +349,10 @@ export const bookingsService = {
   },
 
   async getMyBookings(userId, query) {
-    const { items, total } = await bookingsRepository.findMyBookings(userId, query);
+    const { items, total } = await bookingsRepository.findMyBookings(
+      userId,
+      query,
+    );
 
     return {
       items,
@@ -339,7 +366,10 @@ export const bookingsService = {
   },
 
   async getMyBookingDetail(userId, bookingId) {
-    const booking = await bookingsRepository.findMyBookingById(userId, bookingId);
+    const booking = await bookingsRepository.findMyBookingById(
+      userId,
+      bookingId,
+    );
     if (!booking) {
       throw new NotFoundError("Không tìm thấy booking");
     }
@@ -348,14 +378,17 @@ export const bookingsService = {
   },
 
   async cancelMyBooking(userId, bookingId) {
-    const booking = await bookingsRepository.findMyBookingById(userId, bookingId);
+    const booking = await bookingsRepository.findMyBookingById(
+      userId,
+      bookingId,
+    );
     if (!booking) {
       throw new NotFoundError("Không tìm thấy booking");
     }
 
     if (
       !["PENDING_CONFIRM", "APPROVED", "AWAITING_PAYMENT"].includes(
-        booking.status
+        booking.status,
       )
     ) {
       throw new ForbiddenError("Booking hiện không thể hủy");
@@ -369,7 +402,10 @@ export const bookingsService = {
   },
 
   async getMyBookingCheckInQr(userId, bookingId) {
-    const booking = await bookingsRepository.findMyBookingById(userId, bookingId);
+    const booking = await bookingsRepository.findMyBookingById(
+      userId,
+      bookingId,
+    );
     if (!booking) {
       throw new NotFoundError("Không tìm thấy booking");
     }
@@ -389,11 +425,11 @@ export const bookingsService = {
 
     const start = new Date(booking.start_datetime);
     const expiresAt = new Date(
-      start.getTime() + CHECKIN_LATE_MINUTES * 60 * 1000
+      start.getTime() + CHECKIN_LATE_MINUTES * 60 * 1000,
     );
     const expiresInSeconds = Math.max(
       60,
-      Math.floor((expiresAt.getTime() - Date.now()) / 1000)
+      Math.floor((expiresAt.getTime() - Date.now()) / 1000),
     );
 
     const qr_token = jwt.sign(
@@ -403,7 +439,7 @@ export const bookingsService = {
         type: "BOOKING_CHECKIN",
       },
       secret,
-      { expiresIn: expiresInSeconds }
+      { expiresIn: expiresInSeconds },
     );
 
     return {
@@ -416,7 +452,7 @@ export const bookingsService = {
   async getOwnerBookings(ownerId, query) {
     const { items, total } = await bookingsRepository.findOwnerBookings(
       ownerId,
-      query
+      query,
     );
 
     return {
@@ -433,7 +469,7 @@ export const bookingsService = {
   async getOwnerBookingDetail(ownerId, bookingId) {
     const booking = await bookingsRepository.findOwnerBookingById(
       ownerId,
-      bookingId
+      bookingId,
     );
     if (!booking) {
       throw new NotFoundError("Không tìm thấy booking");
@@ -445,16 +481,14 @@ export const bookingsService = {
   async approveOwnerBooking(ownerId, bookingId) {
     const booking = await bookingsRepository.findOwnerBookingById(
       ownerId,
-      bookingId
+      bookingId,
     );
     if (!booking) {
       throw new NotFoundError("Không tìm thấy booking");
     }
 
     if (booking.status !== "PENDING_CONFIRM") {
-      throw new ForbiddenError(
-        "Chỉ booking đang chờ xác nhận mới được duyệt"
-      );
+      throw new ForbiddenError("Chỉ booking đang chờ xác nhận mới được duyệt");
     }
 
     return bookingsRepository.approveOwnerBooking(ownerId, bookingId);
@@ -463,7 +497,7 @@ export const bookingsService = {
   async rejectOwnerBooking(ownerId, bookingId, payload) {
     const booking = await bookingsRepository.findOwnerBookingById(
       ownerId,
-      bookingId
+      bookingId,
     );
     if (!booking) {
       throw new NotFoundError("Không tìm thấy booking");
@@ -471,17 +505,21 @@ export const bookingsService = {
 
     if (booking.status !== "PENDING_CONFIRM") {
       throw new ForbiddenError(
-        "Chỉ booking đang chờ xác nhận mới được từ chối"
+        "Chỉ booking đang chờ xác nhận mới được từ chối",
       );
     }
 
-    return bookingsRepository.rejectOwnerBooking(ownerId, bookingId, payload.note);
+    return bookingsRepository.rejectOwnerBooking(
+      ownerId,
+      bookingId,
+      payload.note,
+    );
   },
 
   async checkInOwnerBooking(ownerId, bookingId, payload) {
     const booking = await bookingsRepository.findOwnerBookingById(
       ownerId,
-      bookingId
+      bookingId,
     );
     if (!booking) {
       throw new NotFoundError("Không tìm thấy booking");
@@ -493,7 +531,7 @@ export const bookingsService = {
       ownerId,
       bookingId,
       "MANUAL",
-      payload.note
+      payload.note,
     );
   },
 
@@ -521,7 +559,7 @@ export const bookingsService = {
 
     const booking = await bookingsRepository.findOwnerBookingById(
       ownerId,
-      bookingId
+      bookingId,
     );
     if (!booking) {
       throw new NotFoundError("Không tìm thấy booking thuộc owner này");
@@ -533,14 +571,14 @@ export const bookingsService = {
       ownerId,
       bookingId,
       "QR",
-      "Checked in by owner via QR"
+      "Checked in by owner via QR",
     );
   },
 
   async completeOwnerBooking(ownerId, bookingId, payload) {
     const booking = await bookingsRepository.findOwnerBookingById(
       ownerId,
-      bookingId
+      bookingId,
     );
     if (!booking) {
       throw new NotFoundError("Không tìm thấy booking");
@@ -548,10 +586,14 @@ export const bookingsService = {
 
     if (booking.status !== "CHECKED_IN") {
       throw new ForbiddenError(
-        "Chỉ booking đã CHECKED_IN mới được chuyển COMPLETED"
+        "Chỉ booking đã CHECKED_IN mới được chuyển COMPLETED",
       );
     }
 
-    return bookingsRepository.completeOwnerBooking(ownerId, bookingId, payload.note);
+    return bookingsRepository.completeOwnerBooking(
+      ownerId,
+      bookingId,
+      payload.note,
+    );
   },
 };

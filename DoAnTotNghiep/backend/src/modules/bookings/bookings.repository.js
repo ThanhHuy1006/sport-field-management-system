@@ -200,13 +200,24 @@ export const bookingsRepository = {
         tx,
         data.field_id,
         data.start_datetime,
-        data.end_datetime
+        data.end_datetime,
       );
 
       if (conflicts.length > 0) {
         throw new ConflictError("Khung giờ đã được đặt");
       }
 
+      // const booking = await tx.bookings.create({
+      //   data: {
+      //     field_id: data.field_id,
+      //     user_id: data.user_id,
+      //     start_datetime: data.start_datetime,
+      //     end_datetime: data.end_datetime,
+      //     notes: data.notes,
+      //     total_price: data.total_price,
+      //     status: data.status,
+      //   },
+      // });
       const booking = await tx.bookings.create({
         data: {
           field_id: data.field_id,
@@ -214,11 +225,13 @@ export const bookingsRepository = {
           start_datetime: data.start_datetime,
           end_datetime: data.end_datetime,
           notes: data.notes,
+          contact_name: data.contact_name ?? null,
+          contact_email: data.contact_email ?? null,
+          contact_phone: data.contact_phone ?? null,
           total_price: data.total_price,
           status: data.status,
         },
       });
-
       await tx.booking_status_history.create({
         data: {
           booking_id: booking.id,
@@ -299,7 +312,7 @@ export const bookingsRepository = {
           owner_id: ownerId,
         },
       },
-      filters.status
+      filters.status,
     );
 
     return Promise.all([

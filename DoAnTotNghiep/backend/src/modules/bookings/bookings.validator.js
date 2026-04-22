@@ -56,13 +56,28 @@ export function validateCheckAvailabilityPayload(payload) {
   };
 }
 
+// export function validateCreateBookingPayload(payload) {
+//   const base = validateCheckAvailabilityPayload(payload);
+//   const rawNotes = payload.notes ?? payload.note ?? null;
+
+//   return {
+//     ...base,
+//     notes: rawNotes ? String(rawNotes).trim() : null,
+//   };
+// }
 export function validateCreateBookingPayload(payload) {
   const base = validateCheckAvailabilityPayload(payload);
   const rawNotes = payload.notes ?? payload.note ?? null;
+  const rawContactName = payload.contact_name ?? null;
+  const rawContactEmail = payload.contact_email ?? null;
+  const rawContactPhone = payload.contact_phone ?? null;
 
   return {
     ...base,
     notes: rawNotes ? String(rawNotes).trim() : null,
+    contact_name: rawContactName ? String(rawContactName).trim() : null,
+    contact_email: rawContactEmail ? String(rawContactEmail).trim() : null,
+    contact_phone: rawContactPhone ? String(rawContactPhone).trim() : null,
   };
 }
 

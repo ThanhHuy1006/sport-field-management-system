@@ -125,31 +125,72 @@ export default function BookingsPage() {
     completed: 0,
     cancelled: 0,
   })
+  /////
+  const formatLocalDate = (iso: string) => {
+  const d = new Date(iso)
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
 
+const formatLocalTime = (iso: string) => {
+  return new Date(iso).toLocaleTimeString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Ho_Chi_Minh",
+  })
+}
+
+  // const mapApiBookingToUi = (item: MyBookingListItem): Booking => {
+  //   const start = new Date(item.start_datetime)
+  //   const end = new Date(item.end_datetime)
+  //   const duration = Math.max(
+  //     1,
+  //     Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60)),
+  //   )
+
+  //   return {
+  //     id: item.id,
+  //     fieldId: item.field?.id ?? item.field_id,
+  //     fieldName: item.field?.field_name ?? "Chưa có tên sân",
+  //     location: item.field?.address ?? "Chưa cập nhật địa chỉ",
+  //     sportType: item.field?.sport_type ?? null,
+  //     date: item.start_datetime.slice(0, 10),
+  //     time: item.start_datetime.slice(11, 16),
+  //     duration,
+  //     price: Number(item.total_price ?? 0),
+  //     status: item.status,
+  //     image: "/placeholder.svg",
+  //     bookingRef: `BK-${item.id}`,
+  //     checkedInAt: item.checked_in_at ?? undefined,
+  //   }
+  // }
   const mapApiBookingToUi = (item: MyBookingListItem): Booking => {
-    const start = new Date(item.start_datetime)
-    const end = new Date(item.end_datetime)
-    const duration = Math.max(
-      1,
-      Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60)),
-    )
+  const start = new Date(item.start_datetime)
+  const end = new Date(item.end_datetime)
+  const duration = Math.max(
+    1,
+    Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60)),
+  )
 
-    return {
-      id: item.id,
-      fieldId: item.field?.id ?? item.field_id,
-      fieldName: item.field?.field_name ?? "Chưa có tên sân",
-      location: item.field?.address ?? "Chưa cập nhật địa chỉ",
-      sportType: item.field?.sport_type ?? null,
-      date: item.start_datetime.slice(0, 10),
-      time: item.start_datetime.slice(11, 16),
-      duration,
-      price: Number(item.total_price ?? 0),
-      status: item.status,
-      image: "/placeholder.svg",
-      bookingRef: `BK-${item.id}`,
-      checkedInAt: item.checked_in_at ?? undefined,
-    }
+  return {
+    id: item.id,
+    fieldId: item.field?.id ?? item.field_id,
+    fieldName: item.field?.field_name ?? "Chưa có tên sân",
+    location: item.field?.address ?? "Chưa cập nhật địa chỉ",
+    sportType: item.field?.sport_type ?? null,
+    date: formatLocalDate(item.start_datetime),
+    time: `${formatLocalTime(item.start_datetime)} - ${formatLocalTime(item.end_datetime)}`,
+    duration,
+    price: Number(item.total_price ?? 0),
+    status: item.status,
+    image: "/placeholder.svg",
+    bookingRef: `BK-${item.id}`,
+    checkedInAt: item.checked_in_at ?? undefined,
   }
+}
 
   const getStatusParamFromTab = (tab: string): BookingStatus | undefined => {
     switch (tab) {
