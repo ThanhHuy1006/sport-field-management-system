@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -101,8 +101,12 @@ export function ScheduleManager({
   onRejectReschedule,
 }: ScheduleManagerProps) {
   const [bookings, setBookings] = useState(initialBookings)
+
+  useEffect(() => {
+    setBookings(initialBookings)
+  }, [initialBookings])
   const [viewMode, setViewMode] = useState<"list" | "timeline">("list")
-  const [selectedDate, setSelectedDate] = useState(new Date("2025-12-08"))
+  const [selectedDate, setSelectedDate] = useState(() => new Date())
   const [selectedField, setSelectedField] = useState<string>("all")
   const [selectedOwner, setSelectedOwner] = useState<string>("all")
   const [selectedStatus, setSelectedStatus] = useState<string>("all")
@@ -140,7 +144,7 @@ export function ScheduleManager({
   }
 
   const goToToday = () => {
-    setSelectedDate(new Date("2025-12-08"))
+    setSelectedDate(new Date())
   }
 
   // Filter bookings
