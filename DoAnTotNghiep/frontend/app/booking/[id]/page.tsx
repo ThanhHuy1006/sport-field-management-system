@@ -507,7 +507,7 @@ export default function BookingPage() {
                   <Link href={`/field/${field.id}`}>
                     <Button variant="outline">Về chi tiết sân</Button>
                   </Link>
-                  <Link href="/account/bookings">
+                  <Link href="/bookings">
                     <Button>Xem lịch sử booking</Button>
                   </Link>
                 </div>
