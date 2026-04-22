@@ -11,6 +11,31 @@ export type OwnerBookingStatus =
   | "PAY_FAILED"
   | "CHECKED_IN";
 
+// export type OwnerBookingListItem = {
+//   id: number;
+//   field_id: number;
+//   user_id: number;
+//   start_datetime: string;
+//   end_datetime: string;
+//   status: OwnerBookingStatus;
+//   total_price: string | number;
+//   notes?: string | null;
+//   rejection_reason?: string | null;
+//   checked_in_at?: string | null;
+//   user?: {
+//     id: number;
+//     full_name?: string | null;
+//     phone_number?: string | null;
+//     email?: string | null;
+//   } | null;
+//   field?: {
+//     id: number;
+//     field_name?: string | null;
+//     address?: string | null;
+//     sport_type?: string | null;
+//     base_price_per_hour?: string | number | null;
+//   } | null;
+// };
 export type OwnerBookingListItem = {
   id: number;
   field_id: number;
@@ -24,9 +49,11 @@ export type OwnerBookingListItem = {
   checked_in_at?: string | null;
   user?: {
     id: number;
+    name?: string | null;
+    phone?: string | null;
+    email?: string | null;
     full_name?: string | null;
     phone_number?: string | null;
-    email?: string | null;
   } | null;
   field?: {
     id: number;

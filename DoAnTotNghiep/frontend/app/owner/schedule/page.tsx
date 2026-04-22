@@ -33,6 +33,30 @@ function mapApiStatusToUi(
   }
 }
 
+// function mapApiBookingToUi(item: OwnerBookingListItem): Booking {
+//   const start = new Date(item.start_datetime)
+//   const end = new Date(item.end_datetime)
+//   const duration = Math.max(
+//     1,
+//     Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60)),
+//   )
+
+//   return {
+//     id: item.id,
+//     fieldId: item.field?.id ?? item.field_id,
+//     fieldName: item.field?.field_name ?? "Chưa có tên sân",
+//     customerName: item.user?.full_name ?? "Khách hàng",
+//     customerPhone: item.user?.phone_number ?? "Chưa cập nhật",
+//     date: item.start_datetime.slice(0, 10),
+//     startTime: item.start_datetime.slice(11, 16),
+//     endTime: item.end_datetime.slice(11, 16),
+//     duration,
+//     price: Number(item.total_price ?? 0),
+//     status: mapApiStatusToUi(item.status),
+//     location: item.field?.address ?? undefined,
+//     rejectionReason: item.rejection_reason ?? undefined,
+//   }
+// }
 function mapApiBookingToUi(item: OwnerBookingListItem): Booking {
   const start = new Date(item.start_datetime)
   const end = new Date(item.end_datetime)
@@ -45,8 +69,8 @@ function mapApiBookingToUi(item: OwnerBookingListItem): Booking {
     id: item.id,
     fieldId: item.field?.id ?? item.field_id,
     fieldName: item.field?.field_name ?? "Chưa có tên sân",
-    customerName: item.user?.full_name ?? "Khách hàng",
-    customerPhone: item.user?.phone_number ?? "Chưa cập nhật",
+    customerName: item.user?.name ?? "Khách hàng",
+    customerPhone: item.user?.phone ?? "Chưa cập nhật",
     date: item.start_datetime.slice(0, 10),
     startTime: item.start_datetime.slice(11, 16),
     endTime: item.end_datetime.slice(11, 16),
@@ -72,6 +96,9 @@ export default function OwnerSchedulePage() {
         page: 1,
         limit: 100,
       })
+      console.log("OWNER BOOKINGS RAW:", res)
+      console.log("OWNER BOOKINGS FIRST ITEM:", res.data.items?.[0])
+      console.log("OWNER BOOKINGS USER:", res.data.items?.[0]?.user)
 
       setBookings(res.data.items.map(mapApiBookingToUi))
     } catch (error) {
@@ -84,6 +111,7 @@ export default function OwnerSchedulePage() {
     } finally {
       setIsLoading(false)
     }
+  
   }
 
   useEffect(() => {
