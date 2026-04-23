@@ -113,7 +113,8 @@ export const paymentsRepository = {
             booking_id: booking.id,
             from_status: booking.status,
             to_status: "AWAITING_PAYMENT",
-            note: "Payment initiated",
+            // note: "Payment initiated",
+            reason: "Payment initiated",
           },
         });
       }
@@ -172,7 +173,8 @@ export const paymentsRepository = {
             booking_id: payment.booking_id,
             from_status: payment.bookings.status,
             to_status: "PAID",
-            note: "Payment success",
+            // note: "Payment success",
+            reason: "Payment success",
           },
         });
       }
@@ -230,7 +232,8 @@ export const paymentsRepository = {
             booking_id: payment.booking_id,
             from_status: payment.bookings.status,
             to_status: "PAY_FAILED",
-            note: "Payment failed",
+            // note: "Payment failed",
+            reason: "Payment failed",
           },
         });
       }
