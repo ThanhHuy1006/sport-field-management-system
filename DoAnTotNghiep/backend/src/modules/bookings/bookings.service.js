@@ -314,39 +314,46 @@ export const bookingsService = {
     };
   },
 
-  async createBooking(userId, payload) {
-    const availability = await this.checkAvailability(payload);
+ async createBooking(userId, payload) {
+  const availability = await this.checkAvailability(payload);
 
-    if (!availability.available) {
-      throw new ConflictError(
-        availability.reason || "Khung giờ không khả dụng",
-      );
-    }
+  if (!availability.available) {
+    throw new ConflictError(
+      availability.reason || "Khung giờ không khả dụng",
+    );
+  }
 
-    // const booking = await bookingsRepository.createBookingWithHistory({
-    //   field_id: payload.field_id,
-    //   user_id: userId,
-    //   start_datetime: payload.start_datetime,
-    //   end_datetime: payload.end_datetime,
-    //   notes: payload.notes,
-    //   total_price: availability.total_price,
-    //   status: "PENDING_CONFIRM",
-    // });
-    const booking = await bookingsRepository.createBookingWithHistory({
-      field_id: payload.field_id,
-      user_id: userId,
-      start_datetime: payload.start_datetime,
-      end_datetime: payload.end_datetime,
-      notes: payload.notes,
-      contact_name: payload.contact_name,
-      contact_email: payload.contact_email,
-      contact_phone: payload.contact_phone,
-      total_price: availability.total_price,
-      status: "PENDING_CONFIRM",
-    });
+  const field = availability.field;
+  const approvalMode = field.approval_mode || "MANUAL";
+  const requestedPaymentMethod =
+    payload.requested_payment_method || "ONSITE";
 
-    return booking;
-  },
+  let initialStatus = "PENDING_CONFIRM";
+
+  if (approvalMode === "AUTO") {
+    initialStatus =
+      requestedPaymentMethod === "BANK_TRANSFER"
+        ? "AWAITING_PAYMENT"
+        : "APPROVED";
+  }
+
+  const booking = await bookingsRepository.createBookingWithHistory({
+    field_id: payload.field_id,
+    user_id: userId,
+    start_datetime: payload.start_datetime,
+    end_datetime: payload.end_datetime,
+    notes: payload.notes,
+    contact_name: payload.contact_name,
+    contact_email: payload.contact_email,
+    contact_phone: payload.contact_phone,
+    approval_mode_snapshot: approvalMode,
+    requested_payment_method: requestedPaymentMethod,
+    total_price: availability.total_price,
+    status: initialStatus,
+  });
+
+  return booking;
+},
 
   async getMyBookings(userId, query) {
     const { items, total } = await bookingsRepository.findMyBookings(
@@ -478,21 +485,46 @@ export const bookingsService = {
     return booking;
   },
 
+  // async approveOwnerBooking(ownerId, bookingId) {
+  //   const booking = await bookingsRepository.findOwnerBookingById(
+  //     ownerId,
+  //     bookingId,
+  //   );
+  //   if (!booking) {
+  //     throw new NotFoundError("Không tìm thấy booking");
+  //   }
+
+  //   if (booking.status !== "PENDING_CONFIRM") {
+  //     throw new ForbiddenError("Chỉ booking đang chờ xác nhận mới được duyệt");
+  //   }
+
+  //   return bookingsRepository.approveOwnerBooking(ownerId, bookingId);
+  // },
   async approveOwnerBooking(ownerId, bookingId) {
-    const booking = await bookingsRepository.findOwnerBookingById(
-      ownerId,
-      bookingId,
-    );
-    if (!booking) {
-      throw new NotFoundError("Không tìm thấy booking");
-    }
+  const booking = await bookingsRepository.findOwnerBookingById(
+    ownerId,
+    bookingId,
+  );
 
-    if (booking.status !== "PENDING_CONFIRM") {
-      throw new ForbiddenError("Chỉ booking đang chờ xác nhận mới được duyệt");
-    }
+  if (!booking) {
+    throw new NotFoundError("Không tìm thấy booking");
+  }
 
-    return bookingsRepository.approveOwnerBooking(ownerId, bookingId);
-  },
+  if (booking.status !== "PENDING_CONFIRM") {
+    throw new ForbiddenError("Chỉ booking đang chờ xác nhận mới được duyệt");
+  }
+
+  const nextStatus =
+    booking.requested_payment_method === "BANK_TRANSFER"
+      ? "AWAITING_PAYMENT"
+      : "APPROVED";
+
+  return bookingsRepository.approveOwnerBooking(
+    ownerId,
+    bookingId,
+    nextStatus,
+  );
+},
 
   async rejectOwnerBooking(ownerId, bookingId, payload) {
     const booking = await bookingsRepository.findOwnerBookingById(

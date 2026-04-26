@@ -114,6 +114,7 @@ export const bookingsRepository = {
         currency: true,
         min_duration_minutes: true,
         status: true,
+        approval_mode: true,
       },
     });
   },
@@ -207,17 +208,6 @@ export const bookingsRepository = {
         throw new ConflictError("Khung giờ đã được đặt");
       }
 
-      // const booking = await tx.bookings.create({
-      //   data: {
-      //     field_id: data.field_id,
-      //     user_id: data.user_id,
-      //     start_datetime: data.start_datetime,
-      //     end_datetime: data.end_datetime,
-      //     notes: data.notes,
-      //     total_price: data.total_price,
-      //     status: data.status,
-      //   },
-      // });
       const booking = await tx.bookings.create({
         data: {
           field_id: data.field_id,
@@ -228,10 +218,13 @@ export const bookingsRepository = {
           contact_name: data.contact_name ?? null,
           contact_email: data.contact_email ?? null,
           contact_phone: data.contact_phone ?? null,
+          approval_mode_snapshot: data.approval_mode_snapshot ?? "MANUAL",
+          requested_payment_method: data.requested_payment_method ?? "ONSITE",
           total_price: data.total_price,
           status: data.status,
         },
       });
+
       await tx.booking_status_history.create({
         data: {
           booking_id: booking.id,
@@ -346,7 +339,7 @@ export const bookingsRepository = {
     });
   },
 
-  approveOwnerBooking(ownerId, bookingId) {
+  approveOwnerBooking(ownerId, bookingId,nextStatus = "APPROVED") {
     return prisma.$transaction(async (tx) => {
       const booking = await tx.bookings.findFirst({
         where: {
@@ -362,7 +355,7 @@ export const bookingsRepository = {
       await tx.bookings.update({
         where: { id: bookingId },
         data: {
-          status: "APPROVED",
+          status: nextStatus,
         },
       });
 
@@ -370,8 +363,12 @@ export const bookingsRepository = {
         data: {
           booking_id: bookingId,
           from_status: booking.status,
-          to_status: "APPROVED",
-          reason: "Approved by owner",
+          to_status: nextStatus,
+          // reason: "Approved by owner",
+          reason:
+        nextStatus === "AWAITING_PAYMENT"
+    ? "Approved by owner, awaiting payment"
+    : "Approved by owner",
         },
       });
 

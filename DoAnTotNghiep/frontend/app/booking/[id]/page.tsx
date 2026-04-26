@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Check,
@@ -61,6 +61,7 @@ function buildDateTime(date: string, time: string) {
 
 export default function BookingPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const fieldId = Number(params?.id);
 
   const [step, setStep] = useState(1);
@@ -77,6 +78,7 @@ export default function BookingPage() {
     email: "",
     phone: "",
     notes: "",
+    paymentMethod: "ONSITE" as "ONSITE" | "BANK_TRANSFER",
   });
 
   const [slots, setSlots] = useState<SlotUi[]>([]);
@@ -84,6 +86,7 @@ export default function BookingPage() {
     id: number;
     status: string;
     total_price: string | number;
+    requested_payment_method?: "ONSITE" | "BANK_TRANSFER" | null;
   }>(null);
 
   useEffect(() => {
@@ -222,13 +225,25 @@ export default function BookingPage() {
         contact_email: bookingData.email || null,
         contact_phone: bookingData.phone || null,
         notes: bookingData.notes || null,
-});
+        requested_payment_method: bookingData.paymentMethod,
+      });
 
       setCreatedBooking({
         id: result.data.id,
         status: result.data.status,
         total_price: result.data.total_price,
+        requested_payment_method:
+          result.data.requested_payment_method ?? bookingData.paymentMethod,
       });
+      if (
+        result.data.status === "AWAITING_PAYMENT" &&
+        (result.data.requested_payment_method ?? bookingData.paymentMethod) ===
+          "BANK_TRANSFER"
+      ) {
+        router.push(`/payment/${result.data.id}`);
+        return;
+      }
+
       setStep(4);
     } catch (err) {
       setError(
@@ -534,13 +549,60 @@ export default function BookingPage() {
                     </span>
                   </div>
                 </div>
+                <div className="border-t border-border pt-4 mt-4">
+                  <p className="font-medium mb-3">Phương thức thanh toán</p>
+
+                  <div className="grid gap-3">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setBookingData((prev) => ({
+                          ...prev,
+                          paymentMethod: "ONSITE",
+                        }))
+                      }
+                      className={`text-left rounded-lg border p-4 transition ${
+                        bookingData.paymentMethod === "ONSITE"
+                          ? "border-primary bg-primary/10"
+                          : "border-border hover:border-primary/50"
+                      }`}
+                    >
+                      <div className="font-medium">Thanh toán tại sân</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Khách thanh toán trực tiếp khi đến sân.
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setBookingData((prev) => ({
+                          ...prev,
+                          paymentMethod: "BANK_TRANSFER",
+                        }))
+                      }
+                      className={`text-left rounded-lg border p-4 transition ${
+                        bookingData.paymentMethod === "BANK_TRANSFER"
+                          ? "border-primary bg-primary/10"
+                          : "border-border hover:border-primary/50"
+                      }`}
+                    >
+                      <div className="font-medium">Chuyển khoản ngân hàng</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Sau khi booking được duyệt, hệ thống sẽ cho phép thanh
+                        toán giả lập.
+                      </div>
+                    </button>
+                  </div>
+                </div>
 
                 <Alert className="mt-6">
                   <Clock className="h-4 w-4" />
                   <AlertDescription>
-                    Bản backend hiện tại chỉ lưu booking thật. Thông tin
-                    voucher/payment nâng cao sẽ nối sau. Nếu chưa đăng nhập, tạo
-                    booking sẽ bị từ chối.
+                    Nếu chọn chuyển khoản ngân hàng, booking chỉ được thanh toán
+                    khi đã được duyệt hoặc sân đang ở chế độ tự động duyệt. Nếu
+                    chọn thanh toán tại sân, anh sẽ thanh toán trực tiếp khi đến
+                    sân.
                   </AlertDescription>
                 </Alert>
 
@@ -561,14 +623,28 @@ export default function BookingPage() {
                   <Check className="w-8 h-8 text-white" />
                 </div>
                 <h2 className="text-2xl font-bold mb-2">Đặt sân thành công</h2>
-                <p className="text-muted-foreground mb-6">
+                {/* <p className="text-muted-foreground mb-6">
                   Booking của anh đã được tạo với mã #{createdBooking.id}
+                </p> */}
+                <p className="text-muted-foreground mb-6">
+                  {createdBooking.requested_payment_method === "BANK_TRANSFER"
+                    ? "Booking của anh đã được tạo. Sau khi chủ sân duyệt, anh có thể thanh toán trong mục lịch sử booking."
+                    : "Booking của anh đã được tạo. Anh sẽ thanh toán trực tiếp khi đến sân."}
                 </p>
 
                 <div className="bg-muted rounded-lg p-4 text-left max-w-md mx-auto mb-6">
                   <div className="flex justify-between mb-2">
                     <span className="text-muted-foreground">Trạng thái</span>
                     <span className="font-medium">{createdBooking.status}</span>
+                  </div>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-muted-foreground">Thanh toán</span>
+                    <span className="font-medium">
+                      {createdBooking.requested_payment_method ===
+                      "BANK_TRANSFER"
+                        ? "Chuyển khoản ngân hàng"
+                        : "Thanh toán tại sân"}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Tổng tiền</span>

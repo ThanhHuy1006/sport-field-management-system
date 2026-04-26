@@ -1,5 +1,5 @@
 import { ValidationError } from "../../core/errors/index.js";
-
+const ALLOWED_BOOKING_PAYMENT_METHODS = ["ONSITE", "BANK_TRANSFER"];
 function parseDateTime(value, fieldName) {
   const raw = String(value || "").trim();
 
@@ -71,6 +71,14 @@ export function validateCreateBookingPayload(payload) {
   const rawContactName = payload.contact_name ?? null;
   const rawContactEmail = payload.contact_email ?? null;
   const rawContactPhone = payload.contact_phone ?? null;
+  const rawRequestedPaymentMethod =
+    payload.requested_payment_method ?? payload.payment_method ?? "ONSITE";
+
+  const requested_payment_method = String(rawRequestedPaymentMethod).trim();
+
+  if (!ALLOWED_BOOKING_PAYMENT_METHODS.includes(requested_payment_method)) {
+    throw new ValidationError("requested_payment_method không hợp lệ");
+  }
 
   return {
     ...base,
@@ -78,8 +86,10 @@ export function validateCreateBookingPayload(payload) {
     contact_name: rawContactName ? String(rawContactName).trim() : null,
     contact_email: rawContactEmail ? String(rawContactEmail).trim() : null,
     contact_phone: rawContactPhone ? String(rawContactPhone).trim() : null,
+    requested_payment_method,
   };
 }
+
 
 export function validateRejectBookingPayload(payload) {
   return {

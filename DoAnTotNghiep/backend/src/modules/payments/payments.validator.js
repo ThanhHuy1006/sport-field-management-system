@@ -1,6 +1,6 @@
 import { ValidationError } from "../../core/errors/index.js";
 
-const ALLOWED_PROVIDERS = ["VNPAY", "MOMO", "ZALOPAY", "ONSITE", "BANK_TRANSFER"];
+const ALLOWED_PROVIDERS = ["BANK_TRANSFER"];
 
 export function validateBookingIdParams(params) {
   const bookingId = Number(params.bookingId);

@@ -15,8 +15,12 @@ export const paymentsRepository = {
         total_price: true,
         start_datetime: true,
         end_datetime: true,
+        requested_payment_method: true,
         payments: {
-          orderBy: { created_at: "desc" },
+       select: {
+          id: true,
+          status: true,
+        }
         },
       },
     });
@@ -67,6 +71,7 @@ export const paymentsRepository = {
   },
 
   createOrReusePayment(booking, provider) {
+    try {
     return prisma.$transaction(async (tx) => {
       const existed = await tx.payments.findFirst({
         where: { booking_id: booking.id },
@@ -134,6 +139,10 @@ export const paymentsRepository = {
         },
       });
     });
+    } catch (error) {
+    console.error("[PAYMENT REPOSITORY ERROR]", error);
+    throw error;
+  }
   },
 
   markPaymentSuccess(paymentId) {

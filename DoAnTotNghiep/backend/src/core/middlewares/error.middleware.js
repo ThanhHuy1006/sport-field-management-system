@@ -41,6 +41,11 @@ function mapPrismaError(error) {
 }
 
 export function errorMiddleware(error, req, res, next) {
+   console.error("===== RAW ERROR =====");
+  console.error(error);
+  console.error("ERROR CODE:", error?.code);
+  console.error("ERROR META:", error?.meta);
+  console.error("=====================");
   const mappedError = mapPrismaError(error);
   const isDev = process.env.NODE_ENV !== "production";
 

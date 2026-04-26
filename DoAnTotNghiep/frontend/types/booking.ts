@@ -9,6 +9,7 @@ export interface Booking {
   totalPrice: number
   userId: number
   createdAt: string
+  
 }
 
 export interface TimeSlot {

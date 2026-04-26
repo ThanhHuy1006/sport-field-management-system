@@ -31,3 +31,4 @@ export const FIELD_STATUS = {
   INACTIVE: "inactive",
   MAINTENANCE: "maintenance",
 };
+// export const ALLOWED_BOOKING_PAYMENT_METHODS = ["ONSITE", "BANK_TRANSFER"];

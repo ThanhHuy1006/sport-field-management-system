@@ -8,33 +8,41 @@ import {
 
 export const paymentsService = {
   async createPayment(userId, payload) {
-    const booking = await paymentsRepository.findBookingForPayment(
-      userId,
-      payload.booking_id
+  const booking = await paymentsRepository.findBookingForPayment(
+    userId,
+    payload.booking_id
+  );
+  console.log("[PAYMENT CREATE DEBUG] payload:", payload);
+console.log("[PAYMENT CREATE DEBUG] booking:", booking);
+
+  if (!booking) {
+    throw new NotFoundError("Không tìm thấy booking");
+  }
+
+  if (booking.requested_payment_method !== "BANK_TRANSFER") {
+    throw new ForbiddenError(
+      "Booking này thanh toán tại sân, không cần thanh toán online"
     );
+  }
 
-    if (!booking) {
-      throw new NotFoundError("Không tìm thấy booking");
-    }
+  if (!["AWAITING_PAYMENT", "PAY_FAILED"].includes(booking.status)) {
+    throw new ForbiddenError("Booking hiện chưa thể thanh toán");
+  }
 
-    if (!["APPROVED", "AWAITING_PAYMENT", "PAY_FAILED"].includes(booking.status)) {
-      throw new ForbiddenError("Booking hiện chưa thể thanh toán");
-    }
+  if (!booking.total_price || Number(booking.total_price) <= 0) {
+    throw new ValidationError("Booking chưa có tổng tiền hợp lệ");
+  }
 
-    if (!booking.total_price || Number(booking.total_price) <= 0) {
-      throw new ValidationError("Booking chưa có tổng tiền hợp lệ");
-    }
+  const paidPayment = (booking.payments || []).find(
+    (item) => item.status === "success"
+  );
 
-    const paidPayment = (booking.payments || []).find(
-      (item) => item.status === "success"
-    );
+  if (paidPayment) {
+    throw new ConflictError("Booking này đã thanh toán thành công");
+  }
 
-    if (paidPayment) {
-      throw new ConflictError("Booking này đã thanh toán thành công");
-    }
-
-    return paymentsRepository.createOrReusePayment(booking, payload.provider);
-  },
+  return paymentsRepository.createOrReusePayment(booking, payload.provider);
+},
 
   async getPaymentByBooking(userId, bookingId) {
     const payment = await paymentsRepository.findPaymentByBookingId(userId, bookingId);
