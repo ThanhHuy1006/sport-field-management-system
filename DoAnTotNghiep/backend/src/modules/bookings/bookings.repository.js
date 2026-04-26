@@ -437,7 +437,7 @@ export const bookingsRepository = {
           booking_id: bookingId,
           from_status: booking.status,
           to_status: "CHECKED_IN",
-          reason: note,
+          reason: note || "Completed by owner",
         },
       });
 

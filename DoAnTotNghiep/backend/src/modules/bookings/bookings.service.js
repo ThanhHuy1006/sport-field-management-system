@@ -84,22 +84,56 @@ function assertCheckInWindow(startDatetime) {
   }
 }
 
+// function assertCanCheckInBooking(booking) {
+//   if (!booking) {
+//     throw new NotFoundError("Không tìm thấy booking");
+//   }
+
+//   if (!["APPROVED", "PAID"].includes(booking.status)) {
+//     throw new ForbiddenError("Booking hiện không thể check-in");
+//   }
+
+//   if (booking.checked_in_at) {
+//     throw new ConflictError("Booking đã được check-in trước đó");
+//   }
+
+//   assertCheckInWindow(booking.start_datetime);
+// }
 function assertCanCheckInBooking(booking) {
   if (!booking) {
     throw new NotFoundError("Không tìm thấy booking");
   }
 
-  if (!["APPROVED", "PAID"].includes(booking.status)) {
-    throw new ForbiddenError("Booking hiện không thể check-in");
-  }
-
-  if (booking.checked_in_at) {
+  if (booking.checked_in_at || booking.status === "CHECKED_IN") {
     throw new ConflictError("Booking đã được check-in trước đó");
   }
 
-  assertCheckInWindow(booking.start_datetime);
-}
+  if (booking.status === "COMPLETED") {
+    throw new ConflictError("Booking đã hoàn thành");
+  }
 
+  if (["CANCELLED", "REJECTED"].includes(booking.status)) {
+    throw new ForbiddenError("Booking đã bị hủy hoặc bị từ chối");
+  }
+
+  const paymentMethod = booking.requested_payment_method || "ONSITE";
+
+  if (paymentMethod === "BANK_TRANSFER" && booking.status !== "PAID") {
+    throw new ForbiddenError(
+      "Booking chuyển khoản phải thanh toán thành công trước khi check-in"
+    );
+  }
+
+  if (paymentMethod === "ONSITE" && booking.status !== "APPROVED") {
+    throw new ForbiddenError(
+      "Booking thanh toán tại sân phải được xác nhận trước khi check-in"
+    );
+  }
+
+  // Tạm thời không siết thời gian để dễ demo/test.
+  // Khi muốn production hơn thì bật lại:
+  // assertCheckInWindow(booking.start_datetime);
+}
 async function assertBookableField(valid) {
   const field = await bookingsRepository.findFieldById(valid.field_id);
   if (!field) {
