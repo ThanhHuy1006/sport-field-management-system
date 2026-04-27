@@ -387,6 +387,18 @@ export function validateUpdateOwnerFieldPayload(payload) {
     amenities,
   };
 }
+
+
+export function validateOwnerFieldStatusPayload(payload) {
+  const status = String(payload.status || "").trim().toLowerCase();
+
+  if (!ALLOWED_FIELD_STATUSES.includes(status)) {
+    throw new ValidationError("status không hợp lệ");
+  }
+
+  return { status };
+  
+}
 export function validateFieldImageParams(params) {
   const fieldId = Number(params.fieldId);
   const imageId = Number(params.imageId);
@@ -400,14 +412,4 @@ export function validateFieldImageParams(params) {
   }
 
   return { fieldId, imageId };
-}
-
-export function validateOwnerFieldStatusPayload(payload) {
-  const status = String(payload.status || "").trim().toLowerCase();
-
-  if (!ALLOWED_FIELD_STATUSES.includes(status)) {
-    throw new ValidationError("status không hợp lệ");
-  }
-
-  return { status };
 }

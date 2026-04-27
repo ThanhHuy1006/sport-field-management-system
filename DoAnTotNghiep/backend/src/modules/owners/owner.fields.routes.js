@@ -12,6 +12,7 @@ import {
 import { ownerFieldsController } from "./owner.fields.controller.js";
 import {
   validateFieldIdParam,
+  validateFieldImageParams,
   validateCreateOwnerFieldPayload,
   validateUpdateOwnerFieldPayload,
   validateOwnerFieldStatusPayload,
