@@ -36,6 +36,21 @@ export const ownerFieldsController = {
     );
   }),
 
+  uploadOwnerFieldImages: asyncHandler(async (req, res) => {
+  const { fieldId } = req.validated?.params ?? req.params;
+
+  const item = await ownerFieldsService.uploadOwnerFieldImages(
+    req.user.id,
+    fieldId,
+    req.files
+  );
+
+  return successResponse(
+    res,
+    toOwnerFieldResponse(item),
+    "Upload ảnh sân thành công"
+  );
+}),
   updateOwnerField: asyncHandler(async (req, res) => {
     const { fieldId } = req.validated?.params ?? req.params;
     const payload = req.validated?.body ?? req.body;
@@ -69,4 +84,19 @@ export const ownerFieldsController = {
       "Cập nhật trạng thái sân thành công"
     );
   }),
+  setOwnerFieldPrimaryImage: asyncHandler(async (req, res) => {
+  const { fieldId, imageId } = req.validated?.params ?? req.params;
+
+  const item = await ownerFieldsService.setOwnerFieldPrimaryImage(
+    req.user.id,
+    fieldId,
+    imageId
+  );
+
+  return successResponse(
+    res,
+    toOwnerFieldResponse(item),
+    "Đổi ảnh đại diện sân thành công"
+  );
+}),
 };

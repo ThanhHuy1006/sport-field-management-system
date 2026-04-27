@@ -39,22 +39,31 @@ export async function apiRequest<T>(
       ? localStorage.getItem("accessToken")
       : null;
 
+  const isFormData =
+    typeof FormData !== "undefined" && fetchOptions.body instanceof FormData;
+
+  const headers: HeadersInit = {
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(fetchOptions.headers || {}),
+  };
+
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...fetchOptions,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(fetchOptions.headers || {}),
-    },
+    headers,
     cache: "no-store",
   });
 
-  let data: T | ApiErrorPayload;
+  let data: T | ApiErrorPayload | null = null;
 
   try {
     data = await response.json();
   } catch {
-    throw new Error("Response từ server không phải JSON hợp lệ");
+    if (!response.ok) {
+      throw new Error("Response từ server không phải JSON hợp lệ");
+    }
+
+    return null as T;
   }
 
   if (!response.ok) {
