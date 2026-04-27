@@ -1,45 +1,40 @@
 import prisma from "../../config/prisma.js";
 
+const ownerProfileInclude = {
+  users_owner_profiles_user_idTousers: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      avatar_url: true,
+      role: true,
+      status: true,
+    },
+  },
+};
+
 export const ownerRepository = {
   findOwnerProfileByUserId(userId) {
     return prisma.owner_profiles.findUnique({
       where: { user_id: userId },
-      include: {
-        users_owner_profiles_user_idTousers: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,
-            avatar_url: true,
-            role: true,
-            status: true,
-          },
-        },
-      },
+      include: ownerProfileInclude,
     });
   },
 
-  createOwnerRegistration(userId, businessName) {
+  createOwnerRegistration(userId, data) {
     return prisma.owner_profiles.create({
       data: {
         user_id: userId,
-        business_name: businessName,
+        business_name: data.business_name,
+        tax_code: data.tax_code ?? null,
+        address: data.address,
+        license_url: data.license_url,
+        id_front_url: data.id_front_url,
+        id_back_url: data.id_back_url,
         status: "pending",
       },
-      include: {
-        users_owner_profiles_user_idTousers: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,
-            avatar_url: true,
-            role: true,
-            status: true,
-          },
-        },
-      },
+      include: ownerProfileInclude,
     });
   },
 
@@ -53,19 +48,7 @@ export const ownerRepository = {
         approved_by: null,
         reject_reason: null,
       },
-      include: {
-        users_owner_profiles_user_idTousers: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,
-            avatar_url: true,
-            role: true,
-            status: true,
-          },
-        },
-      },
+      include: ownerProfileInclude,
     });
   },
 

@@ -20,7 +20,7 @@ export const ownerService = {
       throw new ConflictError("Bạn đã có hồ sơ đăng ký owner");
     }
 
-    return ownerRepository.createOwnerRegistration(userId, payload.business_name);
+    return ownerRepository.createOwnerRegistration(userId, payload);
   },
 
   async getMyOwnerRegistration(userId) {
