@@ -1,7 +1,8 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -9,17 +10,35 @@ import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Switch } from "@/components/ui/switch"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Upload, Plus, X, Clock, DollarSign, Zap, UserCheck, CalendarCheck, Info } from "lucide-react"
+import { ArrowLeft, Upload, Plus, X, Clock, DollarSign, Zap, UserCheck, CalendarCheck } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import {
+  updateOwnerField,
+  updateOwnerOperatingHour,
+  uploadOwnerFieldImages,
+  setOwnerFieldPrimaryImage,
+  type OwnerApprovalMode,
+  type UpdateOwnerFieldPayload,
+} from "@/features/fields/services/owner-fields.service"
 
-interface FieldData {
+type ExistingImage = {
+  id: number
+  url: string
+  isPrimary: boolean
+}
+
+type FieldData = {
   name: string
   type: string
-  location: string
-  address: string
+
+  address?: string
+  addressLine?: string
+  ward?: string
+  district?: string
+  province?: string
+
   capacity: string
   price: string
   weekendPrice?: string
@@ -28,74 +47,117 @@ interface FieldData {
   amenities: string[]
   openTime: string
   closeTime: string
+  approvalMode?: OwnerApprovalMode | string | null
+  existingImages: ExistingImage[]
 }
 
-export default function EditFieldForm({ fieldId, existingData }: { fieldId: string; existingData: FieldData }) {
+type SelectedImage = {
+  file: File
+  previewUrl: string
+}
+
+const MAX_IMAGES = 5
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"]
+
+export default function EditFieldForm({
+  fieldId,
+  existingData,
+}: {
+  fieldId: string
+  existingData: FieldData
+}) {
   const router = useRouter()
   const { toast } = useToast()
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const selectedImagesRef = useRef<SelectedImage[]>([])
 
   const [formData, setFormData] = useState({
-    name: existingData.name,
-    type: existingData.type,
-    location: existingData.location,
-    address: existingData.address,
-    capacity: existingData.capacity,
-    description: existingData.description,
-    status: existingData.status,
+    name: existingData.name || "",
+    type: existingData.type || "",
+    province: existingData.province || "TP. Hồ Chí Minh",
+    district: existingData.district || "",
+    ward: existingData.ward || "",
+    addressLine: existingData.addressLine || existingData.address || "",
+    capacity: existingData.capacity || "",
+    description: existingData.description || "",
+    status: existingData.status || "pending",
   })
 
   const [pricing, setPricing] = useState({
-    weekdayPrice: existingData.price,
-    weekendPrice: existingData.weekendPrice || String(Number(existingData.price) * 1.2),
+    weekdayPrice: existingData.price || "",
+    weekendPrice: existingData.weekendPrice || existingData.price || "",
   })
 
-  const [amenities, setAmenities] = useState<string[]>(existingData.amenities)
+  const [approvalMode, setApprovalMode] = useState<OwnerApprovalMode>(
+    existingData.approvalMode === "AUTO" ? "AUTO" : "MANUAL",
+  )
+
+  const [amenities, setAmenities] = useState<string[]>(existingData.amenities || [])
   const [newAmenity, setNewAmenity] = useState("")
+
   const [operatingHours, setOperatingHours] = useState({
-    openTime: existingData.openTime,
-    closeTime: existingData.closeTime,
+    openTime: existingData.openTime || "06:00",
+    closeTime: existingData.closeTime || "22:00",
   })
+
+  const [existingImages, setExistingImages] = useState<ExistingImage[]>(existingData.existingImages || [])
+  const [selectedImages, setSelectedImages] = useState<SelectedImage[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [settingPrimaryImageId, setSettingPrimaryImageId] = useState<number | null>(null)
 
-  const [autoApprovalOverride, setAutoApprovalOverride] = useState({
-    enabled: false, // Whether to override global settings
-    useAutoApproval: true, // If override enabled, whether to auto-approve or not
-    mode: "global" as "global" | "all" | "returning" | "advance" | "manual",
-    returningThreshold: 3,
-    advanceHours: 24,
-  })
+  useEffect(() => {
+    selectedImagesRef.current = selectedImages
+  }, [selectedImages])
+
+  useEffect(() => {
+    return () => {
+      selectedImagesRef.current.forEach((image) => URL.revokeObjectURL(image.previewUrl))
+    }
+  }, [])
+
+  const clearError = (key: string) => {
+    if (!errors[key]) return
+
+    setErrors((prev) => {
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+  }
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
     if (!formData.name.trim()) newErrors.name = "Vui lòng nhập tên sân"
     if (!formData.type) newErrors.type = "Vui lòng chọn loại thể thao"
-    if (!formData.location.trim()) newErrors.location = "Vui lòng nhập khu vực"
-    if (!formData.address.trim()) newErrors.address = "Vui lòng nhập địa chỉ chi tiết"
+    if (!formData.province.trim()) newErrors.province = "Vui lòng nhập tỉnh/thành phố"
+    if (!formData.district.trim()) newErrors.district = "Vui lòng nhập quận/huyện"
+    if (!formData.addressLine.trim()) newErrors.addressLine = "Vui lòng nhập địa chỉ chi tiết"
 
-    const weekdayPrice = Number.parseInt(pricing.weekdayPrice)
+    const weekdayPrice = Number.parseInt(pricing.weekdayPrice, 10)
     if (!pricing.weekdayPrice) {
       newErrors.weekdayPrice = "Vui lòng nhập giá ngày thường"
-    } else if (isNaN(weekdayPrice) || weekdayPrice <= 0) {
+    } else if (Number.isNaN(weekdayPrice) || weekdayPrice <= 0) {
       newErrors.weekdayPrice = "Giá thuê phải là số dương"
     } else if (weekdayPrice < 50000) {
       newErrors.weekdayPrice = "Giá thuê tối thiểu 50,000 VND"
     }
 
-    const weekendPrice = Number.parseInt(pricing.weekendPrice)
+    const weekendPrice = Number.parseInt(pricing.weekendPrice, 10)
     if (!pricing.weekendPrice) {
       newErrors.weekendPrice = "Vui lòng nhập giá cuối tuần"
-    } else if (isNaN(weekendPrice) || weekendPrice <= 0) {
+    } else if (Number.isNaN(weekendPrice) || weekendPrice <= 0) {
       newErrors.weekendPrice = "Giá thuê phải là số dương"
     } else if (weekendPrice < 50000) {
       newErrors.weekendPrice = "Giá thuê tối thiểu 50,000 VND"
     }
 
-    const capacity = Number.parseInt(formData.capacity)
+    const capacity = Number.parseInt(formData.capacity, 10)
     if (!formData.capacity) {
       newErrors.capacity = "Vui lòng nhập sức chứa"
-    } else if (isNaN(capacity) || capacity <= 0) {
+    } else if (Number.isNaN(capacity) || capacity <= 0) {
       newErrors.capacity = "Sức chứa phải là số dương"
     } else if (capacity > 100) {
       newErrors.capacity = "Sức chứa tối đa 100 người"
@@ -107,6 +169,124 @@ export default function EditFieldForm({ fieldId, existingData }: { fieldId: stri
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
+  }
+
+  const handleSelectImages = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || [])
+
+    if (files.length === 0) return
+
+    const remainingSlots = MAX_IMAGES - selectedImages.length
+
+    if (remainingSlots <= 0) {
+      toast({
+        title: "Đã đạt giới hạn ảnh",
+        description: `Chỉ được chọn tối đa ${MAX_IMAGES} ảnh mỗi lần.`,
+        variant: "destructive",
+      })
+      return
+    }
+
+    const acceptedFiles: SelectedImage[] = []
+
+    for (const file of files.slice(0, remainingSlots)) {
+      if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+        toast({
+          title: "Định dạng ảnh không hợp lệ",
+          description: "Chỉ hỗ trợ JPG, PNG hoặc WEBP.",
+          variant: "destructive",
+        })
+        continue
+      }
+
+      if (file.size > MAX_IMAGE_SIZE) {
+        toast({
+          title: "Ảnh quá lớn",
+          description: "Mỗi ảnh không được vượt quá 5MB.",
+          variant: "destructive",
+        })
+        continue
+      }
+
+      acceptedFiles.push({
+        file,
+        previewUrl: URL.createObjectURL(file),
+      })
+    }
+
+    if (acceptedFiles.length > 0) {
+      setSelectedImages((prev) => [...prev, ...acceptedFiles])
+    }
+
+    event.target.value = ""
+  }
+
+  const removeImage = (index: number) => {
+    setSelectedImages((prev) => {
+      const image = prev[index]
+      if (image) URL.revokeObjectURL(image.previewUrl)
+
+      return prev.filter((_, i) => i !== index)
+    })
+  }
+
+  const addAmenity = () => {
+    const value = newAmenity.trim()
+
+    if (!value) return
+
+    if (amenities.some((item) => item.toLowerCase() === value.toLowerCase())) {
+      setNewAmenity("")
+      return
+    }
+
+    setAmenities([...amenities, value])
+    setNewAmenity("")
+  }
+
+  const removeAmenity = (index: number) => {
+    setAmenities(amenities.filter((_, i) => i !== index))
+  }
+
+  const updateOperatingHoursForAllDays = async () => {
+    await Promise.all(
+      Array.from({ length: 7 }, (_, day) =>
+        updateOwnerOperatingHour(fieldId, {
+          day_of_week: day,
+          open_time: operatingHours.openTime,
+          close_time: operatingHours.closeTime,
+          is_closed: false,
+        }),
+      ),
+    )
+  }
+
+  const handleSetPrimaryImage = async (imageId: number) => {
+    try {
+      setSettingPrimaryImageId(imageId)
+
+      await setOwnerFieldPrimaryImage(fieldId, imageId)
+
+      setExistingImages((prev) =>
+        prev.map((image) => ({
+          ...image,
+          isPrimary: image.id === imageId,
+        })),
+      )
+
+      toast({
+        title: "Đã đổi ảnh chính",
+        description: "Ảnh đại diện sân đã được cập nhật.",
+      })
+    } catch (error) {
+      toast({
+        title: "Không thể đổi ảnh chính",
+        description: error instanceof Error ? error.message : "Vui lòng thử lại sau.",
+        variant: "destructive",
+      })
+    } finally {
+      setSettingPrimaryImageId(null)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -121,42 +301,72 @@ export default function EditFieldForm({ fieldId, existingData }: { fieldId: stri
       return
     }
 
-    setIsSubmitting(true)
+    try {
+      setIsSubmitting(true)
 
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+      const addressLine = formData.addressLine.trim()
+      const ward = formData.ward.trim() || null
+      const district = formData.district.trim()
+      const province = formData.province.trim()
 
-    console.log("[v0] Updated field data:", {
-      fieldId,
-      formData,
-      pricing,
-      amenities,
-      operatingHours,
-      autoApprovalOverride,
-    })
+      const fullAddress = [addressLine, ward, district, province].filter(Boolean).join(", ")
 
-    toast({
-      title: "Đã lưu thay đổi",
-      description: "Thông tin sân đã được cập nhật thành công.",
-    })
+      const weekdayPrice = Number.parseInt(pricing.weekdayPrice, 10)
+      const weekendPrice = Number.parseInt(pricing.weekendPrice, 10)
 
-    setIsSubmitting(false)
-    router.push("/owner/fields")
-  }
+      const payload: UpdateOwnerFieldPayload = {
+        field_name: formData.name.trim(),
+        sport_type: formData.type,
+        description: formData.description.trim() || null,
 
-  const addAmenity = () => {
-    if (newAmenity.trim()) {
-      setAmenities([...amenities, newAmenity.trim()])
-      setNewAmenity("")
+        address: fullAddress,
+        address_line: addressLine,
+        ward,
+        district,
+        province,
+
+        base_price_per_hour: weekdayPrice,
+        weekday_price: weekdayPrice,
+        weekend_price: weekendPrice,
+
+        currency: "VND",
+        min_duration_minutes: 60,
+        max_players: Number.parseInt(formData.capacity, 10),
+
+        approval_mode: approvalMode,
+        amenities,
+      }
+
+      await updateOwnerField(fieldId, payload)
+      await updateOperatingHoursForAllDays()
+
+      if (selectedImages.length > 0) {
+        await uploadOwnerFieldImages(
+          fieldId,
+          selectedImages.map((image) => image.file),
+        )
+      }
+
+      toast({
+        title: "Đã lưu thay đổi",
+        description: "Thông tin sân đã được cập nhật thành công.",
+      })
+
+      router.push("/owner/fields")
+      router.refresh()
+    } catch (error) {
+      toast({
+        title: "Không thể cập nhật sân",
+        description: error instanceof Error ? error.message : "Đã có lỗi xảy ra, vui lòng thử lại.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
     }
-  }
-
-  const removeAmenity = (index: number) => {
-    setAmenities(amenities.filter((_, i) => i !== index))
   }
 
   return (
     <main className="min-h-screen bg-background">
-      {/* Header */}
       <header className="sticky top-0 z-50 bg-background border-b border-border">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/owner/fields" className="flex items-center gap-2 text-primary hover:text-primary/80">
@@ -170,9 +380,9 @@ export default function EditFieldForm({ fieldId, existingData }: { fieldId: stri
 
       <div className="max-w-4xl mx-auto px-4 py-8">
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Thông tin cơ bản */}
           <Card className="p-6">
             <h2 className="text-lg font-semibold mb-4">Thông Tin Cơ Bản</h2>
+
             <div className="space-y-4">
               <div>
                 <Label htmlFor="name">Tên Sân *</Label>
@@ -182,7 +392,7 @@ export default function EditFieldForm({ fieldId, existingData }: { fieldId: stri
                   value={formData.name}
                   onChange={(e) => {
                     setFormData({ ...formData, name: e.target.value })
-                    if (errors.name) setErrors({ ...errors, name: "" })
+                    clearError("name")
                   }}
                   className={errors.name ? "border-red-500" : ""}
                   required
@@ -197,7 +407,7 @@ export default function EditFieldForm({ fieldId, existingData }: { fieldId: stri
                     value={formData.type}
                     onValueChange={(value) => {
                       setFormData({ ...formData, type: value })
-                      if (errors.type) setErrors({ ...errors, type: "" })
+                      clearError("type")
                     }}
                   >
                     <SelectTrigger className={errors.type ? "border-red-500" : ""}>
@@ -216,19 +426,11 @@ export default function EditFieldForm({ fieldId, existingData }: { fieldId: stri
                 </div>
 
                 <div>
-                  <Label htmlFor="status">Trạng Thái *</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(value) => setFormData({ ...formData, status: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Hoạt Động</SelectItem>
-                      <SelectItem value="inactive">Không Hoạt Động</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="status">Trạng Thái</Label>
+                  <Input id="status" value={formData.status} disabled />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Trạng thái hiển thị do admin hoặc chức năng ẩn/bảo trì quản lý riêng.
+                  </p>
                 </div>
               </div>
 
@@ -241,7 +443,7 @@ export default function EditFieldForm({ fieldId, existingData }: { fieldId: stri
                   value={formData.capacity}
                   onChange={(e) => {
                     setFormData({ ...formData, capacity: e.target.value })
-                    if (errors.capacity) setErrors({ ...errors, capacity: "" })
+                    clearError("capacity")
                   }}
                   className={errors.capacity ? "border-red-500" : ""}
                   required
@@ -262,40 +464,68 @@ export default function EditFieldForm({ fieldId, existingData }: { fieldId: stri
             </div>
           </Card>
 
-          {/* Vị trí */}
           <Card className="p-6">
             <h2 className="text-lg font-semibold mb-4">Vị Trí</h2>
+
             <div className="space-y-4">
-              <div>
-                <Label htmlFor="location">Khu Vực *</Label>
-                <Input
-                  id="location"
-                  placeholder="Ví dụ: Quận 1, TP.HCM"
-                  value={formData.location}
-                  onChange={(e) => {
-                    setFormData({ ...formData, location: e.target.value })
-                    if (errors.location) setErrors({ ...errors, location: "" })
-                  }}
-                  className={errors.location ? "border-red-500" : ""}
-                  required
-                />
-                {errors.location && <p className="text-sm text-red-500 mt-1">{errors.location}</p>}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="province">Tỉnh/Thành phố *</Label>
+                  <Input
+                    id="province"
+                    placeholder="Ví dụ: TP. Hồ Chí Minh"
+                    value={formData.province}
+                    onChange={(e) => {
+                      setFormData({ ...formData, province: e.target.value })
+                      clearError("province")
+                    }}
+                    className={errors.province ? "border-red-500" : ""}
+                    required
+                  />
+                  {errors.province && <p className="text-sm text-red-500 mt-1">{errors.province}</p>}
+                </div>
+
+                <div>
+                  <Label htmlFor="district">Quận/Huyện *</Label>
+                  <Input
+                    id="district"
+                    placeholder="Ví dụ: Quận 7"
+                    value={formData.district}
+                    onChange={(e) => {
+                      setFormData({ ...formData, district: e.target.value })
+                      clearError("district")
+                    }}
+                    className={errors.district ? "border-red-500" : ""}
+                    required
+                  />
+                  {errors.district && <p className="text-sm text-red-500 mt-1">{errors.district}</p>}
+                </div>
               </div>
 
               <div>
-                <Label htmlFor="address">Địa Chỉ Chi Tiết *</Label>
+                <Label htmlFor="ward">Phường/Xã</Label>
                 <Input
-                  id="address"
+                  id="ward"
+                  placeholder="Ví dụ: Phường Tân Quy"
+                  value={formData.ward}
+                  onChange={(e) => setFormData({ ...formData, ward: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="addressLine">Địa Chỉ Chi Tiết *</Label>
+                <Input
+                  id="addressLine"
                   placeholder="Số nhà, tên đường..."
-                  value={formData.address}
+                  value={formData.addressLine}
                   onChange={(e) => {
-                    setFormData({ ...formData, address: e.target.value })
-                    if (errors.address) setErrors({ ...errors, address: "" })
+                    setFormData({ ...formData, addressLine: e.target.value })
+                    clearError("addressLine")
                   }}
-                  className={errors.address ? "border-red-500" : ""}
+                  className={errors.addressLine ? "border-red-500" : ""}
                   required
                 />
-                {errors.address && <p className="text-sm text-red-500 mt-1">{errors.address}</p>}
+                {errors.addressLine && <p className="text-sm text-red-500 mt-1">{errors.addressLine}</p>}
               </div>
             </div>
           </Card>
@@ -306,9 +536,9 @@ export default function EditFieldForm({ fieldId, existingData }: { fieldId: stri
               <h2 className="text-lg font-semibold">Giá & Giờ Hoạt Động</h2>
             </div>
 
-            {/* Bảng giá */}
             <div className="mb-6">
               <h3 className="text-sm font-medium text-muted-foreground mb-3">Bảng Giá Thuê Sân</h3>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="weekdayPrice">Giá Ngày Thường (T2-T6) *</Label>
@@ -320,7 +550,7 @@ export default function EditFieldForm({ fieldId, existingData }: { fieldId: stri
                       value={pricing.weekdayPrice}
                       onChange={(e) => {
                         setPricing({ ...pricing, weekdayPrice: e.target.value })
-                        if (errors.weekdayPrice) setErrors({ ...errors, weekdayPrice: "" })
+                        clearError("weekdayPrice")
                       }}
                       className={errors.weekdayPrice ? "border-red-500" : ""}
                       required
@@ -340,7 +570,7 @@ export default function EditFieldForm({ fieldId, existingData }: { fieldId: stri
                       value={pricing.weekendPrice}
                       onChange={(e) => {
                         setPricing({ ...pricing, weekendPrice: e.target.value })
-                        if (errors.weekendPrice) setErrors({ ...errors, weekendPrice: "" })
+                        clearError("weekendPrice")
                       }}
                       className={errors.weekendPrice ? "border-red-500" : ""}
                       required
@@ -352,12 +582,12 @@ export default function EditFieldForm({ fieldId, existingData }: { fieldId: stri
               </div>
             </div>
 
-            {/* Giờ hoạt động */}
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <Clock className="w-4 h-4 text-muted-foreground" />
                 <h3 className="text-sm font-medium text-muted-foreground">Giờ Hoạt Động</h3>
               </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="openTime">Giờ Mở Cửa</Label>
@@ -370,7 +600,7 @@ export default function EditFieldForm({ fieldId, existingData }: { fieldId: stri
                         ...operatingHours,
                         openTime: e.target.value,
                       })
-                      if (errors.operatingHours) setErrors({ ...errors, operatingHours: "" })
+                      clearError("operatingHours")
                     }}
                     className={errors.operatingHours ? "border-red-500" : ""}
                   />
@@ -387,12 +617,13 @@ export default function EditFieldForm({ fieldId, existingData }: { fieldId: stri
                         ...operatingHours,
                         closeTime: e.target.value,
                       })
-                      if (errors.operatingHours) setErrors({ ...errors, operatingHours: "" })
+                      clearError("operatingHours")
                     }}
                     className={errors.operatingHours ? "border-red-500" : ""}
                   />
                 </div>
               </div>
+
               {errors.operatingHours && <p className="text-sm text-red-500 mt-2">{errors.operatingHours}</p>}
             </div>
           </Card>
@@ -403,170 +634,78 @@ export default function EditFieldForm({ fieldId, existingData }: { fieldId: stri
                 <Zap className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold">Cài Đặt Duyệt Đơn Riêng</h2>
-                <p className="text-sm text-muted-foreground">Override cài đặt duyệt đơn global cho sân này</p>
+                <h2 className="text-lg font-semibold">Cách Duyệt Đơn Đặt Sân</h2>
+                <p className="text-sm text-muted-foreground">
+                  Cấu hình cách hệ thống xử lý đơn đặt sân mới của sân này.
+                </p>
               </div>
             </div>
 
-            <div className="space-y-4">
-              {/* Override Toggle */}
-              <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <Switch
-                    id="override-approval"
-                    checked={autoApprovalOverride.enabled}
-                    onCheckedChange={(checked) =>
-                      setAutoApprovalOverride({ ...autoApprovalOverride, enabled: checked })
-                    }
-                  />
+            <RadioGroup
+              value={approvalMode}
+              onValueChange={(value) => setApprovalMode(value as OwnerApprovalMode)}
+              className="space-y-3"
+            >
+              <div
+                className={`flex items-start gap-3 p-4 rounded-lg border transition-colors ${
+                  approvalMode === "MANUAL" ? "border-primary bg-primary/5" : "border-border"
+                }`}
+              >
+                <RadioGroupItem value="MANUAL" id="approval-manual" className="mt-1" />
+                <div>
+                  <Label htmlFor="approval-manual" className="font-medium cursor-pointer">
+                    Duyệt thủ công
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Khách đặt sân xong sẽ chờ chủ sân xác nhận trước khi được duyệt.
+                  </p>
+                </div>
+              </div>
+
+              <div
+                className={`flex items-start gap-3 p-4 rounded-lg border transition-colors ${
+                  approvalMode === "AUTO" ? "border-primary bg-primary/5" : "border-border"
+                }`}
+              >
+                <RadioGroupItem value="AUTO" id="approval-auto" className="mt-1" />
+                <div className="flex items-start gap-2">
+                  <CalendarCheck className="w-4 h-4 text-green-600 mt-0.5" />
                   <div>
-                    <Label htmlFor="override-approval" className="font-medium cursor-pointer">
-                      Sử dụng cài đặt riêng cho sân này
+                    <Label htmlFor="approval-auto" className="font-medium cursor-pointer">
+                      Tự động duyệt
                     </Label>
                     <p className="text-sm text-muted-foreground">
-                      {autoApprovalOverride.enabled
-                        ? "Cài đặt riêng được áp dụng"
-                        : "Sử dụng cài đặt global từ trang Cài đặt"}
+                      Nếu khung giờ còn trống, hệ thống tự xác nhận đơn theo cấu hình của sân.
                     </p>
                   </div>
                 </div>
               </div>
+            </RadioGroup>
 
-              {/* Override Options */}
-              {autoApprovalOverride.enabled && (
-                <div className="space-y-4 pl-4 border-l-2 border-primary/30">
-                  <RadioGroup
-                    value={autoApprovalOverride.mode}
-                    onValueChange={(value) =>
-                      setAutoApprovalOverride({
-                        ...autoApprovalOverride,
-                        mode: value as typeof autoApprovalOverride.mode,
-                      })
-                    }
-                    className="space-y-3"
-                  >
-                    {/* Manual */}
-                    <div
-                      className={`flex items-start gap-3 p-3 rounded-lg border transition-colors cursor-pointer ${autoApprovalOverride.mode === "manual" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"}`}
-                    >
-                      <RadioGroupItem value="manual" id="field-mode-manual" className="mt-1" />
-                      <div>
-                        <Label htmlFor="field-mode-manual" className="font-medium cursor-pointer">
-                          Duyệt thủ công
-                        </Label>
-                        <p className="text-sm text-muted-foreground">Tất cả đơn đặt sân này phải được duyệt thủ công</p>
-                      </div>
-                    </div>
-
-                    {/* Auto all */}
-                    <div
-                      className={`flex items-start gap-3 p-3 rounded-lg border transition-colors cursor-pointer ${autoApprovalOverride.mode === "all" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"}`}
-                    >
-                      <RadioGroupItem value="all" id="field-mode-all" className="mt-1" />
-                      <div className="flex items-center gap-2">
-                        <CalendarCheck className="w-4 h-4 text-green-600" />
-                        <div>
-                          <Label htmlFor="field-mode-all" className="font-medium cursor-pointer">
-                            Tự động duyệt tất cả
-                          </Label>
-                          <p className="text-sm text-muted-foreground">Mọi đơn đặt sân này đều được duyệt tự động</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Returning */}
-                    <div
-                      className={`flex items-start gap-3 p-3 rounded-lg border transition-colors cursor-pointer ${autoApprovalOverride.mode === "returning" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"}`}
-                    >
-                      <RadioGroupItem value="returning" id="field-mode-returning" className="mt-1" />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <UserCheck className="w-4 h-4 text-blue-600" />
-                          <Label htmlFor="field-mode-returning" className="font-medium cursor-pointer">
-                            Chỉ khách quen
-                          </Label>
-                        </div>
-                        <p className="text-sm text-muted-foreground">Chỉ tự động cho khách đã đặt sân này trước đó</p>
-                        {autoApprovalOverride.mode === "returning" && (
-                          <div className="mt-2 flex items-center gap-2">
-                            <Label className="text-sm">Tối thiểu:</Label>
-                            <Input
-                              type="number"
-                              min={1}
-                              max={10}
-                              value={autoApprovalOverride.returningThreshold}
-                              onChange={(e) =>
-                                setAutoApprovalOverride({
-                                  ...autoApprovalOverride,
-                                  returningThreshold: Number.parseInt(e.target.value) || 1,
-                                })
-                              }
-                              className="w-16 h-8"
-                            />
-                            <span className="text-sm text-muted-foreground">lần</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Advance */}
-                    <div
-                      className={`flex items-start gap-3 p-3 rounded-lg border transition-colors cursor-pointer ${autoApprovalOverride.mode === "advance" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"}`}
-                    >
-                      <RadioGroupItem value="advance" id="field-mode-advance" className="mt-1" />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-orange-600" />
-                          <Label htmlFor="field-mode-advance" className="font-medium cursor-pointer">
-                            Đặt trước thời hạn
-                          </Label>
-                        </div>
-                        <p className="text-sm text-muted-foreground">Chỉ tự động khi đặt trước một khoảng thời gian</p>
-                        {autoApprovalOverride.mode === "advance" && (
-                          <div className="mt-2 flex items-center gap-2">
-                            <Label className="text-sm">Đặt trước:</Label>
-                            <Input
-                              type="number"
-                              min={1}
-                              max={168}
-                              value={autoApprovalOverride.advanceHours}
-                              onChange={(e) =>
-                                setAutoApprovalOverride({
-                                  ...autoApprovalOverride,
-                                  advanceHours: Number.parseInt(e.target.value) || 24,
-                                })
-                              }
-                              className="w-16 h-8"
-                            />
-                            <span className="text-sm text-muted-foreground">giờ</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </RadioGroup>
-
-                  {/* Info */}
-                  <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg">
-                    <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
-                    <p className="text-sm text-blue-700 dark:text-blue-300">
-                      Cài đặt này sẽ ghi đè cài đặt global trong trang Cài đặt chỉ cho sân này.
-                    </p>
-                  </div>
-                </div>
-              )}
+            <div className="mt-4 flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-900 dark:bg-blue-950/20">
+              <UserCheck className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400 mt-0.5" />
+              <p className="text-sm text-blue-700 dark:text-blue-300">
+                Chế độ này sẽ được lưu vào sân. Khi khách tạo booking, hệ thống nên lưu thêm
+                approval_mode_snapshot để booking cũ không bị ảnh hưởng khi chủ sân đổi chế độ sau này.
+              </p>
             </div>
           </Card>
 
-          {/* Tiện ích */}
           <Card className="p-6">
             <h2 className="text-lg font-semibold mb-4">Tiện Ích</h2>
+
             <div className="space-y-4">
               <div className="flex gap-2">
                 <Input
                   placeholder="Ví dụ: Bãi đỗ xe, Phòng thay đồ..."
                   value={newAmenity}
                   onChange={(e) => setNewAmenity(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addAmenity())}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault()
+                      addAmenity()
+                    }
+                  }}
                 />
                 <Button type="button" onClick={addAmenity}>
                   <Plus className="w-4 h-4" />
@@ -592,26 +731,95 @@ export default function EditFieldForm({ fieldId, existingData }: { fieldId: stri
             </div>
           </Card>
 
-          {/* Hình ảnh */}
           <Card className="p-6">
-            <h2 className="text-lg font-semibold mb-4">Hình Ảnh</h2>
-            <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
-              <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground mb-2">Kéo thả hình ảnh hoặc click để chọn</p>
-              <Button type="button" variant="outline" size="sm">
-                Chọn Hình Ảnh
-              </Button>
+            <h2 className="text-lg font-semibold mb-4">Hình Ảnh Sân</h2>
+
+            {existingImages.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-sm font-medium text-muted-foreground mb-3">Ảnh hiện có</h3>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {existingImages.map((image) => (
+                    <div key={image.id} className="relative overflow-hidden rounded-lg border border-border">
+                      <img
+                        src={image.url || "/placeholder.svg"}
+                        alt="Ảnh sân"
+                        className="h-32 w-full object-cover"
+                      />
+
+                      {image.isPrimary && (
+                        <span className="absolute left-2 top-2 rounded bg-primary px-2 py-0.5 text-xs text-primary-foreground">
+                          Ảnh chính
+                        </span>
+                      )}
+
+                      {!image.isPrimary && (
+                        <div className="absolute inset-x-2 bottom-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="w-full bg-black/70 text-white hover:bg-black/80"
+                            disabled={settingPrimaryImageId === image.id}
+                            onClick={() => handleSetPrimaryImage(image.id)}
+                          >
+                            {settingPrimaryImageId === image.id ? "Đang đổi..." : "Đặt làm ảnh chính"}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <h3 className="text-sm font-medium text-muted-foreground mb-3">Thêm ảnh mới</h3>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp"
+                multiple
+                className="hidden"
+                onChange={handleSelectImages}
+              />
+
+              <div className="border-2 border-dashed rounded-lg p-8 text-center border-border">
+                <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground mb-2">
+                  Chọn thêm ảnh mới cho sân. Ảnh cũ sẽ được giữ nguyên.
+                </p>
+                <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                  Chọn Hình Ảnh
+                </Button>
+              </div>
+
+              {selectedImages.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4">
+                  {selectedImages.map((image, index) => (
+                    <div key={image.previewUrl} className="relative overflow-hidden rounded-lg border border-border">
+                      <img
+                        src={image.previewUrl || "/placeholder.svg"}
+                        alt={`Ảnh mới ${index + 1}`}
+                        className="h-28 w-full object-cover"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => removeImage(index)}
+                        className="absolute right-2 top-2 rounded-full bg-black/60 p-1 text-white hover:bg-black/80"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </Card>
 
-          {/* Actions */}
           <div className="flex gap-4 justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => router.push("/owner/fields")}
-              disabled={isSubmitting}
-            >
+            <Button type="button" variant="outline" onClick={() => router.push("/owner/fields")} disabled={isSubmitting}>
               Hủy
             </Button>
             <Button type="submit" disabled={isSubmitting}>

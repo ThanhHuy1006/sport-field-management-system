@@ -16,7 +16,18 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+// app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+function getUploadStaticDir() {
+  const uploadDir = process.env.UPLOAD_DIR || "uploads";
+
+  if (path.isAbsolute(uploadDir)) {
+    return uploadDir;
+  }
+
+  return path.join(process.cwd(), uploadDir);
+}
+
+app.use("/uploads", express.static(getUploadStaticDir()));
 
 app.get("/health", (req, res) => {
   res.json({

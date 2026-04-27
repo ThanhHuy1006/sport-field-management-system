@@ -24,7 +24,7 @@ import ownerProfileRoutes from "../modules/owners/owner.profile.routes.js";
 import ownerDashboardRoutes from "../modules/owners/owner.dashboard.routes.js";
 import ownerFieldsRoutes from "../modules/owners/owner.fields.routes.js";
 import ownerSchedulesRoutes from "../modules/owners/owner.schedules.routes.js";
-
+import uploadsRoutes from "../modules/uploads/uploads.routes.js";
 // import ownerReportsRoutes from "../modules/reports/owner.reports.routes.js";
 // import adminReportsRoutes from "../modules/reports/admin.reports.routes.js";
 
@@ -35,6 +35,7 @@ const router = Router();
 // Auth / User
 router.use("/auth", authRoutes);
 // router.use("/users", usersRoutes);
+router.use("/uploads", uploadsRoutes);
 
 // Public fields + public schedules
 router.use("/fields", fieldsRoutes);
