@@ -99,4 +99,20 @@ export const ownerFieldsController = {
     "Đổi ảnh đại diện sân thành công"
   );
 }),
+deleteOwnerFieldImage: asyncHandler(async (req, res) => {
+  const { fieldId, imageId } = req.validated?.params ?? req.params;
+
+  const item = await ownerFieldsService.deleteOwnerFieldImage(
+    req.user.id,
+    fieldId,
+    imageId
+  );
+
+  return successResponse(
+    res,
+    toOwnerFieldResponse(item),
+    "Xóa ảnh sân thành công"
+  );
+}),
+
 };

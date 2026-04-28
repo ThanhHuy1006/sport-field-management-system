@@ -1,24 +1,86 @@
 import { ValidationError } from "../../core/errors/index.js";
 
-export function validateOwnerRegistrationPayload(payload) {
-  const business_name = String(payload.business_name || "").trim();
-
-  if (!business_name) {
-    throw new ValidationError("business_name là bắt buộc");
-  }
-
-  return { business_name };
+function toTrimmedString(value) {
+  return String(value ?? "").trim();
 }
 
-export function validateOwnerRegistrationUpdatePayload(payload) {
+function validateMaxLength(value, fieldName, maxLength) {
+  if (value && value.length > maxLength) {
+    throw new ValidationError(`${fieldName} không được vượt quá ${maxLength} ký tự`);
+  }
+}
+
+function requireText(payload, fieldName, maxLength) {
+  const value = toTrimmedString(payload[fieldName]);
+
+  if (!value) {
+    throw new ValidationError(`${fieldName} là bắt buộc`);
+  }
+
+  validateMaxLength(value, fieldName, maxLength);
+  return value;
+}
+
+function optionalText(payload, fieldName, maxLength) {
+  if (payload[fieldName] === undefined) {
+    return undefined;
+  }
+
+  const value = toTrimmedString(payload[fieldName]);
+
+  if (!value) {
+    return null;
+  }
+
+  validateMaxLength(value, fieldName, maxLength);
+  return value;
+}
+
+export function validateOwnerRegistrationPayload(payload = {}) {
+  const business_name = requireText(payload, "business_name", 160);
+  const address = requireText(payload, "address", 255);
+
+  const license_url = requireText(payload, "license_url", 255);
+  const id_front_url = requireText(payload, "id_front_url", 255);
+  const id_back_url = requireText(payload, "id_back_url", 255);
+
+  const tax_code = optionalText(payload, "tax_code", 50) ?? null;
+
+  return {
+    business_name,
+    tax_code,
+    address,
+    license_url,
+    id_front_url,
+    id_back_url,
+  };
+}
+
+export function validateOwnerRegistrationUpdatePayload(payload = {}) {
   const data = {};
 
   if (payload.business_name !== undefined) {
-    const value = String(payload.business_name || "").trim();
-    if (!value) {
-      throw new ValidationError("business_name không hợp lệ");
-    }
-    data.business_name = value;
+    data.business_name = requireText(payload, "business_name", 160);
+  }
+
+  if (payload.tax_code !== undefined) {
+    data.tax_code = optionalText(payload, "tax_code", 50);
+  }
+
+  if (payload.address !== undefined) {
+    data.address = requireText(payload, "address", 255);
+  }
+
+  if (payload.license_url !== undefined) {
+    data.license_url = requireText(payload, "license_url", 255);
+  }
+
+  if (payload.id_front_url !== undefined) {
+    data.id_front_url = requireText(payload, "id_front_url", 255);
+  }
+
+  if (payload.id_back_url !== undefined) {
+    data.id_back_url = requireText(payload, "id_back_url", 255);
   }
 
   if (Object.keys(data).length === 0) {
@@ -28,11 +90,11 @@ export function validateOwnerRegistrationUpdatePayload(payload) {
   return data;
 }
 
-export function validateOwnerProfileUpdatePayload(payload) {
+export function validateOwnerProfileUpdatePayload(payload = {}) {
   const data = {};
 
   if (payload.name !== undefined) {
-    const value = String(payload.name || "").trim();
+    const value = toTrimmedString(payload.name);
     if (!value) {
       throw new ValidationError("name không hợp lệ");
     }
@@ -40,7 +102,7 @@ export function validateOwnerProfileUpdatePayload(payload) {
   }
 
   if (payload.phone !== undefined) {
-    const value = String(payload.phone || "").trim();
+    const value = toTrimmedString(payload.phone);
     if (!value) {
       throw new ValidationError("phone không hợp lệ");
     }
@@ -48,7 +110,7 @@ export function validateOwnerProfileUpdatePayload(payload) {
   }
 
   if (payload.avatar_url !== undefined) {
-    data.avatar_url = payload.avatar_url ? String(payload.avatar_url).trim() : null;
+    data.avatar_url = payload.avatar_url ? toTrimmedString(payload.avatar_url) : null;
   }
 
   if (Object.keys(data).length === 0) {

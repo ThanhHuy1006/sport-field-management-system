@@ -1,139 +1,125 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { useToast } from "@/hooks/use-toast"
-import EditFieldForm from "./edit-field-form"
+import { Card } from "@/components/ui/card"
 import { getOwnerFieldDetail, type OwnerFieldApi } from "@/features/fields/services/owner-fields.service"
+import EditFieldForm, { type FieldData } from "./edit-field-form"
 
-type ExistingImage = {
-  id: number
-  url: string
-  isPrimary: boolean
+const API_ORIGIN = (
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api/v1"
+).replace(/\/api\/v1\/?$/, "")
+
+function toAssetUrl(url?: string | null) {
+  if (!url) return ""
+  if (url.startsWith("http")) return url
+  if (url.startsWith("/uploads")) return `${API_ORIGIN}${url}`
+  return url
 }
 
-type FieldData = {
-  name: string
-  type: string
-  address?: string
-  addressLine?: string
-  ward?: string
-  district?: string
-  province?: string
-  capacity: string
-  price: string
-  weekendPrice?: string
-  description: string
-  status: string
-  amenities: string[]
-  openTime: string
-  closeTime: string
-  approvalMode?: string | null
-  existingImages: ExistingImage[]
-}
+function mapSportType(type?: string | null) {
+  const value = String(type || "").trim().toLowerCase()
 
-function getPriceByDayType(field: OwnerFieldApi, dayType: "WEEKDAY" | "WEEKEND") {
-  const rule = field.pricing_rules?.find((item) => item.day_type === dayType)
+  if (value === "football" || value === "soccer" || value === "bóng đá") return "soccer"
+  if (value === "basketball" || value === "bóng rổ") return "basketball"
+  if (value === "tennis") return "tennis"
+  if (value === "badminton" || value === "cầu lông") return "badminton"
+  if (value === "volleyball" || value === "bóng chuyền") return "volleyball"
+  if (value === "pickleball") return "pickleball"
 
-  return String(Number(rule?.price || field.base_price_per_hour || 0))
-}
-
-function getFieldImageUrl(url: string) {
-  const normalizedPath = url.replaceAll("\\", "/")
-
-  if (normalizedPath.startsWith("http")) {
-    return normalizedPath
-  }
-
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api/v1"
-  const backendOrigin = apiBaseUrl.replace(/\/api\/v1\/?$/, "")
-
-  return `${backendOrigin}/${normalizedPath.replace(/^\/+/, "")}`
+  return type || ""
 }
 
 function mapFieldToFormData(field: OwnerFieldApi): FieldData {
-  const activeHour = field.operating_hours?.find(
-    (item) => !item.is_closed && item.open_time && item.close_time,
-  )
-
-  const amenities =
-    field.amenities
-      ?.map((item) => item.name)
-      .filter((name): name is string => Boolean(name)) || []
-
-  const existingImages =
-    field.images?.map((image) => ({
-      id: image.id,
-      url: getFieldImageUrl(image.url),
-      isPrimary: Boolean(image.is_primary),
-    })) || []
+  const weekdayRule = field.pricing_rules?.find((item) => item.day_type === "WEEKDAY")
+  const weekendRule = field.pricing_rules?.find((item) => item.day_type === "WEEKEND")
+  const activeHour = field.operating_hours?.find((item) => item.open_time && item.close_time)
 
   return {
     name: field.field_name || "",
-    type: field.sport_type || "",
+    type: mapSportType(field.sport_type),
+
     address: field.address || "",
-    addressLine: field.address_line || "",
+    addressLine: field.address_line || field.address || "",
     ward: field.ward || "",
     district: field.district || "",
     province: field.province || "TP. Hồ Chí Minh",
+
     capacity: field.max_players ? String(field.max_players) : "",
-    price: getPriceByDayType(field, "WEEKDAY"),
-    weekendPrice: getPriceByDayType(field, "WEEKEND"),
+    price: String(weekdayRule?.price ?? field.base_price_per_hour ?? 0),
+    weekendPrice: String(weekendRule?.price ?? field.base_price_per_hour ?? 0),
     description: field.description || "",
     status: field.status || "pending",
-    amenities,
+    amenities: field.amenities?.map((item) => item.name || "").filter(Boolean) || [],
+
     openTime: activeHour?.open_time || "06:00",
     closeTime: activeHour?.close_time || "22:00",
     approvalMode: field.approval_mode || "MANUAL",
-    existingImages,
+
+    existingImages:
+      field.images?.map((image) => ({
+        id: image.id,
+        url: toAssetUrl(image.url),
+        isPrimary: Boolean(image.is_primary),
+      })) || [],
   }
 }
 
 export default function EditFieldFormClient({ fieldId }: { fieldId: string }) {
-  const router = useRouter()
-  const { toast } = useToast()
-
-  const [existingData, setExistingData] = useState<FieldData | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [data, setData] = useState<FieldData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState("")
 
   useEffect(() => {
-    async function fetchFieldDetail() {
+    let mounted = true
+
+    async function fetchField() {
       try {
-        setIsLoading(true)
+        setLoading(true)
+        setErrorMessage("")
 
-        const response = await getOwnerFieldDetail(fieldId)
-        setExistingData(mapFieldToFormData(response.data))
+        const res = await getOwnerFieldDetail(fieldId)
+
+        if (!mounted) return
+
+        setData(mapFieldToFormData(res.data))
       } catch (error) {
-        toast({
-          title: "Không tải được thông tin sân",
-          description: error instanceof Error ? error.message : "Vui lòng thử lại sau.",
-          variant: "destructive",
-        })
+        if (!mounted) return
 
-        router.push("/owner/fields")
+        setErrorMessage(error instanceof Error ? error.message : "Không thể tải thông tin sân")
       } finally {
-        setIsLoading(false)
+        if (mounted) {
+          setLoading(false)
+        }
       }
     }
 
-    fetchFieldDetail()
-  }, [fieldId, router, toast])
+    fetchField()
 
-  if (isLoading) {
+    return () => {
+      mounted = false
+    }
+  }, [fieldId])
+
+  if (loading) {
     return (
-      <main className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Đang tải thông tin sân...</p>
+      <main className="min-h-screen bg-background p-6">
+        <Card className="mx-auto max-w-4xl p-8 text-center text-muted-foreground">
+          Đang tải thông tin sân...
+        </Card>
       </main>
     )
   }
 
-  if (!existingData) {
+  if (errorMessage || !data) {
     return (
-      <main className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Không tìm thấy thông tin sân.</p>
+      <main className="min-h-screen bg-background p-6">
+        <Card className="mx-auto max-w-4xl p-8 text-center">
+          <p className="font-medium text-destructive">Không thể tải thông tin sân</p>
+          <p className="mt-2 text-sm text-muted-foreground">{errorMessage}</p>
+        </Card>
       </main>
     )
   }
 
-  return <EditFieldForm fieldId={fieldId} existingData={existingData} />
+  return <EditFieldForm fieldId={fieldId} existingData={data} />
 }

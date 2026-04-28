@@ -45,7 +45,8 @@ export const adminController = {
     const { userId } = req.validated?.params ?? req.params;
     const payload = req.validated?.body ?? req.body;
 
-    const item = await adminService.updateUserStatus(userId, payload);
+    // const item = await adminService.updateUserStatus(userId, payload);
+    const item = await adminService.updateUserStatus(req.user.id, userId, payload);
 
     return successResponse(
       res,

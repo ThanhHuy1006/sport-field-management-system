@@ -1,23 +1,19 @@
 function mapOwnerProfileBrief(relation) {
   if (!relation) return null;
 
-  if (Array.isArray(relation)) {
-    const item = relation[0];
-    if (!item) return null;
-
-    return {
-      status: item.status,
-      business_name: item.business_name,
-      approved_at: item.approved_at,
-      reject_reason: item.reject_reason,
-    };
-  }
+  const item = Array.isArray(relation) ? relation[0] : relation;
+  if (!item) return null;
 
   return {
-    status: relation.status,
-    business_name: relation.business_name,
-    approved_at: relation.approved_at,
-    reject_reason: relation.reject_reason,
+    status: item.status,
+    business_name: item.business_name,
+    tax_code: item.tax_code ?? null,
+    address: item.address ?? null,
+    license_url: item.license_url ?? null,
+    id_front_url: item.id_front_url ?? null,
+    id_back_url: item.id_back_url ?? null,
+    approved_at: item.approved_at,
+    reject_reason: item.reject_reason,
   };
 }
 
@@ -46,6 +42,11 @@ export function toAdminOwnerRegistrationResponse(item) {
   return {
     user_id: item.user_id,
     business_name: item.business_name,
+    tax_code: item.tax_code ?? null,
+    address: item.address ?? null,
+    license_url: item.license_url ?? null,
+    id_front_url: item.id_front_url ?? null,
+    id_back_url: item.id_back_url ?? null,
     status: item.status,
     approved_by: item.approved_by,
     approved_at: item.approved_at,

@@ -17,6 +17,7 @@ export const IMAGE_MIME_TYPES = [
 ];
 
 export const DOCUMENT_MIME_TYPES = [
+  ...IMAGE_MIME_TYPES,
   "application/pdf",
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -33,135 +33,203 @@ import {
   Ban,
 } from "lucide-react"
 import { Pagination } from "@/components/pagination"
+import { apiGet, apiRequest } from "@/lib/api-client"
 
-// Mock data for all users
-const mockUsers = [
-  {
-    id: 1,
-    name: "Nguyễn Văn A",
-    email: "nguyenvana@example.com",
-    phone: "+84 123 456 789",
-    type: "customer" as const,
-    joinDate: "2024-06-15",
-    bookings: 24,
-    status: "active" as const,
-    avatar: "/male-avatar.jpg",
-  },
-  {
-    id: 2,
-    name: "Trần Thị B",
-    email: "tranthib@example.com",
-    phone: "+84 234 567 890",
-    type: "owner" as const,
-    joinDate: "2024-05-20",
-    bookings: 156,
-    status: "active" as const,
-    businessName: "Sân Thể Thao ABC",
-    businessAddress: "268 Lý Thường Kiệt, Q.10, TP.HCM",
-    avatar: "/female-avatar.jpg",
-  },
-  {
-    id: 3,
-    name: "Lê Văn C",
-    email: "levanc@example.com",
-    phone: "+84 345 678 901",
-    type: "customer" as const,
-    joinDate: "2024-07-10",
-    bookings: 8,
-    status: "active" as const,
-    avatar: "/male-avatar.jpg",
-  },
-  {
-    id: 4,
-    name: "Phạm Thị D",
-    email: "phamthid@example.com",
-    phone: "+84 456 789 012",
-    type: "owner" as const,
-    joinDate: "2024-04-05",
-    bookings: 234,
-    status: "suspended" as const,
-    businessName: "Sân Bóng XYZ",
-    businessAddress: "123 Nguyễn Huệ, Q.1, TP.HCM",
-    avatar: "/female-avatar.jpg",
-  },
-  {
-    id: 5,
-    name: "Hoàng Văn E",
-    email: "hoangvane@example.com",
-    phone: "+84 567 890 123",
-    type: "customer" as const,
-    joinDate: "2024-08-20",
-    bookings: 15,
-    status: "active" as const,
-    avatar: "/male-avatar.jpg",
-  },
-  {
-    id: 6,
-    name: "Võ Thị F",
-    email: "vothif@example.com",
-    phone: "+84 678 901 234",
-    type: "owner" as const,
-    joinDate: "2024-03-15",
-    bookings: 89,
-    status: "active" as const,
-    businessName: "Sân Tennis Sunrise",
-    businessAddress: "456 Trần Hưng Đạo, Q.5, TP.HCM",
-    avatar: "/female-avatar.jpg",
-  },
-]
+type ApiResponse<T> = {
+  success: boolean
+  message: string
+  data: T
+}
 
-// Mock data for pending owner approvals
-const mockPendingOwners = [
-  {
-    id: 101,
-    name: "Nguyễn Minh G",
-    email: "nguyenminhg@example.com",
-    phone: "+84 789 012 345",
-    type: "pending_owner" as const,
-    joinDate: "2024-12-15",
-    status: "pending" as const,
-    businessName: "Sân Bóng Đá Thủ Đức",
-    taxCode: "0123456789",
-    businessAddress: "789 Võ Văn Ngân, Thủ Đức, TP.HCM",
-    businessPhone: "+84 987 654 321",
-    documents: {
-      businessLicense: "/business-license.jpg",
-      idCardFront: "/generic-id-card-front.png",
-      idCardBack: "/id-card-back.jpg",
-    },
-    avatar: "/male-avatar.jpg",
-  },
-  {
-    id: 102,
-    name: "Lê Thị H",
-    email: "lethih@example.com",
-    phone: "+84 890 123 456",
-    type: "pending_owner" as const,
-    joinDate: "2024-12-16",
-    status: "pending" as const,
-    businessName: "Sân Cầu Lông Quận 7",
-    taxCode: "0987654321",
-    businessAddress: "321 Nguyễn Thị Thập, Q.7, TP.HCM",
-    businessPhone: "+84 876 543 210",
-    documents: {
-      businessLicense: "/business-license.jpg",
-      idCardFront: "/generic-id-card-front.png",
-      idCardBack: "/id-card-back.jpg",
-    },
-    avatar: "/female-avatar.jpg",
-  },
-]
+type AdminUser = {
+  id: number
+  name: string | null
+  email: string
+  phone: string | null
+  avatar_url: string | null
+  role: "USER" | "OWNER" | "ADMIN" | string
+  status: "active" | "locked" | "deleted" | string
+  created_at: string | null
+  updated_at?: string | null
+  owner_profile?: {
+    status: string
+    business_name: string | null
+    tax_code: string | null
+    address: string | null
+    license_url: string | null
+    id_front_url: string | null
+    id_back_url: string | null
+    approved_at: string | null
+    reject_reason: string | null
+  } | null
+}
 
-type PendingOwner = (typeof mockPendingOwners)[0]
+type AdminOwnerRegistration = {
+  user_id: number
+  business_name: string | null
+  tax_code: string | null
+  address: string | null
+  license_url: string | null
+  id_front_url: string | null
+  id_back_url: string | null
+  status: "pending" | "approved" | "rejected" | string
+  approved_by: number | null
+  approved_at: string | null
+  reject_reason: string | null
+  created_at: string | null
+  user: {
+    id: number
+    name: string | null
+    email: string
+    phone: string | null
+    avatar_url?: string | null
+    role: string
+    status: string
+  } | null
+  reviewed_by?: {
+    id: number
+    name: string | null
+    email: string
+  } | null
+}
+
+type UiUser = {
+  id: number
+  name: string
+  email: string
+  phone: string
+  type: "customer" | "owner" | "admin"
+  joinDate: string
+  bookings: number
+  status: "active" | "locked" | "deleted" | string
+  avatar: string
+  businessName?: string | null
+  businessAddress?: string | null
+}
+
+type PendingOwner = {
+  id: number
+  name: string
+  email: string
+  phone: string
+  type: "pending_owner"
+  joinDate: string
+  status: "pending"
+  businessName: string
+  taxCode: string
+  businessAddress: string
+  businessPhone: string
+  documents: {
+    businessLicense: string
+    idCardFront: string
+    idCardBack: string
+  }
+  avatar: string
+}
+
 type TabType = "all" | "customer" | "owner" | "pending"
 
+const API_ORIGIN = (
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api/v1"
+).replace(/\/api\/v1\/?$/, "")
+
+function formatDate(value?: string | null) {
+  if (!value) return "-"
+  return new Date(value).toLocaleDateString("vi-VN")
+}
+
+function toAssetUrl(url?: string | null) {
+  if (!url) return "/placeholder.svg"
+  if (url.startsWith("http")) return url
+  if (url.startsWith("/uploads")) return `${API_ORIGIN}${url}`
+  return url
+}
+
+function mapUserToUi(user: AdminUser): UiUser {
+  const role = String(user.role || "").toUpperCase()
+
+  return {
+    id: user.id,
+    name: user.name || "Chưa cập nhật",
+    email: user.email,
+    phone: user.phone || "-",
+    type: role === "OWNER" ? "owner" : role === "ADMIN" ? "admin" : "customer",
+    joinDate: formatDate(user.created_at),
+    bookings: 0,
+    status: user.status,
+    avatar: toAssetUrl(user.avatar_url),
+    businessName: user.owner_profile?.business_name ?? null,
+    businessAddress: user.owner_profile?.address ?? null,
+  }
+}
+
+function mapOwnerRegistrationToUi(item: AdminOwnerRegistration): PendingOwner {
+  return {
+    id: item.user_id,
+    name: item.user?.name || "Chưa cập nhật",
+    email: item.user?.email || "-",
+    phone: item.user?.phone || "-",
+    type: "pending_owner",
+    joinDate: formatDate(item.created_at),
+    status: "pending",
+    businessName: item.business_name || "-",
+    taxCode: item.tax_code || "-",
+    businessAddress: item.address || "-",
+    businessPhone: item.user?.phone || "-",
+    documents: {
+      businessLicense: toAssetUrl(item.license_url),
+      idCardFront: toAssetUrl(item.id_front_url),
+      idCardBack: toAssetUrl(item.id_back_url),
+    },
+    avatar: toAssetUrl(item.user?.avatar_url),
+  }
+}
+
+function getUserTypeLabel(type: UiUser["type"]) {
+  if (type === "customer") return "Khách hàng"
+  if (type === "owner") return "Chủ sân"
+  return "Quản trị"
+}
+
+function getUserTypeClassName(type: UiUser["type"]) {
+  if (type === "customer") {
+    return "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700"
+  }
+
+  if (type === "owner") {
+    return "bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-700"
+  }
+
+  return "bg-slate-50 dark:bg-slate-900/30 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+}
+
+function getStatusLabel(status: string) {
+  if (status === "active") return "Hoạt động"
+  if (status === "locked") return "Tạm khóa"
+  if (status === "deleted") return "Đã xóa"
+  return status
+}
+
+function getStatusClassName(status: string) {
+  if (status === "active") {
+    return "bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700"
+  }
+
+  if (status === "locked") {
+    return "bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-700"
+  }
+
+  return "bg-slate-50 dark:bg-slate-900/30 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+}
+
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState(mockUsers)
-  const [pendingOwners, setPendingOwners] = useState(mockPendingOwners)
+  const [users, setUsers] = useState<UiUser[]>([])
+  const [pendingOwners, setPendingOwners] = useState<PendingOwner[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [activeTab, setActiveTab] = useState<TabType>("all")
   const [currentPage, setCurrentPage] = useState(1)
-  const [selectedUser, setSelectedUser] = useState<any | null>(null)
+  const [selectedUser, setSelectedUser] = useState<UiUser | null>(null)
   const [selectedPendingOwner, setSelectedPendingOwner] = useState<PendingOwner | null>(null)
   const [showUserDialog, setShowUserDialog] = useState(false)
   const [showPendingDialog, setShowPendingDialog] = useState(false)
@@ -170,30 +238,71 @@ export default function AdminUsersPage() {
   const { toast } = useToast()
   const itemsPerPage = 10
 
-  // Filter users based on tab and search
+  const fetchAdminUsers = useCallback(async () => {
+    setLoading(true)
+
+    try {
+      const [usersRes, ownersRes] = await Promise.all([
+        apiGet<ApiResponse<AdminUser[]>>("/admin/users"),
+        apiGet<ApiResponse<AdminOwnerRegistration[]>>("/admin/owner-registrations"),
+      ])
+
+      setUsers(usersRes.data.map(mapUserToUi))
+      setPendingOwners(
+        ownersRes.data
+          .filter((item) => item.status === "pending")
+          .map(mapOwnerRegistrationToUi)
+      )
+    } catch (error) {
+      toast({
+        title: "Không thể tải dữ liệu",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Vui lòng kiểm tra lại quyền admin hoặc kết nối server.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }, [toast])
+
+  useEffect(() => {
+    fetchAdminUsers()
+  }, [fetchAdminUsers])
+
   const filteredUsers = users.filter((user) => {
+    const keyword = searchTerm.toLowerCase()
     const matchesSearch =
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase())
+      user.name.toLowerCase().includes(keyword) ||
+      user.email.toLowerCase().includes(keyword)
+
     const matchesTab =
       activeTab === "all" ||
       (activeTab === "customer" && user.type === "customer") ||
       (activeTab === "owner" && user.type === "owner")
+
     return matchesSearch && matchesTab
   })
 
-  const filteredPendingOwners = pendingOwners.filter(
-    (owner) =>
-      owner.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      owner.email.toLowerCase().includes(searchTerm.toLowerCase()),
+  const filteredPendingOwners = pendingOwners.filter((owner) => {
+    const keyword = searchTerm.toLowerCase()
+
+    return (
+      owner.name.toLowerCase().includes(keyword) ||
+      owner.email.toLowerCase().includes(keyword) ||
+      owner.businessName.toLowerCase().includes(keyword)
+    )
+  })
+
+  const totalItems = activeTab === "pending" ? filteredPendingOwners.length : filteredUsers.length
+  const totalPages = Math.ceil(totalItems / itemsPerPage)
+  const paginatedUsers = filteredUsers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+  const paginatedPendingOwners = filteredPendingOwners.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   )
 
-  // Pagination
-  const displayData = activeTab === "pending" ? filteredPendingOwners : filteredUsers
-  const totalPages = Math.ceil(displayData.length / itemsPerPage)
-  const paginatedData = displayData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-
-  // Stats
   const stats = {
     total: users.length + pendingOwners.length,
     customers: users.filter((u) => u.type === "customer").length,
@@ -201,8 +310,7 @@ export default function AdminUsersPage() {
     pending: pendingOwners.length,
   }
 
-  // Handlers
-  const handleViewUser = (user: any) => {
+  const handleViewUser = (user: UiUser) => {
     setSelectedUser(user)
     setShowUserDialog(true)
   }
@@ -212,62 +320,123 @@ export default function AdminUsersPage() {
     setShowPendingDialog(true)
   }
 
-  const handleDeleteUser = (id: number) => {
-    setUsers(users.filter((u) => u.id !== id))
-    toast({
-      title: "Đã xóa",
-      description: "Người dùng đã được xóa khỏi hệ thống.",
-    })
-  }
+  const handleDeleteUser = async (id: number) => {
+    try {
+      await apiRequest<ApiResponse<AdminUser>>(`/admin/users/${id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          status: "deleted",
+        }),
+      })
 
-  const handleToggleStatus = (id: number) => {
-    setUsers(users.map((u) => (u.id === id ? { ...u, status: u.status === "active" ? "suspended" : "active" } : u)))
-    const user = users.find((u) => u.id === id)
-    toast({
-      title: user?.status === "active" ? "Đã khóa" : "Đã mở khóa",
-      description: `Tài khoản ${user?.name} đã được ${user?.status === "active" ? "khóa" : "mở khóa"}.`,
-    })
-  }
+      await fetchAdminUsers()
 
-  const handleApproveOwner = (id: number) => {
-    const approvedOwner = pendingOwners.find((o) => o.id === id)
-    if (approvedOwner) {
-      // Add to users list as owner
-      const newOwner = {
-        id: approvedOwner.id,
-        name: approvedOwner.name,
-        email: approvedOwner.email,
-        phone: approvedOwner.phone,
-        type: "owner",
-        joinDate: new Date().toISOString().split("T")[0],
-        bookings: 0,
-        status: "active",
-        businessName: approvedOwner.businessName,
-        businessAddress: approvedOwner.businessAddress,
-        avatar: approvedOwner.avatar,
-      }
-      setUsers([...users, newOwner])
-      setPendingOwners(pendingOwners.filter((o) => o.id !== id))
-      setShowPendingDialog(false)
-      setSelectedPendingOwner(null)
       toast({
-        title: "Đã Phê Duyệt",
-        description: `${approvedOwner.name} đã được phê duyệt thành chủ sân.`,
+        title: "Đã xóa",
+        description: "Người dùng đã được chuyển sang trạng thái đã xóa.",
+      })
+    } catch (error) {
+      toast({
+        title: "Không thể xóa người dùng",
+        description: error instanceof Error ? error.message : "Có lỗi xảy ra.",
+        variant: "destructive",
       })
     }
   }
 
-  const handleRejectOwner = () => {
-    if (selectedPendingOwner && rejectReason.trim()) {
-      const rejectedName = selectedPendingOwner.name
-      setPendingOwners(pendingOwners.filter((o) => o.id !== selectedPendingOwner.id))
+  const handleToggleStatus = async (id: number) => {
+    const user = users.find((u) => u.id === id)
+    if (!user) return
+
+    const nextStatus = user.status === "active" ? "locked" : "active"
+
+    try {
+      await apiRequest<ApiResponse<AdminUser>>(`/admin/users/${id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          status: nextStatus,
+        }),
+      })
+
+      await fetchAdminUsers()
+
+      toast({
+        title: nextStatus === "locked" ? "Đã khóa" : "Đã mở khóa",
+        description: `Tài khoản ${user.name} đã được ${
+          nextStatus === "locked" ? "khóa" : "mở khóa"
+        }.`,
+      })
+    } catch (error) {
+      toast({
+        title: "Không thể cập nhật trạng thái",
+        description: error instanceof Error ? error.message : "Có lỗi xảy ra.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleApproveOwner = async (id: number) => {
+    const approvedOwner = pendingOwners.find((o) => o.id === id)
+    if (!approvedOwner) return
+
+    try {
+      await apiRequest<ApiResponse<AdminOwnerRegistration>>(
+        `/admin/owner-registrations/${id}/approve`,
+        {
+          method: "PATCH",
+        }
+      )
+
+      await fetchAdminUsers()
+
+      setShowPendingDialog(false)
+      setSelectedPendingOwner(null)
+
+      toast({
+        title: "Đã Phê Duyệt",
+        description: `${approvedOwner.name} đã được phê duyệt thành chủ sân.`,
+      })
+    } catch (error) {
+      toast({
+        title: "Không thể phê duyệt",
+        description: error instanceof Error ? error.message : "Có lỗi xảy ra.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleRejectOwner = async () => {
+    if (!selectedPendingOwner || !rejectReason.trim()) return
+
+    const rejectedName = selectedPendingOwner.name
+
+    try {
+      await apiRequest<ApiResponse<AdminOwnerRegistration>>(
+        `/admin/owner-registrations/${selectedPendingOwner.id}/reject`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            reject_reason: rejectReason.trim(),
+          }),
+        }
+      )
+
+      await fetchAdminUsers()
+
       setShowRejectDialog(false)
       setShowPendingDialog(false)
       setSelectedPendingOwner(null)
       setRejectReason("")
+
       toast({
         title: "Đã Từ Chối",
         description: `Đơn của ${rejectedName} đã bị từ chối.`,
+        variant: "destructive",
+      })
+    } catch (error) {
+      toast({
+        title: "Không thể từ chối",
+        description: error instanceof Error ? error.message : "Có lỗi xảy ra.",
         variant: "destructive",
       })
     }
@@ -360,14 +529,20 @@ export default function AdminUsersPage() {
           <Input
             placeholder="Tìm kiếm theo tên hoặc email..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value)
+              setCurrentPage(1)
+            }}
             className="pl-10"
           />
         </div>
       </div>
 
-      {/* Content based on tab */}
-      {activeTab === "pending" ? (
+      {loading ? (
+        <Card className="p-6 mb-6 text-center text-muted-foreground">
+          Đang tải dữ liệu...
+        </Card>
+      ) : activeTab === "pending" ? (
         // Pending Owners List
         <div className="space-y-4">
           {filteredPendingOwners.length === 0 ? (
@@ -377,7 +552,7 @@ export default function AdminUsersPage() {
               <p className="text-muted-foreground">Tất cả đơn đăng ký chủ sân đã được xử lý</p>
             </Card>
           ) : (
-            filteredPendingOwners.map((owner) => (
+            paginatedPendingOwners.map((owner) => (
               <Card key={owner.id} className="p-4 md:p-6">
                 <div className="flex flex-col md:flex-row md:items-center gap-4">
                   <img
@@ -456,7 +631,7 @@ export default function AdminUsersPage() {
                 </tr>
               </thead>
               <tbody>
-                {paginatedData.map((user) => (
+                {paginatedUsers.map((user) => (
                   <tr key={user.id} className="border-b border-border hover:bg-muted/50 transition">
                     <td className="px-4 md:px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -475,15 +650,8 @@ export default function AdminUsersPage() {
                       {user.email}
                     </td>
                     <td className="px-4 md:px-6 py-4 text-sm">
-                      <Badge
-                        variant="outline"
-                        className={
-                          user.type === "customer"
-                            ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700"
-                            : "bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-700"
-                        }
-                      >
-                        {user.type === "customer" ? "Khách hàng" : "Chủ sân"}
+                      <Badge variant="outline" className={getUserTypeClassName(user.type)}>
+                        {getUserTypeLabel(user.type)}
                       </Badge>
                     </td>
                     <td className="px-4 md:px-6 py-4 text-sm text-muted-foreground hidden lg:table-cell">
@@ -493,15 +661,8 @@ export default function AdminUsersPage() {
                       {user.bookings}
                     </td>
                     <td className="px-4 md:px-6 py-4 text-sm">
-                      <Badge
-                        variant="outline"
-                        className={
-                          user.status === "active"
-                            ? "bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700"
-                            : "bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-700"
-                        }
-                      >
-                        {user.status === "active" ? "Hoạt động" : "Tạm khóa"}
+                      <Badge variant="outline" className={getStatusClassName(user.status)}>
+                        {getStatusLabel(user.status)}
                       </Badge>
                     </td>
                     <td className="px-4 md:px-6 py-4 text-sm">
@@ -515,6 +676,7 @@ export default function AdminUsersPage() {
                           onClick={() => handleToggleStatus(user.id)}
                           title={user.status === "active" ? "Khóa tài khoản" : "Mở khóa"}
                           className={user.status === "active" ? "text-amber-600" : "text-green-600"}
+                          disabled={user.status === "deleted"}
                         >
                           {user.status === "active" ? <Ban className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
                         </Button>
@@ -524,6 +686,7 @@ export default function AdminUsersPage() {
                           className="text-destructive bg-transparent"
                           onClick={() => handleDeleteUser(user.id)}
                           title="Xóa"
+                          disabled={user.status === "deleted"}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -535,21 +698,21 @@ export default function AdminUsersPage() {
             </table>
           </div>
 
-          {displayData.length > 0 && (
+          {totalItems > 0 && (
             <div className="p-4 border-t border-border">
               <Pagination
                 currentPage={currentPage}
                 totalPages={totalPages}
                 onPageChange={setCurrentPage}
                 itemsPerPage={itemsPerPage}
-                totalItems={displayData.length}
+                totalItems={totalItems}
               />
             </div>
           )}
         </Card>
       )}
 
-      {displayData.length === 0 && activeTab !== "pending" && (
+      {!loading && totalItems === 0 && activeTab !== "pending" && (
         <Card className="p-12 text-center">
           <p className="text-muted-foreground text-lg">Không tìm thấy người dùng</p>
         </Card>
@@ -571,15 +734,8 @@ export default function AdminUsersPage() {
                 />
                 <div>
                   <h3 className="text-lg font-semibold text-foreground">{selectedUser.name}</h3>
-                  <Badge
-                    variant="outline"
-                    className={
-                      selectedUser.type === "customer"
-                        ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
-                        : "bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300"
-                    }
-                  >
-                    {selectedUser.type === "customer" ? "Khách hàng" : "Chủ sân"}
+                  <Badge variant="outline" className={getUserTypeClassName(selectedUser.type)}>
+                    {getUserTypeLabel(selectedUser.type)}
                   </Badge>
                 </div>
               </div>
@@ -617,15 +773,8 @@ export default function AdminUsersPage() {
                   <p className="text-sm text-muted-foreground">Lượt đặt sân</p>
                 </div>
                 <div className="text-center p-3 bg-muted rounded-lg">
-                  <Badge
-                    variant="outline"
-                    className={
-                      selectedUser.status === "active"
-                        ? "bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300"
-                        : "bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300"
-                    }
-                  >
-                    {selectedUser.status === "active" ? "Hoạt động" : "Tạm khóa"}
+                  <Badge variant="outline" className={getStatusClassName(selectedUser.status)}>
+                    {getStatusLabel(selectedUser.status)}
                   </Badge>
                   <p className="text-sm text-muted-foreground mt-1">Trạng thái</p>
                 </div>

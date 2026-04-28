@@ -59,5 +59,10 @@ router.patch(
   validateParams(validateFieldImageParams),
   ownerFieldsController.setOwnerFieldPrimaryImage
 );
+router.delete(
+  "/fields/:fieldId/images/:imageId",
+  validateParams(validateFieldImageParams),
+  ownerFieldsController.deleteOwnerFieldImage
+);
 
 export default router;

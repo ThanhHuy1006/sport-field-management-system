@@ -8,21 +8,39 @@ import { ownerRepository } from "./owner.repository.js";
 function getMonthRange() {
   const now = new Date();
   const startDate = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
-  const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  const endDate = new Date(
+    now.getFullYear(),
+    now.getMonth() + 1,
+    0,
+    23,
+    59,
+    59,
+  );
   return { startDate, endDate };
 }
 
 export const ownerService = {
   async createOwnerRegistration(userId, payload) {
+    const user = await ownerRepository.findUserById(userId);
+
+    if (!user) {
+      throw new NotFoundError("Không tìm thấy user");
+    }
+
+    if (user.role !== "USER") {
+      throw new ForbiddenError(
+        "Chỉ tài khoản USER mới được đăng ký làm chủ sân",
+      );
+    }
+
     const existing = await ownerRepository.findOwnerProfileByUserId(userId);
 
     if (existing) {
       throw new ConflictError("Bạn đã có hồ sơ đăng ký owner");
     }
 
-    return ownerRepository.createOwnerRegistration(userId, payload.business_name);
+    return ownerRepository.createOwnerRegistration(userId, payload);
   },
-
   async getMyOwnerRegistration(userId) {
     const ownerProfile = await ownerRepository.findOwnerProfileByUserId(userId);
 
@@ -34,20 +52,30 @@ export const ownerService = {
   },
 
   async updateMyOwnerRegistration(userId, payload) {
-    const ownerProfile = await ownerRepository.findOwnerProfileByUserId(userId);
+  const user = await ownerRepository.findUserById(userId);
 
-    if (!ownerProfile) {
-      throw new NotFoundError("Bạn chưa có hồ sơ đăng ký owner");
-    }
+  if (!user) {
+    throw new NotFoundError("Không tìm thấy user");
+  }
 
-    if (ownerProfile.status === "approved") {
-      throw new ForbiddenError(
-        "Hồ sơ owner đã được duyệt, không thể cập nhật lại đăng ký"
-      );
-    }
+  if (user.role !== "USER") {
+    throw new ForbiddenError("Chỉ tài khoản USER mới được cập nhật hồ sơ đăng ký owner");
+  }
 
-    return ownerRepository.updateOwnerRegistration(userId, payload);
-  },
+  const ownerProfile = await ownerRepository.findOwnerProfileByUserId(userId);
+
+  if (!ownerProfile) {
+    throw new NotFoundError("Bạn chưa có hồ sơ đăng ký owner");
+  }
+
+  if (ownerProfile.status === "approved") {
+    throw new ForbiddenError(
+      "Hồ sơ owner đã được duyệt, không thể cập nhật lại đăng ký"
+    );
+  }
+
+  return ownerRepository.updateOwnerRegistration(userId, payload);
+},
 
   async getMyOwnerProfile(userId) {
     const user = await ownerRepository.findUserById(userId);
@@ -68,7 +96,10 @@ export const ownerService = {
       throw new NotFoundError("Không tìm thấy user");
     }
 
-    const updatedUser = await ownerRepository.updateUserProfile(userId, payload);
+    const updatedUser = await ownerRepository.updateUserProfile(
+      userId,
+      payload,
+    );
     const ownerProfile = await ownerRepository.findOwnerProfileByUserId(userId);
 
     return {

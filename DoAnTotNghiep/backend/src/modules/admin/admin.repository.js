@@ -18,14 +18,19 @@ export const adminRepository = {
         role: true,
         status: true,
         created_at: true,
-        owner_profiles_owner_profiles_user_idTousers: {
-          select: {
-            status: true,
-            business_name: true,
-            approved_at: true,
-            reject_reason: true,
-          },
-        },
+       owner_profiles_owner_profiles_user_idTousers: {
+  select: {
+    status: true,
+    business_name: true,
+    tax_code: true,
+    address: true,
+    license_url: true,
+    id_front_url: true,
+    id_back_url: true,
+    approved_at: true,
+    reject_reason: true,
+  },
+},
       },
     });
   },
@@ -43,14 +48,19 @@ export const adminRepository = {
         status: true,
         created_at: true,
         updated_at: true,
-        owner_profiles_owner_profiles_user_idTousers: {
-          select: {
-            status: true,
-            business_name: true,
-            approved_at: true,
-            reject_reason: true,
-          },
-        },
+       owner_profiles_owner_profiles_user_idTousers: {
+  select: {
+    status: true,
+    business_name: true,
+    tax_code: true,
+    address: true,
+    license_url: true,
+    id_front_url: true,
+    id_back_url: true,
+    approved_at: true,
+    reject_reason: true,
+  },
+},
       },
     });
   },
@@ -70,13 +80,18 @@ export const adminRepository = {
         created_at: true,
         updated_at: true,
         owner_profiles_owner_profiles_user_idTousers: {
-          select: {
-            status: true,
-            business_name: true,
-            approved_at: true,
-            reject_reason: true,
-          },
-        },
+  select: {
+    status: true,
+    business_name: true,
+    tax_code: true,
+    address: true,
+    license_url: true,
+    id_front_url: true,
+    id_back_url: true,
+    approved_at: true,
+    reject_reason: true,
+  },
+},
       },
     });
   },

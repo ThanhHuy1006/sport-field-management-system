@@ -64,8 +64,8 @@ router.use("/vouchers", vouchersRoutes);
 // Notifications
 router.use("/notifications", notificationsRoutes);
 
-// // Admin
-// router.use("/admin", adminRoutes);
+// Admin
+router.use("/admin", adminRoutes);
 // router.use("/admin/reports", adminReportsRoutes);
 
 export default router;
