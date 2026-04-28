@@ -20,19 +20,36 @@ export const adminService = {
     return user;
   },
 
-  async updateUserStatus(userId, payload) {
-    const user = await adminRepository.findUserById(userId);
+  // async updateUserStatus(userId, payload) {
+  //   const user = await adminRepository.findUserById(userId);
 
-    if (!user) {
-      throw new NotFoundError("Không tìm thấy user");
-    }
+  //   if (!user) {
+  //     throw new NotFoundError("Không tìm thấy user");
+  //   }
 
-    if (user.status === payload.status) {
-      throw new ConflictError("User đã ở trạng thái này");
-    }
+  //   if (user.status === payload.status) {
+  //     throw new ConflictError("User đã ở trạng thái này");
+  //   }
 
-    return adminRepository.updateUserStatus(userId, payload.status);
-  },
+  //   return adminRepository.updateUserStatus(userId, payload.status);
+  // },
+  async updateUserStatus(adminId, userId, payload) {
+  if (Number(adminId) === Number(userId)) {
+    throw new ConflictError("Admin không thể tự thay đổi trạng thái tài khoản của mình");
+  }
+
+  const user = await adminRepository.findUserById(userId);
+
+  if (!user) {
+    throw new NotFoundError("Không tìm thấy user");
+  }
+
+  if (user.status === payload.status) {
+    throw new ConflictError("User đã ở trạng thái này");
+  }
+
+  return adminRepository.updateUserStatus(userId, payload.status);
+},
 
   async getOwnerRegistrations() {
     return adminRepository.findOwnerRegistrations();
@@ -48,37 +65,53 @@ export const adminService = {
     return item;
   },
 
-  async approveOwnerRegistration(adminId, userId) {
-    const item = await adminRepository.findOwnerRegistrationByUserId(userId);
+ async approveOwnerRegistration(adminId, userId) {
+  if (Number(adminId) === Number(userId)) {
+    throw new ConflictError("Admin không thể duyệt hồ sơ owner của chính mình");
+  }
 
-    if (!item) {
-      throw new NotFoundError("Không tìm thấy hồ sơ owner");
-    }
+  const item = await adminRepository.findOwnerRegistrationByUserId(userId);
 
-    if (item.status !== OWNER_PROFILE_STATUS.PENDING) {
-      throw new ConflictError("Chỉ hồ sơ pending mới được duyệt");
-    }
+  if (!item) {
+    throw new NotFoundError("Không tìm thấy hồ sơ owner");
+  }
 
-    return adminRepository.approveOwnerRegistration(adminId, userId);
-  },
+  if (item.users_owner_profiles_user_idTousers?.role === "ADMIN") {
+    throw new ConflictError("Không thể duyệt tài khoản ADMIN thành owner");
+  }
 
-  async rejectOwnerRegistration(adminId, userId, payload) {
-    const item = await adminRepository.findOwnerRegistrationByUserId(userId);
+  if (item.status !== OWNER_PROFILE_STATUS.PENDING) {
+    throw new ConflictError("Chỉ hồ sơ pending mới được duyệt");
+  }
 
-    if (!item) {
-      throw new NotFoundError("Không tìm thấy hồ sơ owner");
-    }
+  return adminRepository.approveOwnerRegistration(adminId, userId);
+},
 
-    if (item.status !== OWNER_PROFILE_STATUS.PENDING) {
-      throw new ConflictError("Chỉ hồ sơ pending mới được từ chối");
-    }
+ async rejectOwnerRegistration(adminId, userId, payload) {
+  if (Number(adminId) === Number(userId)) {
+    throw new ConflictError("Admin không thể từ chối hồ sơ owner của chính mình");
+  }
 
-    return adminRepository.rejectOwnerRegistration(
-      adminId,
-      userId,
-      payload.reject_reason
-    );
-  },
+  const item = await adminRepository.findOwnerRegistrationByUserId(userId);
+
+  if (!item) {
+    throw new NotFoundError("Không tìm thấy hồ sơ owner");
+  }
+
+  if (item.users_owner_profiles_user_idTousers?.role === "ADMIN") {
+    throw new ConflictError("Không thể xử lý hồ sơ owner của tài khoản ADMIN");
+  }
+
+  if (item.status !== OWNER_PROFILE_STATUS.PENDING) {
+    throw new ConflictError("Chỉ hồ sơ pending mới được từ chối");
+  }
+
+  return adminRepository.rejectOwnerRegistration(
+    adminId,
+    userId,
+    payload.reject_reason
+  );
+},
 
   async getAdminFields() {
     return adminRepository.findAdminFields();
