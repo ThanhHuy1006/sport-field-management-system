@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -30,136 +30,72 @@ import {
   AlertTriangle,
 } from "lucide-react"
 import { Pagination } from "@/components/pagination"
+import { apiGet, apiRequest } from "@/lib/api-client"
 
-const mockFields = [
-  {
-    id: 1,
-    name: "Sân Bóng Đá Thảo Điền",
-    owner: "Nguyễn Văn A",
-    ownerPhone: "0901234567",
-    ownerEmail: "nguyenvana@email.com",
-    location: "123 Nguyễn Văn Hưởng, Thảo Điền, Quận 2, TP.HCM",
-    district: "Quận 2",
-    type: "Football",
-    typeName: "Bóng Đá",
-    status: "approved",
-    createdDate: "2024-06-15",
-    priceWeekday: 300000,
-    priceWeekend: 400000,
-    openTime: "06:00",
-    closeTime: "22:00",
-    rating: 4.5,
-    totalBookings: 156,
-    totalReviews: 48,
-    description:
-      "Sân bóng đá cỏ nhân tạo chất lượng cao, phù hợp cho các trận đấu 5 người và 7 người. Có hệ thống đèn chiếu sáng hiện đại.",
-    amenities: ["wifi", "parking", "shower", "canteen", "changing_room", "lighting"],
-    images: ["/soccer-field-green-grass.png", "/professional-soccer-field-with-players.jpg"],
-    size: "40m x 25m",
-    capacity: "10-14 người",
-  },
-  {
-    id: 2,
-    name: "Sân Bóng Rổ Quận 7",
-    owner: "Trần Thị B",
-    ownerPhone: "0912345678",
-    ownerEmail: "tranthib@email.com",
-    location: "456 Nguyễn Thị Thập, Quận 7, TP.HCM",
-    district: "Quận 7",
-    type: "Basketball",
-    typeName: "Bóng Rổ",
-    status: "approved",
-    createdDate: "2024-06-20",
-    priceWeekday: 200000,
-    priceWeekend: 280000,
-    openTime: "07:00",
-    closeTime: "21:00",
-    rating: 4.2,
-    totalBookings: 89,
-    totalReviews: 32,
-    description: "Sân bóng rổ trong nhà với sàn gỗ chuyên dụng. Phù hợp cho thi đấu và tập luyện.",
-    amenities: ["wifi", "parking", "shower", "changing_room", "lighting"],
-    images: ["/indoor-basketball-court.png", "/outdoor-basketball-court.png"],
-    size: "28m x 15m",
-    capacity: "10 người",
-  },
-  {
-    id: 3,
-    name: "Sân Tennis Bình Thạnh",
-    owner: "Lê Văn C",
-    ownerPhone: "0923456789",
-    ownerEmail: "levanc@email.com",
-    location: "789 Điện Biên Phủ, Bình Thạnh, TP.HCM",
-    district: "Bình Thạnh",
-    type: "Tennis",
-    typeName: "Tennis",
-    status: "pending",
-    createdDate: "2024-01-15",
-    priceWeekday: 250000,
-    priceWeekend: 350000,
-    openTime: "05:30",
-    closeTime: "22:00",
-    rating: 0,
-    totalBookings: 0,
-    totalReviews: 0,
-    description: "Sân tennis mặt cứng tiêu chuẩn quốc tế. Có huấn luyện viên hỗ trợ.",
-    amenities: ["wifi", "parking", "shower", "canteen", "changing_room", "lighting"],
-    images: ["/professional-tennis-court.jpg", "/outdoor-tennis-court.png"],
-    size: "23.77m x 10.97m",
-    capacity: "2-4 người",
-  },
-  {
-    id: 4,
-    name: "Sân Cầu Lông Phú Nhuận",
-    owner: "Phạm Thị D",
-    ownerPhone: "0934567890",
-    ownerEmail: "phamthid@email.com",
-    location: "321 Phan Xích Long, Phú Nhuận, TP.HCM",
-    district: "Phú Nhuận",
-    type: "Badminton",
-    typeName: "Cầu Lông",
-    status: "rejected",
-    createdDate: "2024-01-10",
-    priceWeekday: 80000,
-    priceWeekend: 120000,
-    openTime: "06:00",
-    closeTime: "22:00",
-    rating: 0,
-    totalBookings: 0,
-    totalReviews: 0,
-    description: "Sân cầu lông trong nhà với hệ thống điều hòa. Sàn gỗ chuyên dụng.",
-    amenities: ["wifi", "parking", "changing_room", "lighting"],
-    images: ["/badminton-court.png"],
-    size: "13.4m x 6.1m",
-    capacity: "2-4 người",
-    rejectedReason: "Hình ảnh không rõ ràng, thiếu giấy phép kinh doanh",
-  },
-  {
-    id: 5,
-    name: "Sân Bóng Đá Mini Gò Vấp",
-    owner: "Hoàng Văn E",
-    ownerPhone: "0945678901",
-    ownerEmail: "hoangvane@email.com",
-    location: "555 Nguyễn Oanh, Gò Vấp, TP.HCM",
-    district: "Gò Vấp",
-    type: "Football",
-    typeName: "Bóng Đá",
-    status: "pending",
-    createdDate: "2024-01-18",
-    priceWeekday: 280000,
-    priceWeekend: 380000,
-    openTime: "06:00",
-    closeTime: "23:00",
-    rating: 0,
-    totalBookings: 0,
-    totalReviews: 0,
-    description: "Sân bóng đá mini 5 người với cỏ nhân tạo thế hệ mới. Có dịch vụ cho thuê giày.",
-    amenities: ["wifi", "parking", "shower", "canteen", "changing_room", "lighting"],
-    images: ["/soccer-field-green-grass.png"],
-    size: "30m x 20m",
-    capacity: "10 người",
-  },
-]
+type ApiResponse<T> = {
+  success: boolean
+  message: string
+  data: T
+}
+
+type AdminField = {
+  id: number
+  owner_id: number
+  field_name: string | null
+  sport_type: string | null
+  description: string | null
+  address: string | null
+  latitude: number | null
+  longitude: number | null
+  base_price_per_hour: number
+  currency: string | null
+  status: "pending" | "active" | "inactive" | "maintenance" | string
+  min_duration_minutes: number | null
+  max_players: number | null
+  created_at: string | null
+  owner: {
+    id: number
+    name: string | null
+    email: string | null
+  } | null
+  primary_image: {
+    id: number
+    url: string
+    is_primary: boolean
+    order_no: number | null
+  } | null
+}
+
+type UiField = {
+  id: number
+  name: string
+  owner: string
+  ownerPhone: string
+  ownerEmail: string
+  location: string
+  district: string
+  type: string
+  typeName: string
+  status: "pending" | "active" | "inactive" | "maintenance" | string
+  createdDate: string
+  priceWeekday: number
+  priceWeekend: number
+  openTime: string
+  closeTime: string
+  rating: number
+  totalBookings: number
+  totalReviews: number
+  description: string
+  amenities: string[]
+  images: string[]
+  size: string
+  capacity: string
+  rejectedReason?: string
+}
+
+const API_ORIGIN = (
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api/v1"
+).replace(/\/api\/v1\/?$/, "")
 
 const amenityIcons: Record<string, { icon: React.ReactNode; label: string }> = {
   wifi: { icon: <Wifi className="w-4 h-4" />, label: "Wifi miễn phí" },
@@ -170,17 +106,125 @@ const amenityIcons: Record<string, { icon: React.ReactNode; label: string }> = {
   lighting: { icon: <LampDesk className="w-4 h-4" />, label: "Đèn chiếu sáng" },
 }
 
+function formatDate(value?: string | null) {
+  if (!value) return "-"
+  return new Date(value).toLocaleDateString("vi-VN")
+}
+
+function toAssetUrl(url?: string | null) {
+  if (!url) return "/placeholder.svg?height=96&width=128&query=sports field"
+  if (url.startsWith("http")) return url
+  if (url.startsWith("/uploads")) return `${API_ORIGIN}${url}`
+  return url
+}
+
+function getDistrictFromAddress(address?: string | null) {
+  if (!address) return "-"
+  const parts = address
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+
+  return parts.length >= 2 ? parts[parts.length - 2] : parts[0] || "-"
+}
+
+function getSportTypeName(type?: string | null) {
+  const value = String(type || "").toLowerCase()
+
+  if (value.includes("football") || value.includes("soccer") || value.includes("bóng đá")) return "Bóng Đá"
+  if (value.includes("basketball") || value.includes("bóng rổ")) return "Bóng Rổ"
+  if (value.includes("badminton") || value.includes("cầu lông")) return "Cầu Lông"
+  if (value.includes("tennis")) return "Tennis"
+  if (value.includes("volleyball") || value.includes("bóng chuyền")) return "Bóng Chuyền"
+
+  return type || "Khác"
+}
+
+function mapFieldToUi(field: AdminField): UiField {
+  const imageUrl = toAssetUrl(field.primary_image?.url)
+  const price = Number(field.base_price_per_hour || 0)
+
+  return {
+    id: field.id,
+    name: field.field_name || "Chưa cập nhật tên sân",
+    owner: field.owner?.name || "Chưa cập nhật",
+    ownerPhone: "-",
+    ownerEmail: field.owner?.email || "-",
+    location: field.address || "-",
+    district: getDistrictFromAddress(field.address),
+    type: field.sport_type || "unknown",
+    typeName: getSportTypeName(field.sport_type),
+    status: field.status,
+    createdDate: formatDate(field.created_at),
+    priceWeekday: price,
+    priceWeekend: price,
+    openTime: "-",
+    closeTime: "-",
+    rating: 0,
+    totalBookings: 0,
+    totalReviews: 0,
+    description: field.description || "Chưa có mô tả.",
+    amenities: [],
+    images: [imageUrl],
+    size: "-",
+    capacity: field.max_players ? `${field.max_players} người` : "-",
+    rejectedReason: field.status === "inactive" ? "Sân đã bị từ chối hoặc đã bị ẩn." : undefined,
+  }
+}
+
+function getFieldStatusLabel(status: string) {
+  if (status === "pending") return "Chờ Duyệt"
+  if (status === "active") return "Đã Duyệt"
+  if (status === "inactive") return "Từ Chối"
+  if (status === "maintenance") return "Bảo Trì"
+  return status
+}
+
+function getFieldStatusClassName(status: string) {
+  if (status === "pending") {
+    return "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300"
+  }
+
+  if (status === "active") {
+    return "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+  }
+
+  if (status === "maintenance") {
+    return "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+  }
+
+  return "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
+}
+
 export default function AdminFieldsPage() {
-  const [fields, setFields] = useState(mockFields)
+  const [fields, setFields] = useState<UiField[]>([])
+  const [loading, setLoading] = useState(true)
   const [filterStatus, setFilterStatus] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
-  const [selectedField, setSelectedField] = useState<(typeof mockFields)[0] | null>(null)
+  const [selectedField, setSelectedField] = useState<UiField | null>(null)
   const [showDetailDialog, setShowDetailDialog] = useState(false)
   const [showRejectDialog, setShowRejectDialog] = useState(false)
   const [rejectReason, setRejectReason] = useState("")
   const [fieldToReject, setFieldToReject] = useState<number | null>(null)
   const itemsPerPage = 8
+
+  const fetchAdminFields = useCallback(async () => {
+    setLoading(true)
+
+    try {
+      const res = await apiGet<ApiResponse<AdminField[]>>("/admin/fields")
+      setFields(res.data.map(mapFieldToUi))
+    } catch (error) {
+      console.error(error)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchAdminFields()
+  }, [fetchAdminFields])
 
   const filteredFields = fields.filter((f) => {
     const matchStatus = filterStatus === "all" || f.status === filterStatus
@@ -195,18 +239,27 @@ export default function AdminFieldsPage() {
   const totalPages = Math.ceil(filteredFields.length / itemsPerPage)
   const paginatedFields = filteredFields.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
 
-  // Stats
   const stats = {
     total: fields.length,
     pending: fields.filter((f) => f.status === "pending").length,
-    approved: fields.filter((f) => f.status === "approved").length,
-    rejected: fields.filter((f) => f.status === "rejected").length,
+    approved: fields.filter((f) => f.status === "active").length,
+    rejected: fields.filter((f) => f.status === "inactive").length,
   }
 
-  const handleApprove = (id: number) => {
-    setFields(fields.map((f) => (f.id === id ? { ...f, status: "approved" } : f)))
-    if (selectedField?.id === id) {
-      setSelectedField({ ...selectedField, status: "approved" })
+  const handleApprove = async (id: number) => {
+    try {
+      await apiRequest<ApiResponse<AdminField>>(`/admin/fields/${id}/approve`, {
+        method: "PATCH",
+      })
+
+      await fetchAdminFields()
+
+      if (selectedField?.id === id) {
+        setSelectedField((prev) => (prev ? { ...prev, status: "active" } : prev))
+      }
+    } catch (error) {
+      console.error(error)
+      alert(error instanceof Error ? error.message : "Không thể duyệt sân")
     }
   }
 
@@ -216,29 +269,38 @@ export default function AdminFieldsPage() {
     setShowRejectDialog(true)
   }
 
-  const handleReject = () => {
+  const handleReject = async () => {
     if (fieldToReject === null) return
 
-    setFields(
-      fields.map((f) =>
-        f.id === fieldToReject ? { ...f, status: "rejected", rejectedReason: rejectReason || "Không đạt yêu cầu" } : f,
-      ),
-    )
-
-    if (selectedField?.id === fieldToReject) {
-      setSelectedField({
-        ...selectedField,
-        status: "rejected",
-        rejectedReason: rejectReason || "Không đạt yêu cầu",
+    try {
+      await apiRequest<ApiResponse<AdminField>>(`/admin/fields/${fieldToReject}/reject`, {
+        method: "PATCH",
       })
-    }
 
-    setShowRejectDialog(false)
-    setFieldToReject(null)
-    setRejectReason("")
+      await fetchAdminFields()
+
+      if (selectedField?.id === fieldToReject) {
+        setSelectedField((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: "inactive",
+                rejectedReason: rejectReason || "Không đạt yêu cầu",
+              }
+            : prev
+        )
+      }
+
+      setShowRejectDialog(false)
+      setFieldToReject(null)
+      setRejectReason("")
+    } catch (error) {
+      console.error(error)
+      alert(error instanceof Error ? error.message : "Không thể từ chối sân")
+    }
   }
 
-  const handleViewDetail = (field: (typeof mockFields)[0]) => {
+  const handleViewDetail = (field: UiField) => {
     setSelectedField(field)
     setShowDetailDialog(true)
   }
@@ -293,8 +355,8 @@ export default function AdminFieldsPage() {
           {[
             { value: "all", label: "Tất Cả" },
             { value: "pending", label: `Chờ Duyệt (${stats.pending})` },
-            { value: "approved", label: "Đã Duyệt" },
-            { value: "rejected", label: "Từ Chối" },
+            { value: "active", label: "Đã Duyệt" },
+            { value: "inactive", label: "Từ Chối" },
           ].map((status) => (
             <button
               key={status.value}
@@ -314,118 +376,118 @@ export default function AdminFieldsPage() {
         </div>
       </div>
 
+      {loading && (
+        <Card className="p-6 mb-6 text-center text-muted-foreground">
+          Đang tải dữ liệu...
+        </Card>
+      )}
+
       {/* Fields List */}
-      <div className="space-y-4 mb-8">
-        {paginatedFields.map((field) => (
-          <Card key={field.id} className="p-4 md:p-6">
-            <div className="flex flex-col md:flex-row md:items-start gap-4">
-              {/* Field Image */}
-              <div className="w-full md:w-32 h-24 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                <img
-                  src={field.images[0] || "/placeholder.svg?height=96&width=128&query=sports field"}
-                  alt={field.name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-
-              {/* Field Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div>
-                    <h3 className="text-lg font-bold text-foreground">{field.name}</h3>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Badge variant="outline">{field.typeName}</Badge>
-                      <span>•</span>
-                      <span>{field.district}</span>
-                    </div>
-                  </div>
-                  <Badge
-                    className={`flex-shrink-0 ${
-                      field.status === "pending"
-                        ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300"
-                        : field.status === "approved"
-                          ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
-                          : "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
-                    }`}
-                  >
-                    {field.status === "pending" ? "Chờ Duyệt" : field.status === "approved" ? "Đã Duyệt" : "Từ Chối"}
-                  </Badge>
+      {!loading && (
+        <div className="space-y-4 mb-8">
+          {paginatedFields.map((field) => (
+            <Card key={field.id} className="p-4 md:p-6">
+              <div className="flex flex-col md:flex-row md:items-start gap-4">
+                {/* Field Image */}
+                <div className="w-full md:w-32 h-24 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                  <img
+                    src={field.images[0] || "/placeholder.svg?height=96&width=128&query=sports field"}
+                    alt={field.name}
+                    className="w-full h-full object-cover"
+                  />
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-3">
-                  <div className="flex items-center gap-1.5">
-                    <User className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-foreground truncate">{field.owner}</span>
+                {/* Field Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div>
+                      <h3 className="text-lg font-bold text-foreground">{field.name}</h3>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Badge variant="outline">{field.typeName}</Badge>
+                        <span>•</span>
+                        <span>{field.district}</span>
+                      </div>
+                    </div>
+                    <Badge className={`flex-shrink-0 ${getFieldStatusClassName(field.status)}`}>
+                      {getFieldStatusLabel(field.status)}
+                    </Badge>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <DollarSign className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-foreground">{formatPrice(field.priceWeekday)}/h</span>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-3">
+                    <div className="flex items-center gap-1.5">
+                      <User className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-foreground truncate">{field.owner}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <DollarSign className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-foreground">{formatPrice(field.priceWeekday)}/h</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-foreground">
+                        {field.openTime} - {field.closeTime}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Calendar className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-foreground">{field.createdDate}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-foreground">
-                      {field.openTime} - {field.closeTime}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Calendar className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-foreground">{field.createdDate}</span>
-                  </div>
+
+                  {field.status === "active" && (
+                    <div className="flex items-center gap-4 text-sm">
+                      <div className="flex items-center gap-1">
+                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                        <span className="font-medium">{field.rating}</span>
+                      </div>
+                      <span className="text-muted-foreground">{field.totalBookings} lượt đặt</span>
+                      <span className="text-muted-foreground">{field.totalReviews} đánh giá</span>
+                    </div>
+                  )}
                 </div>
 
-                {field.status === "approved" && (
-                  <div className="flex items-center gap-4 text-sm">
-                    <div className="flex items-center gap-1">
-                      <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                      <span className="font-medium">{field.rating}</span>
-                    </div>
-                    <span className="text-muted-foreground">{field.totalBookings} lượt đặt</span>
-                    <span className="text-muted-foreground">{field.totalReviews} đánh giá</span>
-                  </div>
-                )}
+                {/* Actions */}
+                <div className="flex gap-2 flex-shrink-0">
+                  {field.status === "pending" && (
+                    <>
+                      <Button
+                        size="sm"
+                        onClick={() => handleApprove(field.id)}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        <Check className="w-4 h-4 mr-1" />
+                        Duyệt
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-destructive bg-transparent"
+                        onClick={() => openRejectDialog(field.id)}
+                      >
+                        <X className="w-4 h-4 mr-1" />
+                        Từ Chối
+                      </Button>
+                    </>
+                  )}
+                  <Button variant="outline" size="sm" onClick={() => handleViewDetail(field)}>
+                    <Eye className="w-4 h-4 mr-1" />
+                    Xem
+                  </Button>
+                </div>
               </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
-              {/* Actions */}
-              <div className="flex gap-2 flex-shrink-0">
-                {field.status === "pending" && (
-                  <>
-                    <Button
-                      size="sm"
-                      onClick={() => handleApprove(field.id)}
-                      className="bg-green-600 hover:bg-green-700"
-                    >
-                      <Check className="w-4 h-4 mr-1" />
-                      Duyệt
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-destructive bg-transparent"
-                      onClick={() => openRejectDialog(field.id)}
-                    >
-                      <X className="w-4 h-4 mr-1" />
-                      Từ Chối
-                    </Button>
-                  </>
-                )}
-                <Button variant="outline" size="sm" onClick={() => handleViewDetail(field)}>
-                  <Eye className="w-4 h-4 mr-1" />
-                  Xem
-                </Button>
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
-
-      {filteredFields.length === 0 && (
+      {!loading && filteredFields.length === 0 && (
         <Card className="p-12 text-center">
           <p className="text-muted-foreground text-lg">Không tìm thấy sân nào</p>
         </Card>
       )}
 
       {/* Pagination */}
-      {filteredFields.length > 0 && (
+      {!loading && filteredFields.length > 0 && (
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
@@ -449,20 +511,8 @@ export default function AdminFieldsPage() {
                       {selectedField.location}
                     </p>
                   </div>
-                  <Badge
-                    className={`${
-                      selectedField.status === "pending"
-                        ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300"
-                        : selectedField.status === "approved"
-                          ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
-                          : "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
-                    }`}
-                  >
-                    {selectedField.status === "pending"
-                      ? "Chờ Duyệt"
-                      : selectedField.status === "approved"
-                        ? "Đã Duyệt"
-                        : "Từ Chối"}
+                  <Badge className={`${getFieldStatusClassName(selectedField.status)}`}>
+                    {getFieldStatusLabel(selectedField.status)}
                   </Badge>
                 </div>
               </DialogHeader>
@@ -513,11 +563,15 @@ export default function AdminFieldsPage() {
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">Tiện ích</p>
                   <div className="flex flex-wrap gap-2">
-                    {selectedField.amenities.map((amenity) => (
-                      <Badge key={amenity} variant="secondary">
-                        {amenityIcons[amenity]?.label || amenity}
-                      </Badge>
-                    ))}
+                    {selectedField.amenities.length === 0 ? (
+                      <span className="text-sm text-muted-foreground">Chưa cập nhật</span>
+                    ) : (
+                      selectedField.amenities.map((amenity) => (
+                        <Badge key={amenity} variant="secondary">
+                          {amenityIcons[amenity]?.label || amenity}
+                        </Badge>
+                      ))
+                    )}
                   </div>
                 </div>
 
@@ -536,8 +590,8 @@ export default function AdminFieldsPage() {
                   </p>
                 </div>
 
-                {/* Thống kê (nếu đã duyệt) */}
-                {selectedField.status === "approved" && (
+                {/* Thống kê nếu đã duyệt */}
+                {selectedField.status === "active" && (
                   <div className="grid grid-cols-3 gap-4 text-center">
                     <div className="p-3 bg-muted/50 rounded-lg">
                       <p className="text-2xl font-bold text-primary">{selectedField.rating}</p>
@@ -555,7 +609,7 @@ export default function AdminFieldsPage() {
                 )}
 
                 {/* Lý do từ chối */}
-                {selectedField.status === "rejected" && selectedField.rejectedReason && (
+                {selectedField.status === "inactive" && selectedField.rejectedReason && (
                   <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
                     <p className="text-sm font-medium text-red-700 dark:text-red-300 mb-1">Lý do từ chối</p>
                     <p className="text-sm text-red-600 dark:text-red-400">{selectedField.rejectedReason}</p>
@@ -576,6 +630,7 @@ export default function AdminFieldsPage() {
                       variant="outline"
                       className="flex-1 border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20 bg-transparent"
                       onClick={() => {
+                        setFieldToReject(selectedField.id)
                         setShowDetailDialog(false)
                         setShowRejectDialog(true)
                       }}
@@ -612,7 +667,9 @@ export default function AdminFieldsPage() {
                 onChange={(e) => setRejectReason(e.target.value)}
                 rows={4}
               />
-              <p className="text-sm text-muted-foreground">Lý do này sẽ được gửi đến chủ sân để họ có thể cải thiện.</p>
+              <p className="text-sm text-muted-foreground">
+                Hiện backend đang chuyển sân sang inactive. Nếu muốn lưu lý do từ chối, cần bổ sung cột reject_reason cho bảng fields.
+              </p>
             </div>
           </div>
           <DialogFooter className="gap-2">

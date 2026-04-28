@@ -1,7 +1,14 @@
 import { apiRequest } from "@/lib/api-client"
 
-export type OwnerFieldStatus = "pending" | "active" | "hidden" | "maintenance"
+export type OwnerFieldStatus = "pending" | "active" | "inactive" | "maintenance"
 export type OwnerApprovalMode = "MANUAL" | "AUTO"
+
+export type OwnerOperatingHourPayload = {
+  day_of_week: number
+  open_time: string | null
+  close_time: string | null
+  is_closed: boolean
+}
 
 export type OwnerFieldApi = {
   id: number
@@ -86,16 +93,30 @@ export type CreateOwnerFieldPayload = {
 
   approval_mode?: OwnerApprovalMode
   amenities?: string[]
+
+  /**
+   * Cách 2:
+   * Bắt buộc cấu hình lịch hoạt động 7 ngày ngay lúc tạo sân.
+   * BE sẽ validate đủ day_of_week 1-7.
+   */
+  operating_hours: OwnerOperatingHourPayload[]
 }
 
-export type UpdateOwnerFieldPayload = Partial<CreateOwnerFieldPayload>
+export type UpdateOwnerFieldPayload = Partial<
+  Omit<CreateOwnerFieldPayload, "operating_hours">
+> & {
+  /**
+   * Cho phép dùng lại type này nếu sau này edit field cũng cập nhật operating_hours.
+   * Hiện tại nếu edit chưa gửi lịch thì không ảnh hưởng.
+   */
+  operating_hours?: OwnerOperatingHourPayload[]
+}
 
 type ApiResponse<T> = {
   success: boolean
   message: string
   data: T
 }
-
 
 export function getOwnerFields() {
   return apiRequest<ApiResponse<OwnerFieldApi[]>>("/owner/fields", {
@@ -116,28 +137,34 @@ export function createOwnerField(payload: CreateOwnerFieldPayload) {
   })
 }
 
-export function updateOwnerField(fieldId: number | string, payload: UpdateOwnerFieldPayload) {
+export function updateOwnerField(
+  fieldId: number | string,
+  payload: UpdateOwnerFieldPayload,
+) {
   return apiRequest<ApiResponse<OwnerFieldApi>>(`/owner/fields/${fieldId}`, {
     method: "PATCH",
     body: JSON.stringify(payload),
   })
 }
 
-export function updateOwnerFieldStatus(fieldId: number | string, status: OwnerFieldStatus) {
+export function updateOwnerFieldStatus(
+  fieldId: number | string,
+  status: OwnerFieldStatus,
+) {
   return apiRequest<ApiResponse<OwnerFieldApi>>(`/owner/fields/${fieldId}/status`, {
     method: "PATCH",
     body: JSON.stringify({ status }),
   })
 }
 
+/**
+ * API này vẫn giữ lại để trang edit/schedule cũ không bị lỗi import.
+ * Nhưng với flow tạo sân mới, không gọi hàm này nữa.
+ * Tạo sân sẽ gửi operating_hours trực tiếp trong createOwnerField(payload).
+ */
 export function updateOwnerOperatingHour(
   fieldId: number | string,
-  payload: {
-    day_of_week: number
-    open_time: string
-    close_time: string
-    is_closed: boolean
-  },
+  payload: OwnerOperatingHourPayload,
 ) {
   return apiRequest<
     ApiResponse<{
@@ -153,6 +180,7 @@ export function updateOwnerOperatingHour(
     body: JSON.stringify(payload),
   })
 }
+
 export function setOwnerFieldPrimaryImage(
   fieldId: number | string,
   imageId: number | string,
@@ -176,5 +204,4 @@ export function uploadOwnerFieldImages(fieldId: number | string, files: File[]) 
     method: "POST",
     body: formData,
   })
-  
 }
