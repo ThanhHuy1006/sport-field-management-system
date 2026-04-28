@@ -98,5 +98,35 @@ export const ownerFieldsService = {
   }
 
   return updatedField;
-}
+},
+async deleteOwnerFieldImage(ownerId, fieldId, imageId) {
+  const field = await ownerFieldsRepository.findOwnerFieldById(ownerId, fieldId);
+
+  if (!field) {
+    throw new NotFoundError("Không tìm thấy sân của owner");
+  }
+
+  const images = field.field_images || [];
+  const image = images.find((item) => Number(item.id) === Number(imageId));
+
+  if (!image) {
+    throw new NotFoundError("Không tìm thấy ảnh của sân");
+  }
+
+  if (images.length <= 1) {
+    throw new ConflictError("Không thể xóa ảnh cuối cùng của sân");
+  }
+
+  const updatedField = await ownerFieldsRepository.deleteOwnerFieldImage(
+    fieldId,
+    imageId
+  );
+
+  if (!updatedField) {
+    throw new NotFoundError("Không tìm thấy ảnh của sân");
+  }
+
+  return updatedField;
+},
+
 };

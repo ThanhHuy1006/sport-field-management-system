@@ -242,4 +242,41 @@ async setOwnerFieldPrimaryImage(fieldId, imageId) {
       include: OWNER_FIELD_INCLUDE,
     });
   },
+  async deleteOwnerFieldImage(fieldId, imageId) {
+  return prisma.$transaction(async (tx) => {
+    const image = await tx.field_images.findFirst({
+      where: {
+        id: Number(imageId),
+        field_id: Number(fieldId),
+      },
+    });
+
+    if (!image) {
+      return null;
+    }
+
+    await tx.field_images.delete({
+      where: { id: image.id },
+    });
+
+    const remainingImages = await tx.field_images.findMany({
+      where: { field_id: Number(fieldId) },
+      orderBy: [{ is_primary: "desc" }, { order_no: "asc" }, { id: "asc" }],
+    });
+
+    const hasPrimary = remainingImages.some((item) => item.is_primary);
+
+    if (!hasPrimary && remainingImages.length > 0) {
+      await tx.field_images.update({
+        where: { id: remainingImages[0].id },
+        data: { is_primary: true },
+      });
+    }
+
+    return tx.fields.findUnique({
+      where: { id: Number(fieldId) },
+      include: OWNER_FIELD_INCLUDE,
+    });
+  });
+},
 };

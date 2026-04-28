@@ -46,14 +46,18 @@ import {
   updateOwnerField,
   updateOwnerFieldStatus,
   uploadOwnerFieldImages,
+  setOwnerFieldPrimaryImage,
+  deleteOwnerFieldImage,
   type OwnerApprovalMode,
   type UpdateOwnerFieldPayload,
 } from "@/features/fields/services/owner-fields.service";
 
 type SelectedImage = {
+  id?: number;
   file: File | null;
   previewUrl: string;
   isExisting?: boolean;
+  isPrimary?: boolean;
 };
 
 type ExistingImage = {
@@ -323,15 +327,25 @@ export default function EditFieldForm({
     if (safeData.existingImages && safeData.existingImages.length > 0) {
       return safeData.existingImages
         .filter((image) => image.url)
+        .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary))
         .map((image) => ({
+          id: image.id,
           file: null,
           previewUrl: image.url,
           isExisting: true,
+          isPrimary: Boolean(image.isPrimary),
         }));
     }
 
     if (safeData.image) {
-      return [{ file: null, previewUrl: safeData.image, isExisting: true }];
+      return [
+        {
+          file: null,
+          previewUrl: safeData.image,
+          isExisting: true,
+          isPrimary: true,
+        },
+      ];
     }
 
     return [];
@@ -374,6 +388,7 @@ export default function EditFieldForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isHiding, setIsHiding] = useState(false);
+  const [imageActionId, setImageActionId] = useState<number | null>(null);
 
   useEffect(() => {
     selectedImagesRef.current = selectedImages;
@@ -530,25 +545,25 @@ export default function EditFieldForm({
     processFiles(e.dataTransfer.files);
   };
 
-  const removeImage = (index: number) => {
-    setSelectedImages((prev) => {
-      const img = prev[index];
+  // const removeImage = (index: number) => {
+  //   setSelectedImages((prev) => {
+  //     const img = prev[index];
 
-      if (img?.isExisting) {
-        toast({
-          title: "Chưa hỗ trợ xóa ảnh cũ",
-          description:
-            "Hiện tại chỉ hỗ trợ thêm ảnh mới. Chức năng xóa ảnh sẽ bổ sung sau.",
-        });
+  //     if (img?.isExisting) {
+  //       toast({
+  //         title: "Chưa hỗ trợ xóa ảnh cũ",
+  //         description:
+  //           "Hiện tại chỉ hỗ trợ thêm ảnh mới. Chức năng xóa ảnh sẽ bổ sung sau.",
+  //       });
 
-        return prev;
-      }
+  //       return prev;
+  //     }
 
-      if (img && !img.isExisting) URL.revokeObjectURL(img.previewUrl);
+  //     if (img && !img.isExisting) URL.revokeObjectURL(img.previewUrl);
 
-      return prev.filter((_, i) => i !== index);
-    });
-  };
+  //     return prev.filter((_, i) => i !== index);
+  //   });
+  // };
 
   const addAmenity = (value?: string) => {
     const v = (value ?? newAmenity).trim();
@@ -566,6 +581,130 @@ export default function EditFieldForm({
   const removeAmenity = (index: number) => {
     setAmenities(amenities.filter((_, i) => i !== index));
   };
+  const handleSetPrimaryImage = async (image: SelectedImage) => {
+    if (!image.isExisting || !image.id) {
+      toast({
+        title: "Không thể đặt ảnh chính",
+        description: "Ảnh mới cần được lưu trước khi đặt làm ảnh chính.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setImageActionId(image.id);
+
+      await setOwnerFieldPrimaryImage(fieldId, image.id);
+
+      setSelectedImages((prev) =>
+        prev.map((item) => ({
+          ...item,
+          isPrimary: item.id === image.id,
+        })),
+      );
+
+      toast({
+        title: "Đã đổi ảnh chính",
+        description: "Ảnh đại diện sân đã được cập nhật.",
+      });
+
+      router.refresh();
+    } catch (error) {
+      toast({
+        title: "Không thể đổi ảnh chính",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Đã có lỗi xảy ra, vui lòng thử lại.",
+        variant: "destructive",
+      });
+    } finally {
+      setImageActionId(null);
+    }
+  };
+ const removeImage = async (index: number) => {
+  const img = selectedImages[index]
+
+  if (!img) return
+
+  // Ảnh đã upload lên server
+  if (img.isExisting) {
+    if (!img.id) {
+      toast({
+        title: "Không thể xóa ảnh",
+        description: "Ảnh hiện tại không có mã ảnh để xóa.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const existingCount = selectedImages.filter((item) => item.isExisting).length
+
+    if (existingCount <= 1) {
+      toast({
+        title: "Không thể xóa ảnh cuối cùng",
+        description: "Mỗi sân nên có ít nhất 1 ảnh để hiển thị.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!confirm("Bạn có chắc chắn muốn xóa ảnh này khỏi sân?")) {
+      return
+    }
+
+    try {
+      setImageActionId(img.id)
+
+      await deleteOwnerFieldImage(fieldId, img.id)
+
+      setSelectedImages((prev) => {
+        const next = prev.filter((_, i) => i !== index)
+
+        // Nếu ảnh vừa xóa là ảnh chính, cập nhật tạm ảnh đầu tiên còn lại làm ảnh chính trên UI
+        if (img.isPrimary) {
+          const firstExisting = next.find((item) => item.isExisting && item.id)
+
+          return next.map((item) => ({
+            ...item,
+            isPrimary: firstExisting ? item.id === firstExisting.id : item.isPrimary,
+          }))
+        }
+
+        return next
+      })
+
+      toast({
+        title: "Đã xóa ảnh",
+        description: "Ảnh sân đã được xóa thành công.",
+      })
+
+      router.refresh()
+    } catch (error) {
+      toast({
+        title: "Không thể xóa ảnh",
+        description: error instanceof Error ? error.message : "Đã có lỗi xảy ra, vui lòng thử lại.",
+        variant: "destructive",
+      })
+    } finally {
+      setImageActionId(null)
+    }
+
+    return
+  }
+
+  // Ảnh mới chỉ mới chọn ở FE, chưa upload lên server
+  if (img.previewUrl) {
+    URL.revokeObjectURL(img.previewUrl)
+  }
+
+  setSelectedImages((prev) => prev.filter((_, i) => i !== index))
+
+  toast({
+    title: "Đã bỏ ảnh",
+    description: "Ảnh mới đã được bỏ khỏi danh sách tải lên.",
+  })
+}
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1271,7 +1410,7 @@ export default function EditFieldForm({
                             className="w-full h-full object-cover"
                           />
 
-                          {index === 0 && (
+                          {img.isPrimary && (
                             <Badge className="absolute top-2 left-2 text-xs">
                               Ảnh chính
                             </Badge>
@@ -1279,14 +1418,30 @@ export default function EditFieldForm({
 
                           <button
                             type="button"
+                            disabled={img.id ? imageActionId === img.id : false}
                             onClick={(event) => {
                               event.stopPropagation();
                               removeImage(index);
                             }}
-                            className="absolute top-2 right-2 w-6 h-6 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute top-2 right-2 w-6 h-6 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
                           >
                             <X className="w-4 h-4 text-white" />
                           </button>
+                          {img.isExisting && !img.isPrimary && img.id && (
+                            <button
+                              type="button"
+                              disabled={imageActionId === img.id}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleSetPrimaryImage(img);
+                              }}
+                              className="absolute inset-x-2 bottom-2 rounded-md bg-black/70 px-2 py-1 text-xs text-white opacity-0 transition-opacity hover:bg-black/80 group-hover:opacity-100"
+                            >
+                              {imageActionId === img.id
+                                ? "Đang đổi..."
+                                : "Đặt ảnh chính"}
+                            </button>
+                          )}
                         </div>
                       ))}
 

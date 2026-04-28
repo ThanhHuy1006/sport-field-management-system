@@ -205,3 +205,14 @@ export function uploadOwnerFieldImages(fieldId: number | string, files: File[]) 
     body: formData,
   })
 }
+export function deleteOwnerFieldImage(
+  fieldId: number | string,
+  imageId: number | string,
+) {
+  return apiRequest<ApiResponse<OwnerFieldApi>>(
+    `/owner/fields/${fieldId}/images/${imageId}`,
+    {
+      method: "DELETE",
+    },
+  )
+}
