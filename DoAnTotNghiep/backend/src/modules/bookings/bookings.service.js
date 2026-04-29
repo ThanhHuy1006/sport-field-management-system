@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import { bookingsRepository } from "./bookings.repository.js";
+import { vouchersService } from "../vouchers/vouchers.service.js";
 import {
   AuthError,
   ConflictError,
@@ -362,11 +363,24 @@ export const bookingsService = {
     const approvalMode = field.approval_mode || "MANUAL";
     const requestedPaymentMethod = payload.requested_payment_method || "ONSITE";
 
+    const originalPrice = Number(availability.total_price);
+    let discountAmount = 0;
+    let finalPrice = originalPrice;
+    let voucherId = null;
+
+    if (payload.voucher_code) {
+      const voucherResult = await vouchersService.validateVoucher(userId, {
+        code: payload.voucher_code,
+        order_amount: originalPrice,
+        owner_id: field.owner_id,
+      });
+
+      voucherId = voucherResult.voucher.id;
+      discountAmount = Number(voucherResult.discount_amount || 0);
+      finalPrice = Number(voucherResult.final_amount || originalPrice);
+    }
+
     let initialStatus = "PENDING_CONFIRM";
-    const paymentExpiresAt =
-      initialStatus === "AWAITING_PAYMENT"
-        ? new Date(Date.now() + PAYMENT_EXPIRE_MINUTES * 60 * 1000)
-        : null;
 
     if (approvalMode === "AUTO") {
       initialStatus =
@@ -374,6 +388,11 @@ export const bookingsService = {
           ? "AWAITING_PAYMENT"
           : "APPROVED";
     }
+
+    const paymentExpiresAt =
+      initialStatus === "AWAITING_PAYMENT"
+        ? new Date(Date.now() + PAYMENT_EXPIRE_MINUTES * 60 * 1000)
+        : null;
 
     const booking = await bookingsRepository.createBookingWithHistory({
       field_id: payload.field_id,
@@ -386,14 +405,18 @@ export const bookingsService = {
       contact_phone: payload.contact_phone,
       approval_mode_snapshot: approvalMode,
       requested_payment_method: requestedPaymentMethod,
-      total_price: availability.total_price,
+
+      original_price: originalPrice,
+      discount_amount: discountAmount,
+      total_price: finalPrice,
+      voucher_id: voucherId,
+
       status: initialStatus,
       payment_expires_at: paymentExpiresAt,
     });
 
     return booking;
   },
-
   async getMyBookings(userId, query) {
     const { items, total } = await bookingsRepository.findMyBookings(
       userId,
@@ -667,6 +690,4 @@ export const bookingsService = {
       payload.note,
     );
   },
-  
-  
 };

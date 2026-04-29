@@ -46,6 +46,27 @@ function memberBookingDetailInclude() {
     fields: {
       select: memberFieldSelect,
     },
+    voucher: {
+      select: {
+        id: true,
+        code: true,
+        type: true,
+        discount_value: true,
+        max_discount_amount: true,
+      },
+    },
+    reviews: {
+      where: {
+        visible: true,
+      },
+      select: {
+        id: true,
+        rating: true,
+        comment: true,
+        created_at: true,
+      },
+      take: 1,
+    },
     booking_status_history: {
       orderBy: { changed_at: "desc" },
     },
@@ -60,12 +81,20 @@ function ownerBookingDetailInclude() {
     users: {
       select: userSelect,
     },
+    voucher: {
+      select: {
+        id: true,
+        code: true,
+        type: true,
+        discount_value: true,
+        max_discount_amount: true,
+      },
+    },
     booking_status_history: {
       orderBy: { changed_at: "desc" },
     },
   };
 }
-
 async function hydrateMemberBooking(tx, bookingId) {
   return tx.bookings.findUnique({
     where: { id: bookingId },
@@ -222,9 +251,12 @@ export const bookingsRepository = {
 
           requested_payment_method: data.requested_payment_method ?? "ONSITE",
           payment_expires_at: data.payment_expires_at ?? null,
+
+          original_price: data.original_price ?? data.total_price,
+          discount_amount: data.discount_amount ?? 0,
           total_price: data.total_price,
-          status: data.status,
-          total_price: data.total_price,
+          voucher_id: data.voucher_id ?? null,
+
           status: data.status,
         },
       });
@@ -255,6 +287,15 @@ export const bookingsRepository = {
           fields: {
             select: memberFieldSelect,
           },
+          voucher: {
+            select: {
+              id: true,
+              code: true,
+              type: true,
+              discount_value: true,
+              max_discount_amount: true,
+            },
+          },
           reviews: {
             where: {
               visible: true,
@@ -272,28 +313,14 @@ export const bookingsRepository = {
       prisma.bookings.count({ where }),
     ]).then(([items, total]) => ({ items, total }));
   },
-
   findMyBookingById(userId, bookingId) {
-   return {
-  fields: {
-    select: memberFieldSelect,
-  },
-  reviews: {
-    where: {
-      visible: true,
-    },
-    select: {
-      id: true,
-      rating: true,
-      comment: true,
-      created_at: true,
-    },
-    take: 1,
-  },
-  booking_status_history: {
-    orderBy: { changed_at: "desc" },
-  },
-};
+    return prisma.bookings.findFirst({
+      where: {
+        id: bookingId,
+        user_id: userId,
+      },
+      include: memberBookingDetailInclude(),
+    });
   },
 
   cancelMyBooking(userId, bookingId) {
@@ -349,6 +376,15 @@ export const bookingsRepository = {
           },
           users: {
             select: userSelect,
+          },
+          voucher: {
+            select: {
+              id: true,
+              code: true,
+              type: true,
+              discount_value: true,
+              max_discount_amount: true,
+            },
           },
         },
       }),

@@ -9,7 +9,12 @@ export function toBookingListItem(item) {
     notes: item.notes,
     approval_mode_snapshot: item.approval_mode_snapshot ?? null,
     requested_payment_method: item.requested_payment_method ?? null,
+
+    original_price: item.original_price,
+    discount_amount: item.discount_amount ?? 0,
     total_price: item.total_price,
+    voucher_id: item.voucher_id ?? null,
+    voucher: toBookingVoucher(item),
     checked_in_at: item.checked_in_at || null,
     checked_in_by: item.checked_in_by || null,
     checkin_method: item.checkin_method || null,
@@ -35,6 +40,21 @@ export function toBookingListItem(item) {
       : null,
   };
 }
+function toBookingVoucher(item) {
+  return item.voucher
+    ? {
+        id: item.voucher.id,
+        code: item.voucher.code,
+        type: item.voucher.type,
+        discount_value: item.voucher.discount_value
+          ? Number(item.voucher.discount_value)
+          : null,
+        max_discount_amount: item.voucher.max_discount_amount
+          ? Number(item.voucher.max_discount_amount)
+          : null,
+      }
+    : null;
+}
 
 export function toBookingDetail(item) {
   return {
@@ -51,7 +71,11 @@ export function toBookingDetail(item) {
     contact_name: item.contact_name ?? null,
     contact_email: item.contact_email ?? null,
     contact_phone: item.contact_phone ?? null,
+    original_price: item.original_price,
+    discount_amount: item.discount_amount ?? 0,
     total_price: item.total_price,
+    voucher_id: item.voucher_id ?? null,
+    voucher: toBookingVoucher(item),
     checked_in_at: item.checked_in_at || null,
     checked_in_by: item.checked_in_by || null,
     checkin_method: item.checkin_method || null,
@@ -99,7 +123,11 @@ export function toOwnerBookingListItem(item) {
     contact_name: item.contact_name ?? null,
     contact_email: item.contact_email ?? null,
     contact_phone: item.contact_phone ?? null,
+    original_price: item.original_price,
+    discount_amount: item.discount_amount ?? 0,
     total_price: item.total_price,
+    voucher_id: item.voucher_id ?? null,
+    voucher: toBookingVoucher(item),
     checked_in_at: item.checked_in_at || null,
     checked_in_by: item.checked_in_by || null,
     checkin_method: item.checkin_method || null,
@@ -138,7 +166,11 @@ export function toOwnerBookingDetail(item) {
     contact_name: item.contact_name ?? null,
     contact_email: item.contact_email ?? null,
     contact_phone: item.contact_phone ?? null,
+    original_price: item.original_price,
+    discount_amount: item.discount_amount ?? 0,
     total_price: item.total_price,
+    voucher_id: item.voucher_id ?? null,
+    voucher: toBookingVoucher(item),
     checked_in_at: item.checked_in_at || null,
     checked_in_by: item.checked_in_by || null,
     checkin_method: item.checkin_method || null,
