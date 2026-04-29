@@ -28,7 +28,7 @@ export const DEFAULT_PAGINATION = {
 export const FIELD_STATUS = {
   PENDING: "pending",
   ACTIVE: "active",
-  INACTIVE: "inactive",
+  HIDDEN: "hidden",
   MAINTENANCE: "maintenance",
 };
 // export const ALLOWED_BOOKING_PAYMENT_METHODS = ["ONSITE", "BANK_TRANSFER"];

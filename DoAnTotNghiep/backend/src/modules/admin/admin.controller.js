@@ -129,16 +129,28 @@ export const adminController = {
     );
   }),
 
-  rejectField: asyncHandler(async (req, res) => {
-    const { fieldId } = req.validated?.params ?? req.params;
-    const item = await adminService.rejectField(fieldId);
+  // rejectField: asyncHandler(async (req, res) => {
+  //   const { fieldId } = req.validated?.params ?? req.params;
+  //   const item = await adminService.rejectField(fieldId);
 
-    return successResponse(
-      res,
-      toAdminFieldResponse(item),
-      "Từ chối sân thành công"
-    );
-  }),
+  //   return successResponse(
+  //     res,
+  //     toAdminFieldResponse(item),
+  //     "Từ chối sân thành công"
+  //   );
+  // }),
+  rejectField: asyncHandler(async (req, res) => {
+  const { fieldId } = req.validated?.params ?? req.params;
+  const payload = req.validated?.body ?? req.body;
+
+  const item = await adminService.rejectField(fieldId, payload);
+
+  return successResponse(
+    res,
+    toAdminFieldResponse(item),
+    "Từ chối sân thành công"
+  );
+}),
 
   getAdminBookings: asyncHandler(async (req, res) => {
     const items = await adminService.getAdminBookings();

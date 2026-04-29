@@ -127,6 +127,7 @@ model fields {
   base_price_per_hour  Decimal?            @db.Decimal(12, 2)
   currency             String?             @default("VND") @db.VarChar(8)
   status               fields_status       @default(pending)
+  reject_reason String? @db.VarChar(255)
   approval_mode        field_approval_mode @default(MANUAL)
   min_duration_minutes Int?                @default(60)
   max_players          Int?

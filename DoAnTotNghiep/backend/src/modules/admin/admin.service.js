@@ -136,19 +136,19 @@ export const adminService = {
     return adminRepository.updateFieldStatus(fieldId, FIELD_STATUS.ACTIVE);
   },
 
-  async rejectField(fieldId) {
-    const field = await adminRepository.findFieldById(fieldId);
+  async rejectField(fieldId, payload) {
+  const field = await adminRepository.findFieldById(fieldId);
 
-    if (!field) {
-      throw new NotFoundError("Không tìm thấy sân");
-    }
+  if (!field) {
+    throw new NotFoundError("Không tìm thấy sân");
+  }
 
-    if (field.status !== FIELD_STATUS.PENDING) {
-      throw new ConflictError("Chỉ sân pending mới được từ chối");
-    }
+  if (field.status !== FIELD_STATUS.PENDING) {
+    throw new ConflictError("Chỉ sân pending mới được từ chối");
+  }
 
-    return adminRepository.updateFieldStatus(fieldId, FIELD_STATUS.INACTIVE);
-  },
+  return adminRepository.rejectField(fieldId, payload.reject_reason);
+},
 
   async getAdminBookings() {
     return adminRepository.findAdminBookings();

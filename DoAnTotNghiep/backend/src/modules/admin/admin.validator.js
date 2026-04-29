@@ -56,3 +56,16 @@ export function validateRejectOwnerRegistrationPayload(payload) {
 
   return { reject_reason };
 }
+export function validateRejectFieldPayload(payload) {
+  const reject_reason = String(payload.reject_reason || "").trim();
+
+  if (!reject_reason) {
+    throw new ValidationError("reject_reason là bắt buộc");
+  }
+
+  if (reject_reason.length > 255) {
+    throw new ValidationError("reject_reason không được vượt quá 255 ký tự");
+  }
+
+  return { reject_reason };
+}
