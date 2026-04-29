@@ -16,39 +16,33 @@ export const adminService = {
 
     return user;
   },
-
-  // async updateUserStatus(userId, payload) {
-  //   const user = await adminRepository.findUserById(userId);
-
-  //   if (!user) {
-  //     throw new NotFoundError("Không tìm thấy user");
-  //   }
-
-  //   if (user.status === payload.status) {
-  //     throw new ConflictError("User đã ở trạng thái này");
-  //   }
-
-  //   return adminRepository.updateUserStatus(userId, payload.status);
-  // },
   async updateUserStatus(adminId, userId, payload) {
-    if (Number(adminId) === Number(userId)) {
-      throw new ConflictError(
-        "Admin không thể tự thay đổi trạng thái tài khoản của mình",
-      );
-    }
+  const user = await adminRepository.findUserById(userId);
 
-    const user = await adminRepository.findUserById(userId);
+  if (!user) {
+    throw new NotFoundError("Không tìm thấy user");
+  }
 
-    if (!user) {
-      throw new NotFoundError("Không tìm thấy user");
-    }
+  if (Number(adminId) === Number(userId)) {
+    throw new ConflictError(
+      "Admin không thể tự thay đổi trạng thái tài khoản của mình"
+    );
+  }
 
-    if (user.status === payload.status) {
-      throw new ConflictError("User đã ở trạng thái này");
-    }
+  if (user.role === "ADMIN") {
+    throw new ConflictError(
+      "Không thể thay đổi trạng thái tài khoản ADMIN"
+    );
+  }
 
-    return adminRepository.updateUserStatus(userId, payload.status);
-  },
+  if (user.status === payload.status) {
+    throw new ConflictError("User đã ở trạng thái này");
+  }
+
+  return adminRepository.updateUserStatus(userId, payload.status);
+},
+
+
 
   async getOwnerRegistrations() {
     return adminRepository.findOwnerRegistrations();

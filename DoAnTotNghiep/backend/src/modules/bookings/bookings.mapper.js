@@ -24,6 +24,15 @@ export function toBookingListItem(item) {
           currency: item.fields.currency,
         }
       : null,
+    payment_expires_at: item.payment_expires_at || null,
+    review: item.reviews?.[0]
+      ? {
+          id: item.reviews[0].id,
+          rating: item.reviews[0].rating,
+          comment: item.reviews[0].comment,
+          created_at: item.reviews[0].created_at,
+        }
+      : null,
   };
 }
 
@@ -38,7 +47,7 @@ export function toBookingDetail(item) {
     notes: item.notes,
 
     approval_mode_snapshot: item.approval_mode_snapshot ?? null,
-requested_payment_method: item.requested_payment_method ?? null,
+    requested_payment_method: item.requested_payment_method ?? null,
     contact_name: item.contact_name ?? null,
     contact_email: item.contact_email ?? null,
     contact_phone: item.contact_phone ?? null,
@@ -64,6 +73,15 @@ requested_payment_method: item.requested_payment_method ?? null,
       changed_at: h.changed_at,
       reason: h.reason ?? null,
     })),
+    payment_expires_at: item.payment_expires_at || null,
+    review: item.reviews?.[0]
+      ? {
+          id: item.reviews[0].id,
+          rating: item.reviews[0].rating,
+          comment: item.reviews[0].comment,
+          created_at: item.reviews[0].created_at,
+        }
+      : null,
   };
 }
 
@@ -102,6 +120,7 @@ export function toOwnerBookingListItem(item) {
           phone: item.users.phone,
         }
       : null,
+    payment_expires_at: item.payment_expires_at || null,
   };
 }
 
@@ -115,7 +134,7 @@ export function toOwnerBookingDetail(item) {
     status: item.status,
     notes: item.notes,
     approval_mode_snapshot: item.approval_mode_snapshot ?? null,
-    requested_payment_method: item.requested_payment_method ?? null,  
+    requested_payment_method: item.requested_payment_method ?? null,
     contact_name: item.contact_name ?? null,
     contact_email: item.contact_email ?? null,
     contact_phone: item.contact_phone ?? null,
@@ -147,6 +166,7 @@ export function toOwnerBookingDetail(item) {
       changed_at: h.changed_at,
       reason: h.reason ?? null,
     })),
+    payment_expires_at: item.payment_expires_at || null,
   };
 }
 

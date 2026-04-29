@@ -53,7 +53,9 @@ function buildFullAddress({ address, address_line, ward, district, province }) {
   }
 
   return [address_line, ward, district, province]
-    .map((item) => (item === undefined || item === null ? "" : String(item).trim()))
+    .map((item) =>
+      item === undefined || item === null ? "" : String(item).trim(),
+    )
     .filter(Boolean)
     .join(", ");
 }
@@ -65,16 +67,93 @@ function normalizeAmenities(value) {
     throw new ValidationError("amenities phải là mảng");
   }
 
-  const names = value
-    .map((item) => String(item || "").trim())
-    .filter(Boolean);
+  const names = value.map((item) => String(item || "").trim()).filter(Boolean);
 
   return [...new Set(names)];
+}
+function normalizeOperatingHours(value, { required = false } = {}) {
+  if (value === undefined || value === null) {
+    if (required) {
+      throw new ValidationError("operating_hours là bắt buộc");
+    }
+
+    return undefined;
+  }
+
+  if (!Array.isArray(value)) {
+    throw new ValidationError("operating_hours phải là mảng");
+  }
+
+  if (value.length !== 7) {
+    throw new ValidationError("operating_hours phải có đủ 7 ngày trong tuần");
+  }
+
+  const seenDays = new Set();
+
+  const items = value.map((item, index) => {
+    const day_of_week = Number(item.day_of_week);
+
+    if (!Number.isInteger(day_of_week) || day_of_week < 1 || day_of_week > 7) {
+      throw new ValidationError(
+        `operating_hours[${index}].day_of_week không hợp lệ`,
+      );
+    }
+
+    if (seenDays.has(day_of_week)) {
+      throw new ValidationError(`operating_hours bị trùng ngày ${day_of_week}`);
+    }
+
+    seenDays.add(day_of_week);
+
+    const is_closed = Boolean(item.is_closed);
+
+    if (is_closed) {
+      return {
+        day_of_week,
+        open_time: null,
+        close_time: null,
+      };
+    }
+
+    const open_time = validateTime(
+      item.open_time,
+      `operating_hours[${index}].open_time`,
+    );
+
+    const close_time = validateTime(
+      item.close_time,
+      `operating_hours[${index}].close_time`,
+    );
+
+    if (open_time >= close_time) {
+      throw new ValidationError(
+        `Ngày ${day_of_week}: giờ mở cửa phải trước giờ đóng cửa`,
+      );
+    }
+
+    return {
+      day_of_week,
+      open_time,
+      close_time,
+    };
+  });
+
+  const openDaysCount = items.filter(
+    (item) => item.open_time && item.close_time,
+  ).length;
+
+  if (openDaysCount === 0) {
+    throw new ValidationError("Sân phải mở cửa ít nhất 1 ngày trong tuần");
+  }
+
+  return items.sort((a, b) => a.day_of_week - b.day_of_week);
 }
 function normalizeApprovalMode(value) {
   if (value === undefined) return undefined;
 
-  const mode = String(value || "").trim().toUpperCase();
+  const mode = String(value || "")
+    .trim()
+    .toUpperCase();
 
   if (!ALLOWED_APPROVAL_MODES.includes(mode)) {
     throw new ValidationError("approval_mode không hợp lệ");
@@ -123,6 +202,9 @@ export function validateCreateOwnerFieldPayload(payload) {
     payload.weekend_price !== undefined
       ? toPositiveMoney(payload.weekend_price, "weekend_price")
       : weekday_price;
+  const operatingHours = normalizeOperatingHours(payload.operating_hours, {
+  required: true,
+});
 
   if (weekday_price < 50000) {
     throw new ValidationError("weekday_price tối thiểu 50,000 VND");
@@ -152,7 +234,9 @@ export function validateCreateOwnerFieldPayload(payload) {
     min_duration_minutes <= 0 ||
     min_duration_minutes % 30 !== 0
   ) {
-    throw new ValidationError("min_duration_minutes phải là số dương và chia hết cho 30");
+    throw new ValidationError(
+      "min_duration_minutes phải là số dương và chia hết cho 30",
+    );
   }
 
   const max_players =
@@ -167,7 +251,8 @@ export function validateCreateOwnerFieldPayload(payload) {
     : "VND";
 
   const amenities = normalizeAmenities(payload.amenities);
-  const approval_mode = normalizeApprovalMode(payload.approval_mode) ?? "MANUAL";
+  const approval_mode =
+    normalizeApprovalMode(payload.approval_mode) ?? "MANUAL";
 
   return {
     fieldData: {
@@ -190,6 +275,7 @@ export function validateCreateOwnerFieldPayload(payload) {
       min_duration_minutes,
       max_players,
     },
+      operatingHours,
 
     pricingRules: [
       {
@@ -267,12 +353,10 @@ export function validateUpdateOwnerFieldPayload(payload) {
 
   if (
     payload.address === undefined &&
-    (
-      payload.address_line !== undefined ||
+    (payload.address_line !== undefined ||
       payload.ward !== undefined ||
       payload.district !== undefined ||
-      payload.province !== undefined
-    )
+      payload.province !== undefined)
   ) {
     const address = buildFullAddress({
       address: "",
@@ -296,14 +380,23 @@ export function validateUpdateOwnerFieldPayload(payload) {
   }
 
   if (payload.currency !== undefined) {
-    const value = String(payload.currency || "").trim().toUpperCase();
+    const value = String(payload.currency || "")
+      .trim()
+      .toUpperCase();
     if (!value) throw new ValidationError("currency không hợp lệ");
     fieldData.currency = value;
   }
 
-  const currency = fieldData.currency || String(payload.currency || "VND").trim().toUpperCase();
+  const currency =
+    fieldData.currency ||
+    String(payload.currency || "VND")
+      .trim()
+      .toUpperCase();
 
-  if (payload.weekday_price !== undefined || payload.base_price_per_hour !== undefined) {
+  if (
+    payload.weekday_price !== undefined ||
+    payload.base_price_per_hour !== undefined
+  ) {
     const weekdayPrice =
       payload.weekday_price !== undefined
         ? toPositiveMoney(payload.weekday_price, "weekday_price")
@@ -327,7 +420,10 @@ export function validateUpdateOwnerFieldPayload(payload) {
   }
 
   if (payload.weekend_price !== undefined) {
-    const weekendPrice = toPositiveMoney(payload.weekend_price, "weekend_price");
+    const weekendPrice = toPositiveMoney(
+      payload.weekend_price,
+      "weekend_price",
+    );
 
     if (weekendPrice < 50000) {
       throw new ValidationError("weekend_price tối thiểu 50,000 VND");
@@ -347,7 +443,9 @@ export function validateUpdateOwnerFieldPayload(payload) {
   if (payload.min_duration_minutes !== undefined) {
     const value = Number(payload.min_duration_minutes);
     if (Number.isNaN(value) || value <= 0 || value % 30 !== 0) {
-      throw new ValidationError("min_duration_minutes phải là số dương và chia hết cho 30");
+      throw new ValidationError(
+        "min_duration_minutes phải là số dương và chia hết cho 30",
+      );
     }
 
     fieldData.min_duration_minutes = value;
@@ -389,7 +487,6 @@ export function validateUpdateOwnerFieldPayload(payload) {
   };
 }
 
-
 // export function validateOwnerFieldStatusPayload(payload) {
 //   const status = String(payload.status || "").trim().toLowerCase();
 
@@ -398,14 +495,16 @@ export function validateUpdateOwnerFieldPayload(payload) {
 //   }
 
 //   return { status };
-  
+
 // }
 export function validateOwnerFieldStatusPayload(payload) {
-  const status = String(payload.status || "").trim().toLowerCase();
+  const status = String(payload.status || "")
+    .trim()
+    .toLowerCase();
 
   if (!ALLOWED_OWNER_FIELD_STATUSES.includes(status)) {
     throw new ValidationError(
-      "Owner chỉ được chuyển sân sang inactive hoặc maintenance"
+      "Owner chỉ được chuyển sân sang inactive hoặc maintenance",
     );
   }
 

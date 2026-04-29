@@ -1,6 +1,6 @@
 import { apiRequest } from "@/lib/api-client"
 
-export type OwnerFieldStatus = "pending" | "active" | "inactive" | "maintenance"
+export type OwnerFieldStatus = "pending" | "active" | "hidden" | "maintenance"
 export type OwnerApprovalMode = "MANUAL" | "AUTO"
 
 export type OwnerOperatingHourPayload = {

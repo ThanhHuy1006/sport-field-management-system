@@ -177,4 +177,45 @@ export const reviewsRepository = {
       },
     });
   },
+  findPublicReviewsByFieldId(fieldId) {
+    return prisma.reviews.findMany({
+      where: {
+        field_id: fieldId,
+        visible: true,
+      },
+      orderBy: {
+        created_at: "desc",
+      },
+      include: {
+        users: {
+          select: {
+            id: true,
+            name: true,
+            avatar_url: true,
+          },
+        },
+        fields: {
+          select: {
+            id: true,
+            field_name: true,
+          },
+        },
+      },
+    });
+  },
+
+  getFieldReviewSummary(fieldId) {
+    return prisma.reviews.aggregate({
+      where: {
+        field_id: fieldId,
+        visible: true,
+      },
+      _avg: {
+        rating: true,
+      },
+      _count: {
+        id: true,
+      },
+    });
+  },
 };

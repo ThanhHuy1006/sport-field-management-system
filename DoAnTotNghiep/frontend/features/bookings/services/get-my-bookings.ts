@@ -9,7 +9,10 @@ export type BookingStatus =
   | "CANCELLED"
   | "COMPLETED"
   | "PAY_FAILED"
-  | "CHECKED_IN";
+  | "CHECKED_IN"
+  | "PAYMENT_EXPIRED";
+
+export type BookingPaymentMethod = "ONSITE" | "BANK_TRANSFER";
 
 export type MyBookingListItem = {
   id: number;
@@ -18,6 +21,7 @@ export type MyBookingListItem = {
   start_datetime: string;
   end_datetime: string;
   status: BookingStatus;
+  requested_payment_method: BookingPaymentMethod | null;
   notes: string | null;
   total_price: string | number;
   checked_in_at: string | null;
@@ -32,6 +36,14 @@ export type MyBookingListItem = {
     base_price_per_hour: string | number | null;
     currency: string | null;
   } | null;
+  payment_expires_at?: string | null;
+  review?: {
+  id: number
+  rating: number
+  comment: string | null
+  created_at: string
+} | null
+  
 };
 
 export type GetMyBookingsResponse = {

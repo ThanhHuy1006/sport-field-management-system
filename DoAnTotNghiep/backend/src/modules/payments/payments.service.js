@@ -8,44 +8,66 @@ import {
 
 export const paymentsService = {
   async createPayment(userId, payload) {
-  const booking = await paymentsRepository.findBookingForPayment(
-    userId,
-    payload.booking_id
-  );
-  console.log("[PAYMENT CREATE DEBUG] payload:", payload);
-console.log("[PAYMENT CREATE DEBUG] booking:", booking);
-
-  if (!booking) {
-    throw new NotFoundError("Không tìm thấy booking");
-  }
-
-  if (booking.requested_payment_method !== "BANK_TRANSFER") {
-    throw new ForbiddenError(
-      "Booking này thanh toán tại sân, không cần thanh toán online"
+    const booking = await paymentsRepository.findBookingForPayment(
+      userId,
+      payload.booking_id,
     );
-  }
+    if (
+      booking.status !== "AWAITING_PAYMENT" &&
+      booking.status !== "PAY_FAILED"
+    ) {
+      throw new ForbiddenError(
+        "Booking hiện không ở trạng thái chờ thanh toán",
+      );
+    }
 
-  if (!["AWAITING_PAYMENT", "PAY_FAILED"].includes(booking.status)) {
-    throw new ForbiddenError("Booking hiện chưa thể thanh toán");
-  }
+    if (
+      booking.status === "AWAITING_PAYMENT" &&
+      booking.payment_expires_at &&
+      new Date() > new Date(booking.payment_expires_at)
+    ) {
+      await bookingsRepository.expireAwaitingPaymentBooking(
+        booking.id,
+        "Payment expired before creating payment",
+      );
 
-  if (!booking.total_price || Number(booking.total_price) <= 0) {
-    throw new ValidationError("Booking chưa có tổng tiền hợp lệ");
-  }
+      throw new ForbiddenError("Booking đã quá hạn thanh toán");
+    }
 
-  const paidPayment = (booking.payments || []).find(
-    (item) => item.status === "success"
-  );
+    if (!booking) {
+      throw new NotFoundError("Không tìm thấy booking");
+    }
 
-  if (paidPayment) {
-    throw new ConflictError("Booking này đã thanh toán thành công");
-  }
+    if (booking.requested_payment_method !== "BANK_TRANSFER") {
+      throw new ForbiddenError(
+        "Booking này thanh toán tại sân, không cần thanh toán online",
+      );
+    }
 
-  return paymentsRepository.createOrReusePayment(booking, payload.provider);
-},
+    if (!["AWAITING_PAYMENT", "PAY_FAILED"].includes(booking.status)) {
+      throw new ForbiddenError("Booking hiện chưa thể thanh toán");
+    }
+
+    if (!booking.total_price || Number(booking.total_price) <= 0) {
+      throw new ValidationError("Booking chưa có tổng tiền hợp lệ");
+    }
+
+    const paidPayment = (booking.payments || []).find(
+      (item) => item.status === "success",
+    );
+
+    if (paidPayment) {
+      throw new ConflictError("Booking này đã thanh toán thành công");
+    }
+
+    return paymentsRepository.createOrReusePayment(booking, payload.provider);
+  },
 
   async getPaymentByBooking(userId, bookingId) {
-    const payment = await paymentsRepository.findPaymentByBookingId(userId, bookingId);
+    const payment = await paymentsRepository.findPaymentByBookingId(
+      userId,
+      bookingId,
+    );
 
     if (!payment) {
       throw new NotFoundError("Không tìm thấy payment cho booking này");
@@ -86,7 +108,9 @@ console.log("[PAYMENT CREATE DEBUG] booking:", booking);
     }
 
     if (payment.status === "success") {
-      throw new ConflictError("Payment đã thành công, không thể chuyển sang failed");
+      throw new ConflictError(
+        "Payment đã thành công, không thể chuyển sang failed",
+      );
     }
 
     if (payment.status === "failed") {
