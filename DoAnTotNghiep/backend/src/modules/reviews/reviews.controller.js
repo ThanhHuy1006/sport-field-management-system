@@ -1,7 +1,4 @@
-import {
-  successResponse,
-  createdResponse,
-} from "../../core/utils/response.js";
+import { successResponse, createdResponse } from "../../core/utils/response.js";
 import { reviewsService } from "./reviews.service.js";
 import { toReviewResponse } from "./reviews.mapper.js";
 
@@ -11,7 +8,11 @@ export const reviewsController = {
       const payload = req.validated?.body ?? req.body;
       const item = await reviewsService.createReview(req.user.id, payload);
 
-      return createdResponse(res, toReviewResponse(item), "Tạo review thành công");
+      return createdResponse(
+        res,
+        toReviewResponse(item),
+        "Tạo review thành công",
+      );
     } catch (error) {
       next(error);
     }
@@ -25,13 +26,13 @@ export const reviewsController = {
       const item = await reviewsService.updateMyReview(
         req.user.id,
         reviewId,
-        payload
+        payload,
       );
 
       return successResponse(
         res,
         toReviewResponse(item),
-        "Cập nhật review thành công"
+        "Cập nhật review thành công",
       );
     } catch (error) {
       next(error);
@@ -57,7 +58,7 @@ export const reviewsController = {
       return successResponse(
         res,
         items.map(toReviewResponse),
-        "Lấy danh sách review của owner thành công"
+        "Lấy danh sách review của owner thành công",
       );
     } catch (error) {
       next(error);
@@ -72,13 +73,31 @@ export const reviewsController = {
       const item = await reviewsService.replyOwnerReview(
         req.user.id,
         reviewId,
-        payload
+        payload,
       );
 
       return successResponse(
         res,
         toReviewResponse(item),
-        "Phản hồi review thành công"
+        "Phản hồi review thành công",
+      );
+    } catch (error) {
+      next(error);
+    }
+  },
+  async getPublicFieldReviews(req, res, next) {
+    try {
+      const { fieldId } = req.validated?.params ?? req.params;
+
+      const result = await reviewsService.getPublicFieldReviews(fieldId);
+
+      return successResponse(
+        res,
+        {
+          items: result.items.map(toReviewResponse),
+          summary: result.summary,
+        },
+        "Lấy danh sách đánh giá của sân thành công",
       );
     } catch (error) {
       next(error);

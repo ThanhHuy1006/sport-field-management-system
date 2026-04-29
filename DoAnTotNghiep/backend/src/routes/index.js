@@ -25,6 +25,7 @@ import ownerDashboardRoutes from "../modules/owners/owner.dashboard.routes.js";
 import ownerFieldsRoutes from "../modules/owners/owner.fields.routes.js";
 import ownerSchedulesRoutes from "../modules/owners/owner.schedules.routes.js";
 import uploadsRoutes from "../modules/uploads/uploads.routes.js";
+import publicReviewsRoutes from "../modules/reviews/public.reviews.routes.js";
 // import ownerReportsRoutes from "../modules/reports/owner.reports.routes.js";
 // import adminReportsRoutes from "../modules/reports/admin.reports.routes.js";
 
@@ -40,6 +41,7 @@ router.use("/uploads", uploadsRoutes);
 // Public fields + public schedules
 router.use("/fields", fieldsRoutes);
 router.use("/fields", publicSchedulesRoutes);
+router.use("/fields", publicReviewsRoutes);
 
 // Member bookings / payments / reviews
 router.use("/bookings", memberBookingRoutes);

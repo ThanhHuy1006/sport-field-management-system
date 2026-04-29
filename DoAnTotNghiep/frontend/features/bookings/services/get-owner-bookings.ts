@@ -65,6 +65,7 @@ export type OwnerBookingListItem = {
     sport_type?: string | null;
     base_price_per_hour?: string | number | null;
   } | null;
+  
 };
 
 export type GetOwnerBookingsResponse = {

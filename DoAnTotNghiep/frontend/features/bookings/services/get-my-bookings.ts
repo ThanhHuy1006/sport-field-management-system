@@ -37,6 +37,13 @@ export type MyBookingListItem = {
     currency: string | null;
   } | null;
   payment_expires_at?: string | null;
+  review?: {
+  id: number
+  rating: number
+  comment: string | null
+  created_at: string
+} | null
+  
 };
 
 export type GetMyBookingsResponse = {

@@ -7,7 +7,6 @@ const ACTIVE_BOOKING_STATUSES = [
   "AWAITING_PAYMENT",
   "PAID",
   "CHECKED_IN",
- 
 ];
 
 const memberFieldSelect = {
@@ -256,6 +255,18 @@ export const bookingsRepository = {
           fields: {
             select: memberFieldSelect,
           },
+          reviews: {
+            where: {
+              visible: true,
+            },
+            select: {
+              id: true,
+              rating: true,
+              comment: true,
+              created_at: true,
+            },
+            take: 1,
+          },
         },
       }),
       prisma.bookings.count({ where }),
@@ -263,13 +274,26 @@ export const bookingsRepository = {
   },
 
   findMyBookingById(userId, bookingId) {
-    return prisma.bookings.findFirst({
-      where: {
-        id: bookingId,
-        user_id: userId,
-      },
-      include: memberBookingDetailInclude(),
-    });
+   return {
+  fields: {
+    select: memberFieldSelect,
+  },
+  reviews: {
+    where: {
+      visible: true,
+    },
+    select: {
+      id: true,
+      rating: true,
+      comment: true,
+      created_at: true,
+    },
+    take: 1,
+  },
+  booking_status_history: {
+    orderBy: { changed_at: "desc" },
+  },
+};
   },
 
   cancelMyBooking(userId, bookingId) {

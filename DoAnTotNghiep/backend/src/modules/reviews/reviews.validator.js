@@ -61,3 +61,12 @@ export function validateReplyReviewPayload(payload) {
 
   return { reply_text };
 }
+export function validateFieldReviewParams(params) {
+  const fieldId = Number(params.fieldId);
+
+  if (Number.isNaN(fieldId) || fieldId <= 0) {
+    throw new ValidationError("fieldId không hợp lệ");
+  }
+
+  return { fieldId };
+}

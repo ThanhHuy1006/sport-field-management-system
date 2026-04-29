@@ -25,6 +25,14 @@ export function toBookingListItem(item) {
         }
       : null,
     payment_expires_at: item.payment_expires_at || null,
+    review: item.reviews?.[0]
+      ? {
+          id: item.reviews[0].id,
+          rating: item.reviews[0].rating,
+          comment: item.reviews[0].comment,
+          created_at: item.reviews[0].created_at,
+        }
+      : null,
   };
 }
 
@@ -66,6 +74,14 @@ export function toBookingDetail(item) {
       reason: h.reason ?? null,
     })),
     payment_expires_at: item.payment_expires_at || null,
+    review: item.reviews?.[0]
+      ? {
+          id: item.reviews[0].id,
+          rating: item.reviews[0].rating,
+          comment: item.reviews[0].comment,
+          created_at: item.reviews[0].created_at,
+        }
+      : null,
   };
 }
 
