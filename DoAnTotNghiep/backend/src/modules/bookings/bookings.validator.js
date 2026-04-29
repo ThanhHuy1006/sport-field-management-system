@@ -65,6 +65,30 @@ export function validateCheckAvailabilityPayload(payload) {
 //     notes: rawNotes ? String(rawNotes).trim() : null,
 //   };
 // }
+// export function validateCreateBookingPayload(payload) {
+//   const base = validateCheckAvailabilityPayload(payload);
+//   const rawNotes = payload.notes ?? payload.note ?? null;
+//   const rawContactName = payload.contact_name ?? null;
+//   const rawContactEmail = payload.contact_email ?? null;
+//   const rawContactPhone = payload.contact_phone ?? null;
+//   const rawRequestedPaymentMethod =
+//     payload.requested_payment_method ?? payload.payment_method ?? "ONSITE";
+
+//   const requested_payment_method = String(rawRequestedPaymentMethod).trim();
+
+//   if (!ALLOWED_BOOKING_PAYMENT_METHODS.includes(requested_payment_method)) {
+//     throw new ValidationError("requested_payment_method không hợp lệ");
+//   }
+
+//   return {
+//     ...base,
+//     notes: rawNotes ? String(rawNotes).trim() : null,
+//     contact_name: rawContactName ? String(rawContactName).trim() : null,
+//     contact_email: rawContactEmail ? String(rawContactEmail).trim() : null,
+//     contact_phone: rawContactPhone ? String(rawContactPhone).trim() : null,
+//     requested_payment_method,
+//   };
+// }
 export function validateCreateBookingPayload(payload) {
   const base = validateCheckAvailabilityPayload(payload);
   const rawNotes = payload.notes ?? payload.note ?? null;
@@ -74,11 +98,18 @@ export function validateCreateBookingPayload(payload) {
   const rawRequestedPaymentMethod =
     payload.requested_payment_method ?? payload.payment_method ?? "ONSITE";
 
-  const requested_payment_method = String(rawRequestedPaymentMethod).trim();
+  const requested_payment_method = String(rawRequestedPaymentMethod)
+    .trim()
+    .toUpperCase();
 
   if (!ALLOWED_BOOKING_PAYMENT_METHODS.includes(requested_payment_method)) {
     throw new ValidationError("requested_payment_method không hợp lệ");
   }
+
+  const rawVoucherCode = payload.voucher_code ?? payload.voucherCode ?? null;
+  const voucher_code = rawVoucherCode
+    ? String(rawVoucherCode).trim().toUpperCase()
+    : null;
 
   return {
     ...base,
@@ -87,9 +118,9 @@ export function validateCreateBookingPayload(payload) {
     contact_email: rawContactEmail ? String(rawContactEmail).trim() : null,
     contact_phone: rawContactPhone ? String(rawContactPhone).trim() : null,
     requested_payment_method,
+    voucher_code,
   };
 }
-
 
 export function validateRejectBookingPayload(payload) {
   return {

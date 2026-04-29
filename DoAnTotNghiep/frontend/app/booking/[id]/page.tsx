@@ -19,9 +19,11 @@ import {
 } from "@/features/fields/services/get-field-detail";
 import { getBookingAvailabilitySlots } from "@/features/bookings/services/get-booking-availability-slots";
 import { createBooking } from "@/features/bookings/services/create-booking";
+import { validateVoucher } from "@/features/vouchers/services/validate-voucher";
 
 type FieldUi = {
   id: number;
+  ownerId: number | null;
   name: string;
   location: string;
   image: string | null;
@@ -40,8 +42,13 @@ type SlotUi = {
 };
 
 function mapFieldDetailToUi(data: FieldDetailResponse["data"]): FieldUi {
+  const source = data as FieldDetailResponse["data"] & {
+    owner_id?: number | null;
+  };
+
   return {
     id: data.id,
+    ownerId: source.owner_id ?? null,
     name: data.field_name ?? "Chưa có tên sân",
     location: data.address ?? "Chưa cập nhật địa chỉ",
     image: data.images?.[0]?.url ?? null,
@@ -87,6 +94,21 @@ export default function BookingPage() {
     status: string;
     total_price: string | number;
     requested_payment_method?: "ONSITE" | "BANK_TRANSFER" | null;
+  }>(null);
+  const [voucherCode, setVoucherCode] = useState("");
+  const [isApplyingVoucher, setIsApplyingVoucher] = useState(false);
+  const [voucherError, setVoucherError] = useState("");
+  const [voucherMessage, setVoucherMessage] = useState("");
+  const [appliedVoucher, setAppliedVoucher] = useState<null | {
+    voucher: {
+      id: number;
+      code: string;
+      type: "FIXED" | "PERCENT";
+      discount_value: number | null;
+    };
+    order_amount: number;
+    discount_amount: number;
+    final_amount: number;
   }>(null);
 
   useEffect(() => {
@@ -170,8 +192,9 @@ export default function BookingPage() {
     return field.pricePerHour * bookingData.durationHours;
   }, [field, bookingData.durationHours]);
 
-  const serviceFee = 50000;
-  const finalAmount = subtotal + serviceFee;
+  const voucherDiscount = appliedVoucher?.discount_amount ?? 0;
+  const serviceFee = 0;
+  const finalAmount = Math.max(subtotal - voucherDiscount, 0);
 
   const handleDateChange = (value: string) => {
     setBookingData((prev) => ({
@@ -179,17 +202,84 @@ export default function BookingPage() {
       date: value,
       selectedSlot: null,
     }));
+    setAppliedVoucher(null);
+    setVoucherMessage("");
+    setVoucherError("");
   };
 
-  const handleDurationChange = (delta: number) => {
-    setBookingData((prev) => {
-      const next = Math.min(4, Math.max(1, prev.durationHours + delta));
-      return {
-        ...prev,
-        durationHours: next,
-        selectedSlot: null,
-      };
-    });
+const handleDurationChange = (delta: number) => {
+  setBookingData((prev) => {
+    const next = Math.min(4, Math.max(1, prev.durationHours + delta));
+    return {
+      ...prev,
+      durationHours: next,
+      selectedSlot: null,
+    };
+  });
+
+  setAppliedVoucher(null);
+  setVoucherMessage("");
+  setVoucherError("");
+};
+  const handleApplyVoucher = async () => {
+    if (!field) return;
+
+    const code = voucherCode.trim().toUpperCase();
+
+    if (!code) {
+      setVoucherError("Vui lòng nhập mã voucher");
+      setVoucherMessage("");
+      setAppliedVoucher(null);
+      return;
+    }
+
+    if (subtotal <= 0) {
+      setVoucherError("Vui lòng chọn thời lượng đặt sân trước khi áp voucher");
+      setVoucherMessage("");
+      setAppliedVoucher(null);
+      return;
+    }
+
+    try {
+      setIsApplyingVoucher(true);
+      setVoucherError("");
+      setVoucherMessage("");
+
+      const result = await validateVoucher({
+        code,
+        order_amount: subtotal,
+        owner_id: field.ownerId,
+      });
+
+      setAppliedVoucher({
+        voucher: result.data.voucher,
+        order_amount: result.data.order_amount,
+        discount_amount: result.data.discount_amount,
+        final_amount: result.data.final_amount,
+      });
+
+      setVoucherCode(result.data.voucher.code);
+      setVoucherMessage(
+        `Áp dụng voucher thành công, giảm ${formatCurrency(
+          result.data.discount_amount,
+        )} VND`,
+      );
+    } catch (err) {
+      setAppliedVoucher(null);
+      setVoucherMessage("");
+      setVoucherError(
+        err instanceof Error ? err.message : "Voucher không hợp lệ",
+      );
+    } finally {
+      setIsApplyingVoucher(false);
+    }
+  };
+
+  const handleRemoveVoucher = () => {
+    setAppliedVoucher(null);
+    setVoucherCode("");
+    setVoucherMessage("");
+    setVoucherError("");
   };
 
   const handleCreateBooking = async () => {
@@ -226,6 +316,7 @@ export default function BookingPage() {
         contact_phone: bookingData.phone || null,
         notes: bookingData.notes || null,
         requested_payment_method: bookingData.paymentMethod,
+        voucher_code: appliedVoucher?.voucher.code ?? null,
       });
 
       setCreatedBooking({
@@ -595,6 +686,52 @@ export default function BookingPage() {
                     </button>
                   </div>
                 </div>
+                <div className="border-t border-border pt-4 mt-4">
+                  <p className="font-medium mb-3">Mã giảm giá</p>
+
+                  <div className="flex gap-2">
+                    <input
+                      className="flex-1 border border-border rounded-md px-3 py-2 bg-background"
+                      placeholder="Nhập mã voucher"
+                      value={voucherCode}
+                      onChange={(e) => {
+                        setVoucherCode(e.target.value.toUpperCase());
+                        setVoucherError("");
+                        setVoucherMessage("");
+                      }}
+                      disabled={Boolean(appliedVoucher) || isApplyingVoucher}
+                    />
+
+                    {appliedVoucher ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleRemoveVoucher}
+                      >
+                        Bỏ áp dụng
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleApplyVoucher}
+                        disabled={isApplyingVoucher || !voucherCode.trim()}
+                      >
+                        {isApplyingVoucher ? "Đang áp dụng..." : "Áp dụng"}
+                      </Button>
+                    )}
+                  </div>
+
+                  {voucherMessage && (
+                    <p className="text-sm text-green-600 mt-2">
+                      {voucherMessage}
+                    </p>
+                  )}
+
+                  {voucherError && (
+                    <p className="text-sm text-red-600 mt-2">{voucherError}</p>
+                  )}
+                </div>
 
                 <Alert className="mt-6">
                   <Clock className="h-4 w-4" />
@@ -704,6 +841,17 @@ export default function BookingPage() {
                     {formatCurrency(serviceFee)} VND
                   </span>
                 </div>
+
+                {appliedVoucher && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Giảm giá ({appliedVoucher.voucher.code})</span>
+                    <span className="font-medium">
+                      -{formatCurrency(voucherDiscount)} VND
+                    </span>
+                  </div>
+                )}
+
+                
                 <div className="flex justify-between border-t border-border pt-3 text-base">
                   <span className="font-semibold">Tổng cộng</span>
                   <span className="font-bold text-primary">
