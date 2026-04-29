@@ -12,6 +12,7 @@ import {
   validateAdminBookingIdParams,
   validateUserStatusPayload,
   validateRejectOwnerRegistrationPayload,
+  validateRejectFieldPayload,
 } from "./admin.validator.js";
 
 const router = Router();
@@ -67,6 +68,7 @@ router.patch(
 router.patch(
   "/fields/:fieldId/reject",
   validateParams(validateAdminFieldIdParams),
+  validateBody(validateRejectFieldPayload),
   adminController.rejectField
 );
 

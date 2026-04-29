@@ -93,9 +93,11 @@ export function toAdminFieldResponse(item) {
       : 0,
     currency: item.currency,
     status: item.status,
+    reject_reason: item.reject_reason ?? null,
     min_duration_minutes: item.min_duration_minutes,
     max_players: item.max_players,
     created_at: item.created_at,
+    
     owner: item.users
       ? {
           id: item.users.id,

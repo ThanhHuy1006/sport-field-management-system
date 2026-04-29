@@ -99,8 +99,8 @@ const INITIAL_FORM_DATA: FormData = {
   agreeTerms: false,
 }
 
-function getAccessTokenFromAuthResponse(data: AuthData | { data?: AuthData }) {
-  const payload = "data" in data && data.data ? data.data : data
+function getAccessTokenFromAuthResponse(response: ApiResponse<AuthData>) {
+  const payload = response.data
 
   return payload.accessToken || payload.access_token || payload.token || ""
 }

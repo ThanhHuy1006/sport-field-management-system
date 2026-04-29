@@ -1,15 +1,21 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useCallback, useEffect, useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
+import { useCallback, useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   Check,
   X,
@@ -28,121 +34,133 @@ import {
   Shirt,
   LampDesk,
   AlertTriangle,
-} from "lucide-react"
-import { Pagination } from "@/components/pagination"
-import { apiGet, apiRequest } from "@/lib/api-client"
+} from "lucide-react";
+import { Pagination } from "@/components/pagination";
+import { apiGet, apiRequest } from "@/lib/api-client";
 
 type ApiResponse<T> = {
-  success: boolean
-  message: string
-  data: T
-}
+  success: boolean;
+  message: string;
+  data: T;
+};
 
 type AdminField = {
-  id: number
-  owner_id: number
-  field_name: string | null
-  sport_type: string | null
-  description: string | null
-  address: string | null
-  latitude: number | null
-  longitude: number | null
-  base_price_per_hour: number
-  currency: string | null
-  status: "pending" | "active" | "inactive" | "maintenance" | string
-  min_duration_minutes: number | null
-  max_players: number | null
-  created_at: string | null
+  id: number;
+  owner_id: number;
+  field_name: string | null;
+  sport_type: string | null;
+  description: string | null;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  base_price_per_hour: number;
+  currency: string | null;
+  status: "pending" | "active" | "hidden" | "maintenance" | string;
+  reject_reason: string | null;
+  min_duration_minutes: number | null;
+  max_players: number | null;
+  created_at: string | null;
   owner: {
-    id: number
-    name: string | null
-    email: string | null
-  } | null
+    id: number;
+    name: string | null;
+    email: string | null;
+  } | null;
   primary_image: {
-    id: number
-    url: string
-    is_primary: boolean
-    order_no: number | null
-  } | null
-}
+    id: number;
+    url: string;
+    is_primary: boolean;
+    order_no: number | null;
+  } | null;
+};
 
 type UiField = {
-  id: number
-  name: string
-  owner: string
-  ownerPhone: string
-  ownerEmail: string
-  location: string
-  district: string
-  type: string
-  typeName: string
-  status: "pending" | "active" | "inactive" | "maintenance" | string
-  createdDate: string
-  priceWeekday: number
-  priceWeekend: number
-  openTime: string
-  closeTime: string
-  rating: number
-  totalBookings: number
-  totalReviews: number
-  description: string
-  amenities: string[]
-  images: string[]
-  size: string
-  capacity: string
-  rejectedReason?: string
-}
+  id: number;
+  name: string;
+  owner: string;
+  ownerPhone: string;
+  ownerEmail: string;
+  location: string;
+  district: string;
+  type: string;
+  typeName: string;
+  status: "pending" | "active" | "inactive" | "maintenance" | string;
+  createdDate: string;
+  priceWeekday: number;
+  priceWeekend: number;
+  openTime: string;
+  closeTime: string;
+  rating: number;
+  totalBookings: number;
+  totalReviews: number;
+  description: string;
+  amenities: string[];
+  images: string[];
+  size: string;
+  capacity: string;
+  rejectedReason?: string;
+};
 
 const API_ORIGIN = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api/v1"
-).replace(/\/api\/v1\/?$/, "")
+).replace(/\/api\/v1\/?$/, "");
 
 const amenityIcons: Record<string, { icon: React.ReactNode; label: string }> = {
   wifi: { icon: <Wifi className="w-4 h-4" />, label: "Wifi miễn phí" },
   parking: { icon: <Car className="w-4 h-4" />, label: "Bãi đỗ xe" },
   shower: { icon: <ShowerHead className="w-4 h-4" />, label: "Phòng tắm" },
   canteen: { icon: <UtensilsCrossed className="w-4 h-4" />, label: "Căn tin" },
-  changing_room: { icon: <Shirt className="w-4 h-4" />, label: "Phòng thay đồ" },
+  changing_room: {
+    icon: <Shirt className="w-4 h-4" />,
+    label: "Phòng thay đồ",
+  },
   lighting: { icon: <LampDesk className="w-4 h-4" />, label: "Đèn chiếu sáng" },
-}
+};
 
 function formatDate(value?: string | null) {
-  if (!value) return "-"
-  return new Date(value).toLocaleDateString("vi-VN")
+  if (!value) return "-";
+  return new Date(value).toLocaleDateString("vi-VN");
 }
 
 function toAssetUrl(url?: string | null) {
-  if (!url) return "/placeholder.svg?height=96&width=128&query=sports field"
-  if (url.startsWith("http")) return url
-  if (url.startsWith("/uploads")) return `${API_ORIGIN}${url}`
-  return url
+  if (!url) return "/placeholder.svg?height=96&width=128&query=sports field";
+  if (url.startsWith("http")) return url;
+  if (url.startsWith("/uploads")) return `${API_ORIGIN}${url}`;
+  return url;
 }
 
 function getDistrictFromAddress(address?: string | null) {
-  if (!address) return "-"
+  if (!address) return "-";
   const parts = address
     .split(",")
     .map((item) => item.trim())
-    .filter(Boolean)
+    .filter(Boolean);
 
-  return parts.length >= 2 ? parts[parts.length - 2] : parts[0] || "-"
+  return parts.length >= 2 ? parts[parts.length - 2] : parts[0] || "-";
 }
 
 function getSportTypeName(type?: string | null) {
-  const value = String(type || "").toLowerCase()
+  const value = String(type || "").toLowerCase();
 
-  if (value.includes("football") || value.includes("soccer") || value.includes("bóng đá")) return "Bóng Đá"
-  if (value.includes("basketball") || value.includes("bóng rổ")) return "Bóng Rổ"
-  if (value.includes("badminton") || value.includes("cầu lông")) return "Cầu Lông"
-  if (value.includes("tennis")) return "Tennis"
-  if (value.includes("volleyball") || value.includes("bóng chuyền")) return "Bóng Chuyền"
+  if (
+    value.includes("football") ||
+    value.includes("soccer") ||
+    value.includes("bóng đá")
+  )
+    return "Bóng Đá";
+  if (value.includes("basketball") || value.includes("bóng rổ"))
+    return "Bóng Rổ";
+  if (value.includes("badminton") || value.includes("cầu lông"))
+    return "Cầu Lông";
+  if (value.includes("tennis")) return "Tennis";
+  if (value.includes("volleyball") || value.includes("bóng chuyền"))
+    return "Bóng Chuyền";
 
-  return type || "Khác"
+  return type || "Khác";
 }
 
 function mapFieldToUi(field: AdminField): UiField {
-  const imageUrl = toAssetUrl(field.primary_image?.url)
-  const price = Number(field.base_price_per_hour || 0)
+  const imageUrl = toAssetUrl(field.primary_image?.url);
+  const price = Number(field.base_price_per_hour || 0);
 
   return {
     id: field.id,
@@ -155,6 +173,10 @@ function mapFieldToUi(field: AdminField): UiField {
     type: field.sport_type || "unknown",
     typeName: getSportTypeName(field.sport_type),
     status: field.status,
+    rejectedReason:
+      field.status === "hidden"
+        ? field.reject_reason || "Sân đã bị từ chối hoặc đã bị ẩn."
+        : undefined,
     createdDate: formatDate(field.created_at),
     priceWeekday: price,
     priceWeekend: price,
@@ -168,153 +190,165 @@ function mapFieldToUi(field: AdminField): UiField {
     images: [imageUrl],
     size: "-",
     capacity: field.max_players ? `${field.max_players} người` : "-",
-    rejectedReason: field.status === "inactive" ? "Sân đã bị từ chối hoặc đã bị ẩn." : undefined,
-  }
+  };
 }
 
 function getFieldStatusLabel(status: string) {
-  if (status === "pending") return "Chờ Duyệt"
-  if (status === "active") return "Đã Duyệt"
-  if (status === "inactive") return "Từ Chối"
-  if (status === "maintenance") return "Bảo Trì"
-  return status
+  if (status === "pending") return "Chờ Duyệt";
+  if (status === "active") return "Đã Duyệt";
+  if (status === "hidden") return "Từ Chối";
+  if (status === "maintenance") return "Bảo Trì";
+  return status;
 }
 
 function getFieldStatusClassName(status: string) {
   if (status === "pending") {
-    return "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300"
+    return "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300";
   }
 
   if (status === "active") {
-    return "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+    return "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300";
   }
 
   if (status === "maintenance") {
-    return "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+    return "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300";
   }
 
-  return "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
+  return "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300";
 }
 
 export default function AdminFieldsPage() {
-  const [fields, setFields] = useState<UiField[]>([])
-  const [loading, setLoading] = useState(true)
-  const [filterStatus, setFilterStatus] = useState("all")
-  const [searchQuery, setSearchQuery] = useState("")
-  const [currentPage, setCurrentPage] = useState(1)
-  const [selectedField, setSelectedField] = useState<UiField | null>(null)
-  const [showDetailDialog, setShowDetailDialog] = useState(false)
-  const [showRejectDialog, setShowRejectDialog] = useState(false)
-  const [rejectReason, setRejectReason] = useState("")
-  const [fieldToReject, setFieldToReject] = useState<number | null>(null)
-  const itemsPerPage = 8
+  const [fields, setFields] = useState<UiField[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedField, setSelectedField] = useState<UiField | null>(null);
+  const [showDetailDialog, setShowDetailDialog] = useState(false);
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [fieldToReject, setFieldToReject] = useState<number | null>(null);
+  const itemsPerPage = 8;
 
   const fetchAdminFields = useCallback(async () => {
-    setLoading(true)
+    setLoading(true);
 
     try {
-      const res = await apiGet<ApiResponse<AdminField[]>>("/admin/fields")
-      setFields(res.data.map(mapFieldToUi))
+      const res = await apiGet<ApiResponse<AdminField[]>>("/admin/fields");
+      setFields(res.data.map(mapFieldToUi));
     } catch (error) {
-      console.error(error)
+      console.error(error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
-    fetchAdminFields()
-  }, [fetchAdminFields])
+    fetchAdminFields();
+  }, [fetchAdminFields]);
 
   const filteredFields = fields.filter((f) => {
-    const matchStatus = filterStatus === "all" || f.status === filterStatus
+    const matchStatus = filterStatus === "all" || f.status === filterStatus;
     const matchSearch =
       searchQuery === "" ||
       f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       f.owner.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      f.location.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchStatus && matchSearch
-  })
+      f.location.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchStatus && matchSearch;
+  });
 
-  const totalPages = Math.ceil(filteredFields.length / itemsPerPage)
-  const paginatedFields = filteredFields.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+  const totalPages = Math.ceil(filteredFields.length / itemsPerPage);
+  const paginatedFields = filteredFields.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage,
+  );
 
   const stats = {
     total: fields.length,
     pending: fields.filter((f) => f.status === "pending").length,
     approved: fields.filter((f) => f.status === "active").length,
-    rejected: fields.filter((f) => f.status === "inactive").length,
-  }
+    rejected: fields.filter((f) => f.status === "hidden").length,
+  };
 
   const handleApprove = async (id: number) => {
     try {
       await apiRequest<ApiResponse<AdminField>>(`/admin/fields/${id}/approve`, {
         method: "PATCH",
-      })
+      });
 
-      await fetchAdminFields()
+      await fetchAdminFields();
 
       if (selectedField?.id === id) {
-        setSelectedField((prev) => (prev ? { ...prev, status: "active" } : prev))
+        setSelectedField((prev) =>
+          prev ? { ...prev, status: "active" } : prev,
+        );
       }
     } catch (error) {
-      console.error(error)
-      alert(error instanceof Error ? error.message : "Không thể duyệt sân")
+      console.error(error);
+      alert(error instanceof Error ? error.message : "Không thể duyệt sân");
     }
-  }
+  };
 
   const openRejectDialog = (id: number) => {
-    setFieldToReject(id)
-    setRejectReason("")
-    setShowRejectDialog(true)
-  }
+    setFieldToReject(id);
+    setRejectReason("");
+    setShowRejectDialog(true);
+  };
 
   const handleReject = async () => {
-    if (fieldToReject === null) return
+    if (fieldToReject === null) return;
 
     try {
-      await apiRequest<ApiResponse<AdminField>>(`/admin/fields/${fieldToReject}/reject`, {
-        method: "PATCH",
-      })
+      await apiRequest<ApiResponse<AdminField>>(
+        `/admin/fields/${fieldToReject}/reject`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            reject_reason: rejectReason.trim(),
+          }),
+        },
+      );
 
-      await fetchAdminFields()
+      await fetchAdminFields();
 
       if (selectedField?.id === fieldToReject) {
         setSelectedField((prev) =>
           prev
             ? {
                 ...prev,
-                status: "inactive",
+                status: "hidden",
                 rejectedReason: rejectReason || "Không đạt yêu cầu",
               }
-            : prev
-        )
+            : prev,
+        );
       }
 
-      setShowRejectDialog(false)
-      setFieldToReject(null)
-      setRejectReason("")
+      setShowRejectDialog(false);
+      setFieldToReject(null);
+      setRejectReason("");
     } catch (error) {
-      console.error(error)
-      alert(error instanceof Error ? error.message : "Không thể từ chối sân")
+      console.error(error);
+      alert(error instanceof Error ? error.message : "Không thể từ chối sân");
     }
-  }
+  };
 
   const handleViewDetail = (field: UiField) => {
-    setSelectedField(field)
-    setShowDetailDialog(true)
-  }
+    setSelectedField(field);
+    setShowDetailDialog(true);
+  };
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("vi-VN").format(price) + " VND"
-  }
+    return new Intl.NumberFormat("vi-VN").format(price) + " VND";
+  };
 
   return (
     <div className="p-4 md:p-8">
       {/* Page Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground">Quản Lý Sân</h1>
-        <p className="text-muted-foreground">Phê duyệt và quản lý các sân thể thao trong hệ thống</p>
+        <p className="text-muted-foreground">
+          Phê duyệt và quản lý các sân thể thao trong hệ thống
+        </p>
       </div>
 
       {/* Stats Cards */}
@@ -345,8 +379,8 @@ export default function AdminFieldsPage() {
             placeholder="Tìm kiếm theo tên sân, chủ sân, địa chỉ..."
             value={searchQuery}
             onChange={(e) => {
-              setSearchQuery(e.target.value)
-              setCurrentPage(1)
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
             }}
             className="pl-10"
           />
@@ -356,13 +390,13 @@ export default function AdminFieldsPage() {
             { value: "all", label: "Tất Cả" },
             { value: "pending", label: `Chờ Duyệt (${stats.pending})` },
             { value: "active", label: "Đã Duyệt" },
-            { value: "inactive", label: "Từ Chối" },
+            { value: "hidden", label: "Từ Chối" },
           ].map((status) => (
             <button
               key={status.value}
               onClick={() => {
-                setFilterStatus(status.value)
-                setCurrentPage(1)
+                setFilterStatus(status.value);
+                setCurrentPage(1);
               }}
               className={`px-4 py-2 rounded-lg font-medium transition text-sm ${
                 filterStatus === status.value
@@ -391,7 +425,10 @@ export default function AdminFieldsPage() {
                 {/* Field Image */}
                 <div className="w-full md:w-32 h-24 rounded-lg overflow-hidden bg-muted flex-shrink-0">
                   <img
-                    src={field.images[0] || "/placeholder.svg?height=96&width=128&query=sports field"}
+                    src={
+                      field.images[0] ||
+                      "/placeholder.svg?height=96&width=128&query=sports field"
+                    }
                     alt={field.name}
                     className="w-full h-full object-cover"
                   />
@@ -401,14 +438,18 @@ export default function AdminFieldsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div>
-                      <h3 className="text-lg font-bold text-foreground">{field.name}</h3>
+                      <h3 className="text-lg font-bold text-foreground">
+                        {field.name}
+                      </h3>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Badge variant="outline">{field.typeName}</Badge>
                         <span>•</span>
                         <span>{field.district}</span>
                       </div>
                     </div>
-                    <Badge className={`flex-shrink-0 ${getFieldStatusClassName(field.status)}`}>
+                    <Badge
+                      className={`flex-shrink-0 ${getFieldStatusClassName(field.status)}`}
+                    >
                       {getFieldStatusLabel(field.status)}
                     </Badge>
                   </div>
@@ -416,11 +457,15 @@ export default function AdminFieldsPage() {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-3">
                     <div className="flex items-center gap-1.5">
                       <User className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-foreground truncate">{field.owner}</span>
+                      <span className="text-foreground truncate">
+                        {field.owner}
+                      </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <DollarSign className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-foreground">{formatPrice(field.priceWeekday)}/h</span>
+                      <span className="text-foreground">
+                        {formatPrice(field.priceWeekday)}/h
+                      </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Clock className="w-4 h-4 text-muted-foreground" />
@@ -430,7 +475,9 @@ export default function AdminFieldsPage() {
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Calendar className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-foreground">{field.createdDate}</span>
+                      <span className="text-foreground">
+                        {field.createdDate}
+                      </span>
                     </div>
                   </div>
 
@@ -440,8 +487,12 @@ export default function AdminFieldsPage() {
                         <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                         <span className="font-medium">{field.rating}</span>
                       </div>
-                      <span className="text-muted-foreground">{field.totalBookings} lượt đặt</span>
-                      <span className="text-muted-foreground">{field.totalReviews} đánh giá</span>
+                      <span className="text-muted-foreground">
+                        {field.totalBookings} lượt đặt
+                      </span>
+                      <span className="text-muted-foreground">
+                        {field.totalReviews} đánh giá
+                      </span>
                     </div>
                   )}
                 </div>
@@ -469,7 +520,11 @@ export default function AdminFieldsPage() {
                       </Button>
                     </>
                   )}
-                  <Button variant="outline" size="sm" onClick={() => handleViewDetail(field)}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleViewDetail(field)}
+                  >
                     <Eye className="w-4 h-4 mr-1" />
                     Xem
                   </Button>
@@ -482,7 +537,9 @@ export default function AdminFieldsPage() {
 
       {!loading && filteredFields.length === 0 && (
         <Card className="p-12 text-center">
-          <p className="text-muted-foreground text-lg">Không tìm thấy sân nào</p>
+          <p className="text-muted-foreground text-lg">
+            Không tìm thấy sân nào
+          </p>
         </Card>
       )}
 
@@ -505,13 +562,17 @@ export default function AdminFieldsPage() {
               <DialogHeader>
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <DialogTitle className="text-xl">{selectedField.name}</DialogTitle>
+                    <DialogTitle className="text-xl">
+                      {selectedField.name}
+                    </DialogTitle>
                     <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
                       <MapPin className="w-4 h-4" />
                       {selectedField.location}
                     </p>
                   </div>
-                  <Badge className={`${getFieldStatusClassName(selectedField.status)}`}>
+                  <Badge
+                    className={`${getFieldStatusClassName(selectedField.status)}`}
+                  >
                     {getFieldStatusLabel(selectedField.status)}
                   </Badge>
                 </div>
@@ -551,11 +612,15 @@ export default function AdminFieldsPage() {
                   </div>
                   <div className="space-y-1">
                     <p className="text-muted-foreground">Giá ngày thường</p>
-                    <p className="font-medium text-primary">{formatPrice(selectedField.priceWeekday)}/giờ</p>
+                    <p className="font-medium text-primary">
+                      {formatPrice(selectedField.priceWeekday)}/giờ
+                    </p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-muted-foreground">Giá cuối tuần</p>
-                    <p className="font-medium text-primary">{formatPrice(selectedField.priceWeekend)}/giờ</p>
+                    <p className="font-medium text-primary">
+                      {formatPrice(selectedField.priceWeekend)}/giờ
+                    </p>
                   </div>
                 </div>
 
@@ -564,7 +629,9 @@ export default function AdminFieldsPage() {
                   <p className="text-sm text-muted-foreground mb-2">Tiện ích</p>
                   <div className="flex flex-wrap gap-2">
                     {selectedField.amenities.length === 0 ? (
-                      <span className="text-sm text-muted-foreground">Chưa cập nhật</span>
+                      <span className="text-sm text-muted-foreground">
+                        Chưa cập nhật
+                      </span>
                     ) : (
                       selectedField.amenities.map((amenity) => (
                         <Badge key={amenity} variant="secondary">
@@ -594,27 +661,38 @@ export default function AdminFieldsPage() {
                 {selectedField.status === "active" && (
                   <div className="grid grid-cols-3 gap-4 text-center">
                     <div className="p-3 bg-muted/50 rounded-lg">
-                      <p className="text-2xl font-bold text-primary">{selectedField.rating}</p>
+                      <p className="text-2xl font-bold text-primary">
+                        {selectedField.rating}
+                      </p>
                       <p className="text-xs text-muted-foreground">Đánh giá</p>
                     </div>
                     <div className="p-3 bg-muted/50 rounded-lg">
-                      <p className="text-2xl font-bold text-primary">{selectedField.totalBookings}</p>
+                      <p className="text-2xl font-bold text-primary">
+                        {selectedField.totalBookings}
+                      </p>
                       <p className="text-xs text-muted-foreground">Lượt đặt</p>
                     </div>
                     <div className="p-3 bg-muted/50 rounded-lg">
-                      <p className="text-2xl font-bold text-primary">{selectedField.totalReviews}</p>
+                      <p className="text-2xl font-bold text-primary">
+                        {selectedField.totalReviews}
+                      </p>
                       <p className="text-xs text-muted-foreground">Đánh giá</p>
                     </div>
                   </div>
                 )}
 
                 {/* Lý do từ chối */}
-                {selectedField.status === "inactive" && selectedField.rejectedReason && (
-                  <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-                    <p className="text-sm font-medium text-red-700 dark:text-red-300 mb-1">Lý do từ chối</p>
-                    <p className="text-sm text-red-600 dark:text-red-400">{selectedField.rejectedReason}</p>
-                  </div>
-                )}
+                {selectedField.status === "hidden" &&
+                  selectedField.rejectedReason && (
+                    <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                      <p className="text-sm font-medium text-red-700 dark:text-red-300 mb-1">
+                        Lý do từ chối
+                      </p>
+                      <p className="text-sm text-red-600 dark:text-red-400">
+                        {selectedField.rejectedReason}
+                      </p>
+                    </div>
+                  )}
 
                 {/* Actions */}
                 {selectedField.status === "pending" && (
@@ -630,9 +708,9 @@ export default function AdminFieldsPage() {
                       variant="outline"
                       className="flex-1 border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20 bg-transparent"
                       onClick={() => {
-                        setFieldToReject(selectedField.id)
-                        setShowDetailDialog(false)
-                        setShowRejectDialog(true)
+                        setFieldToReject(selectedField.id);
+                        setShowDetailDialog(false);
+                        setShowRejectDialog(true);
                       }}
                     >
                       <X className="w-4 h-4 mr-2" />
@@ -668,7 +746,8 @@ export default function AdminFieldsPage() {
                 rows={4}
               />
               <p className="text-sm text-muted-foreground">
-                Hiện backend đang chuyển sân sang inactive. Nếu muốn lưu lý do từ chối, cần bổ sung cột reject_reason cho bảng fields.
+                Hiện backend đang chuyển sân sang hidden. Nếu muốn lưu lý do từ
+                chối, cần bổ sung cột reject_reason cho bảng fields.
               </p>
             </div>
           </div>
@@ -676,14 +755,18 @@ export default function AdminFieldsPage() {
             <Button
               variant="outline"
               onClick={() => {
-                setShowRejectDialog(false)
-                setFieldToReject(null)
-                setRejectReason("")
+                setShowRejectDialog(false);
+                setFieldToReject(null);
+                setRejectReason("");
               }}
             >
               Hủy
             </Button>
-            <Button variant="destructive" onClick={handleReject} disabled={!rejectReason.trim()}>
+            <Button
+              variant="destructive"
+              onClick={handleReject}
+              disabled={!rejectReason.trim()}
+            >
               <X className="w-4 h-4 mr-2" />
               Xác Nhận Từ Chối
             </Button>
@@ -691,5 +774,5 @@ export default function AdminFieldsPage() {
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }
