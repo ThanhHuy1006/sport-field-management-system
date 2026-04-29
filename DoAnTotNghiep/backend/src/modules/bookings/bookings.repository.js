@@ -7,6 +7,7 @@ const ACTIVE_BOOKING_STATUSES = [
   "AWAITING_PAYMENT",
   "PAID",
   "CHECKED_IN",
+ 
 ];
 
 const memberFieldSelect = {
@@ -219,7 +220,11 @@ export const bookingsRepository = {
           contact_email: data.contact_email ?? null,
           contact_phone: data.contact_phone ?? null,
           approval_mode_snapshot: data.approval_mode_snapshot ?? "MANUAL",
+
           requested_payment_method: data.requested_payment_method ?? "ONSITE",
+          payment_expires_at: data.payment_expires_at ?? null,
+          total_price: data.total_price,
+          status: data.status,
           total_price: data.total_price,
           status: data.status,
         },
@@ -339,7 +344,7 @@ export const bookingsRepository = {
     });
   },
 
-  approveOwnerBooking(ownerId, bookingId,nextStatus = "APPROVED") {
+  approveOwnerBooking(ownerId, bookingId, nextStatus = "APPROVED") {
     return prisma.$transaction(async (tx) => {
       const booking = await tx.bookings.findFirst({
         where: {
@@ -356,6 +361,10 @@ export const bookingsRepository = {
         where: { id: bookingId },
         data: {
           status: nextStatus,
+          payment_expires_at:
+            nextStatus === "AWAITING_PAYMENT"
+              ? new Date(Date.now() + 30 * 60 * 1000)
+              : null,
         },
       });
 
@@ -366,9 +375,9 @@ export const bookingsRepository = {
           to_status: nextStatus,
           // reason: "Approved by owner",
           reason:
-        nextStatus === "AWAITING_PAYMENT"
-    ? "Approved by owner, awaiting payment"
-    : "Approved by owner",
+            nextStatus === "AWAITING_PAYMENT"
+              ? "Approved by owner, awaiting payment"
+              : "Approved by owner",
         },
       });
 
@@ -475,6 +484,37 @@ export const bookingsRepository = {
       });
 
       return hydrateOwnerBooking(tx, bookingId);
+    });
+  },
+  expireAwaitingPaymentBooking(bookingId, reason = "Payment expired") {
+    return prisma.$transaction(async (tx) => {
+      const booking = await tx.bookings.findUnique({
+        where: { id: bookingId },
+      });
+
+      if (!booking) return null;
+
+      if (booking.status !== "AWAITING_PAYMENT") {
+        return booking;
+      }
+
+      await tx.bookings.update({
+        where: { id: bookingId },
+        data: {
+          status: "PAYMENT_EXPIRED",
+        },
+      });
+
+      await tx.booking_status_history.create({
+        data: {
+          booking_id: bookingId,
+          from_status: booking.status,
+          to_status: "PAYMENT_EXPIRED",
+          reason,
+        },
+      });
+
+      return hydrateMemberBooking(tx, bookingId);
     });
   },
 };

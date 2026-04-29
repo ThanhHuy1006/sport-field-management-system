@@ -10,6 +10,7 @@ import {
 
 const CHECKIN_EARLY_MINUTES = 30;
 const CHECKIN_LATE_MINUTES = 60;
+const PAYMENT_EXPIRE_MINUTES = 30;
 
 function diffMinutes(start, end) {
   return Math.floor((end.getTime() - start.getTime()) / 60000);
@@ -120,13 +121,13 @@ function assertCanCheckInBooking(booking) {
 
   if (paymentMethod === "BANK_TRANSFER" && booking.status !== "PAID") {
     throw new ForbiddenError(
-      "Booking chuyển khoản phải thanh toán thành công trước khi check-in"
+      "Booking chuyển khoản phải thanh toán thành công trước khi check-in",
     );
   }
 
   if (paymentMethod === "ONSITE" && booking.status !== "APPROVED") {
     throw new ForbiddenError(
-      "Booking thanh toán tại sân phải được xác nhận trước khi check-in"
+      "Booking thanh toán tại sân phải được xác nhận trước khi check-in",
     );
   }
 
@@ -348,46 +349,50 @@ export const bookingsService = {
     };
   },
 
- async createBooking(userId, payload) {
-  const availability = await this.checkAvailability(payload);
+  async createBooking(userId, payload) {
+    const availability = await this.checkAvailability(payload);
 
-  if (!availability.available) {
-    throw new ConflictError(
-      availability.reason || "Khung giờ không khả dụng",
-    );
-  }
+    if (!availability.available) {
+      throw new ConflictError(
+        availability.reason || "Khung giờ không khả dụng",
+      );
+    }
 
-  const field = availability.field;
-  const approvalMode = field.approval_mode || "MANUAL";
-  const requestedPaymentMethod =
-    payload.requested_payment_method || "ONSITE";
+    const field = availability.field;
+    const approvalMode = field.approval_mode || "MANUAL";
+    const requestedPaymentMethod = payload.requested_payment_method || "ONSITE";
 
-  let initialStatus = "PENDING_CONFIRM";
+    let initialStatus = "PENDING_CONFIRM";
+    const paymentExpiresAt =
+      initialStatus === "AWAITING_PAYMENT"
+        ? new Date(Date.now() + PAYMENT_EXPIRE_MINUTES * 60 * 1000)
+        : null;
 
-  if (approvalMode === "AUTO") {
-    initialStatus =
-      requestedPaymentMethod === "BANK_TRANSFER"
-        ? "AWAITING_PAYMENT"
-        : "APPROVED";
-  }
+    if (approvalMode === "AUTO") {
+      initialStatus =
+        requestedPaymentMethod === "BANK_TRANSFER"
+          ? "AWAITING_PAYMENT"
+          : "APPROVED";
+    }
 
-  const booking = await bookingsRepository.createBookingWithHistory({
-    field_id: payload.field_id,
-    user_id: userId,
-    start_datetime: payload.start_datetime,
-    end_datetime: payload.end_datetime,
-    notes: payload.notes,
-    contact_name: payload.contact_name,
-    contact_email: payload.contact_email,
-    contact_phone: payload.contact_phone,
-    approval_mode_snapshot: approvalMode,
-    requested_payment_method: requestedPaymentMethod,
-    total_price: availability.total_price,
-    status: initialStatus,
-  });
+    const booking = await bookingsRepository.createBookingWithHistory({
+      field_id: payload.field_id,
+      user_id: userId,
+      start_datetime: payload.start_datetime,
+      end_datetime: payload.end_datetime,
+      notes: payload.notes,
+      contact_name: payload.contact_name,
+      contact_email: payload.contact_email,
+      contact_phone: payload.contact_phone,
+      approval_mode_snapshot: approvalMode,
+      requested_payment_method: requestedPaymentMethod,
+      total_price: availability.total_price,
+      status: initialStatus,
+      payment_expires_at: paymentExpiresAt,
+    });
 
-  return booking;
-},
+    return booking;
+  },
 
   async getMyBookings(userId, query) {
     const { items, total } = await bookingsRepository.findMyBookings(
@@ -535,30 +540,30 @@ export const bookingsService = {
   //   return bookingsRepository.approveOwnerBooking(ownerId, bookingId);
   // },
   async approveOwnerBooking(ownerId, bookingId) {
-  const booking = await bookingsRepository.findOwnerBookingById(
-    ownerId,
-    bookingId,
-  );
+    const booking = await bookingsRepository.findOwnerBookingById(
+      ownerId,
+      bookingId,
+    );
 
-  if (!booking) {
-    throw new NotFoundError("Không tìm thấy booking");
-  }
+    if (!booking) {
+      throw new NotFoundError("Không tìm thấy booking");
+    }
 
-  if (booking.status !== "PENDING_CONFIRM") {
-    throw new ForbiddenError("Chỉ booking đang chờ xác nhận mới được duyệt");
-  }
+    if (booking.status !== "PENDING_CONFIRM") {
+      throw new ForbiddenError("Chỉ booking đang chờ xác nhận mới được duyệt");
+    }
 
-  const nextStatus =
-    booking.requested_payment_method === "BANK_TRANSFER"
-      ? "AWAITING_PAYMENT"
-      : "APPROVED";
+    const nextStatus =
+      booking.requested_payment_method === "BANK_TRANSFER"
+        ? "AWAITING_PAYMENT"
+        : "APPROVED";
 
-  return bookingsRepository.approveOwnerBooking(
-    ownerId,
-    bookingId,
-    nextStatus,
-  );
-},
+    return bookingsRepository.approveOwnerBooking(
+      ownerId,
+      bookingId,
+      nextStatus,
+    );
+  },
 
   async rejectOwnerBooking(ownerId, bookingId, payload) {
     const booking = await bookingsRepository.findOwnerBookingById(
@@ -662,4 +667,6 @@ export const bookingsService = {
       payload.note,
     );
   },
+  
+  
 };

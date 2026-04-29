@@ -51,6 +51,8 @@ import {
 import { cancelMyBooking } from "@/features/bookings/services/cancel-my-booking"
 import { getMyBookingCheckInQr } from "@/features/bookings/services/get-my-booking-checkin-qr"
 
+type BookingPaymentMethod = "ONSITE" | "BANK_TRANSFER"
+
 type Booking = {
   id: number
   fieldId?: number
@@ -85,6 +87,7 @@ type Booking = {
   }
   recurringDates?: string[]
   checkedInAt?: string
+  requestedPaymentMethod?: BookingPaymentMethod | null
 }
 
 export default function BookingsPage() {
@@ -143,6 +146,10 @@ const formatLocalTime = (iso: string) => {
   })
 }
 
+const getBookingStartTime = (timeRange: string) => {
+  return timeRange.split(" - ")[0] || timeRange
+}
+
   // const mapApiBookingToUi = (item: MyBookingListItem): Booking => {
   //   const start = new Date(item.start_datetime)
   //   const end = new Date(item.end_datetime)
@@ -168,6 +175,9 @@ const formatLocalTime = (iso: string) => {
   //   }
   // }
   const mapApiBookingToUi = (item: MyBookingListItem): Booking => {
+  const source = item as MyBookingListItem & {
+    requested_payment_method?: BookingPaymentMethod | null
+  }
   const start = new Date(item.start_datetime)
   const end = new Date(item.end_datetime)
   const duration = Math.max(
@@ -189,6 +199,7 @@ const formatLocalTime = (iso: string) => {
     image: "/placeholder.svg",
     bookingRef: `BK-${item.id}`,
     checkedInAt: item.checked_in_at ?? undefined,
+    requestedPaymentMethod: source.requested_payment_method ?? null,
   }
 }
 
@@ -300,7 +311,7 @@ const formatLocalTime = (iso: string) => {
   }, [])
 
   const calculateRefund = (booking: Booking) => {
-    const bookingDateTime = new Date(`${booking.date}T${booking.time}`)
+    const bookingDateTime = new Date(`${booking.date}T${getBookingStartTime(booking.time)}`)
     const now = new Date()
     const hoursUntilBooking = (bookingDateTime.getTime() - now.getTime()) / (1000 * 60 * 60)
 
@@ -323,7 +334,7 @@ const formatLocalTime = (iso: string) => {
       return
     }
 
-    const bookingDateTime = new Date(`${selectedBooking.date}T${selectedBooking.time}`)
+    const bookingDateTime = new Date(`${selectedBooking.date}T${getBookingStartTime(selectedBooking.time)}`)
     const now = new Date()
     const hoursUntilBooking = (bookingDateTime.getTime() - now.getTime()) / (1000 * 60 * 60)
 
@@ -669,6 +680,9 @@ const formatLocalTime = (iso: string) => {
           ) : (
             paginatedBookings.map((booking) => {
               const statusDisplay = getStatusDisplay(booking.status)
+              const canPay =
+                booking.status === "AWAITING_PAYMENT" && booking.requestedPaymentMethod === "BANK_TRANSFER"
+
               return (
                 <Card key={booking.id} className="overflow-hidden hover:shadow-lg transition">
                   <div className="flex flex-col md:flex-row">
@@ -707,6 +721,16 @@ const formatLocalTime = (iso: string) => {
                             <div className="text-sm text-green-800 dark:text-green-200">
                               <p className="font-medium">Đã check-in thành công</p>
                               <p>Lúc: {new Date(booking.checkedInAt).toLocaleTimeString("vi-VN")}</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {canPay && (
+                          <div className="flex items-start gap-2 mb-4 p-3 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900 rounded-lg">
+                            <AlertCircle className="w-4 h-4 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
+                            <div className="text-sm text-orange-800 dark:text-orange-200">
+                              <p className="font-medium">Đơn đã được duyệt, đang chờ thanh toán</p>
+                              <p>Vui lòng thanh toán để hoàn tất đặt sân.</p>
                             </div>
                           </div>
                         )}
@@ -789,6 +813,15 @@ const formatLocalTime = (iso: string) => {
                             <QrCode className="w-4 h-4" />
                             {booking.status === "CHECKED_IN" ? "Xem QR" : "Mã Check-in"}
                           </Button>
+                        )}
+
+                        {canPay && (
+                          <Link href={`/payment/${booking.id}`}>
+                            <Button size="sm" className="gap-2">
+                              <DollarSign className="w-4 h-4" />
+                              Thanh toán ngay
+                            </Button>
+                          </Link>
                         )}
 
                         {booking.isRecurring && (

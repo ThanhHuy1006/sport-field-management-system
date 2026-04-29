@@ -72,6 +72,7 @@ export const ownerFieldsRepository = {
     const {
       fieldData,
       pricingRules = [],
+      operatingHours = [],
      
       amenities = [],
     } = payload;
@@ -98,6 +99,16 @@ export const ownerFieldsRepository = {
           })),
         });
       }
+      if (operatingHours.length > 0) {
+  await tx.operating_hours.createMany({
+    data: operatingHours.map((item) => ({
+      field_id: field.id,
+      day_of_week: item.day_of_week,
+      open_time: item.open_time,
+      close_time: item.close_time,
+    })),
+  });
+}
 
       // if (operatingHours.length > 0) {
       //   await tx.operating_hours.createMany({
