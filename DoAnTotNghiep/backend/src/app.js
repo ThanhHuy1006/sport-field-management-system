@@ -68,5 +68,9 @@ app.use("/api/v1", routes);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
+console.log("PROCESS CWD:", process.cwd());
+console.log("UPLOAD STATIC DIR:", getUploadStaticDir());
+
+app.use("/uploads", express.static(getUploadStaticDir()));
 
 export default app;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type SyntheticEvent } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import {
 } from "@/features/fields/services/get-field-detail";
 import { getFieldOwnerInfo } from "@/features/fields/services/get-field-owner-info";
 import { getFieldReviews } from "@/features/fields/services/get-field-reviews";
+import { getImageUrl } from "@/lib/image-url";
 
 type DetailFieldUi = {
   id: number;
@@ -59,9 +60,20 @@ type DetailFieldUi = {
 
 function formatDate(value: string | null | undefined) {
   if (!value) return "";
+
   const date = new Date(value);
+
   if (Number.isNaN(date.getTime())) return "";
+
   return date.toLocaleDateString("vi-VN");
+}
+
+function handleImageError(event: SyntheticEvent<HTMLImageElement>) {
+  const img = event.currentTarget;
+
+  if (img.src.includes("/placeholder.svg")) return;
+
+  img.src = "/placeholder.svg";
 }
 
 function mapFieldDetailToUi(
@@ -82,6 +94,16 @@ function mapFieldDetailToUi(
   const openTime = detail.openTime ?? "--:--";
   const closeTime = detail.closeTime ?? "--:--";
 
+  const images = [...(detail.images ?? [])]
+    .sort((a, b) => {
+      if (a.is_primary && !b.is_primary) return -1;
+      if (!a.is_primary && b.is_primary) return 1;
+
+      return Number(a.order_no ?? 0) - Number(b.order_no ?? 0);
+    })
+    .map((img) => img.url)
+    .filter(Boolean);
+
   return {
     id: detail.id,
     name: detail.field_name ?? "Chưa có tên sân",
@@ -94,7 +116,7 @@ function mapFieldDetailToUi(
     price: Number(detail.base_price_per_hour ?? 0),
     rating: Number(detail.rating ?? 0),
     reviewCount: Number(detail.reviews ?? 0),
-    images: (detail.images ?? []).map((img) => img.url).filter(Boolean),
+    images,
     description: detail.description ?? "Chưa có mô tả",
     amenities: (detail.facilities ?? []).map((item) => item.name).filter(Boolean),
     hours: `${openTime} - ${closeTime}`,
@@ -107,7 +129,6 @@ function mapFieldDetailToUi(
       reviews: Number(detail.reviews ?? 0),
     },
 
-    // TODO: thay bằng API thật sau
     availability: {
       "2025-01-15": ["08:00", "09:00", "10:00", "14:00", "15:00"],
       "2025-01-16": ["08:00", "09:00", "10:00", "11:00", "14:00"],
@@ -166,8 +187,11 @@ export default function FieldDetailsPage() {
         setCurrentImageIndex(0);
       } catch (err) {
         if (cancelled) return;
+
         setField(null);
-        setError(err instanceof Error ? err.message : "Không thể tải chi tiết sân");
+        setError(
+          err instanceof Error ? err.message : "Không thể tải chi tiết sân"
+        );
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -182,11 +206,13 @@ export default function FieldDetailsPage() {
 
   const displayImages = useMemo(() => {
     if (!field?.images?.length) return ["/placeholder.svg"];
-    return field.images;
+
+    return field.images.map((image) => getImageUrl(image));
   }, [field]);
 
   const handleShare = async () => {
     const url = window.location.href;
+
     if (navigator.share && field) {
       try {
         await navigator.share({
@@ -208,14 +234,18 @@ export default function FieldDetailsPage() {
   };
 
   const prevImage = () => {
-    setCurrentImageIndex((prev) => (prev - 1 + displayImages.length) % displayImages.length);
+    setCurrentImageIndex(
+      (prev) => (prev - 1 + displayImages.length) % displayImages.length
+    );
   };
 
   if (isLoading) {
     return (
       <main className="min-h-screen bg-background">
         <div className="max-w-7xl mx-auto px-4 py-12 text-center">
-          <p className="text-lg text-muted-foreground">Đang tải chi tiết sân...</p>
+          <p className="text-lg text-muted-foreground">
+            Đang tải chi tiết sân...
+          </p>
         </div>
       </main>
     );
@@ -241,19 +271,31 @@ export default function FieldDetailsPage() {
     <main className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 bg-background border-b border-border">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/browse" className="flex items-center gap-2 text-primary hover:text-primary/80">
+          <Link
+            href="/browse"
+            className="flex items-center gap-2 text-primary hover:text-primary/80"
+          >
             <ArrowLeft className="w-5 h-5" />
             Quay lại
           </Link>
+
           <div className="flex items-center gap-4">
-            <button onClick={handleShare} className="p-2 hover:bg-muted rounded-lg transition">
+            <button
+              onClick={handleShare}
+              className="p-2 hover:bg-muted rounded-lg transition"
+            >
               <Share2 className="w-5 h-5" />
             </button>
+
             <button
               onClick={() => setIsWishlisted(!isWishlisted)}
               className="p-2 hover:bg-muted rounded-lg transition"
             >
-              <Heart className={`w-5 h-5 ${isWishlisted ? "fill-red-500 text-red-500" : ""}`} />
+              <Heart
+                className={`w-5 h-5 ${
+                  isWishlisted ? "fill-red-500 text-red-500" : ""
+                }`}
+              />
             </button>
           </div>
         </div>
@@ -262,52 +304,92 @@ export default function FieldDetailsPage() {
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
-            <div className="relative bg-muted rounded-lg overflow-hidden mb-8">
+            <div className="relative bg-muted rounded-lg overflow-hidden mb-4">
               <img
                 src={displayImages[currentImageIndex] || "/placeholder.svg"}
                 alt={field.name}
+                onError={handleImageError}
                 className="w-full h-96 object-cover"
               />
-              <button
-                onClick={prevImage}
-                className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full transition"
-              >
-                <ChevronLeft className="w-6 h-6" />
-              </button>
-              <button
-                onClick={nextImage}
-                className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full transition"
-              >
-                <ChevronRight className="w-6 h-6" />
-              </button>
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-                {displayImages.map((_, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setCurrentImageIndex(idx)}
-                    className={`w-2 h-2 rounded-full transition ${
-                      idx === currentImageIndex ? "bg-white" : "bg-white/50"
-                    }`}
-                  />
-                ))}
+
+              <div className="absolute top-4 right-4 rounded-full bg-black/60 px-3 py-1 text-sm text-white">
+                {currentImageIndex + 1} / {displayImages.length}
               </div>
+
+              {displayImages.length > 1 && (
+                <>
+                  <button
+                    onClick={prevImage}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full transition"
+                  >
+                    <ChevronLeft className="w-6 h-6" />
+                  </button>
+
+                  <button
+                    onClick={nextImage}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full transition"
+                  >
+                    <ChevronRight className="w-6 h-6" />
+                  </button>
+
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+                    {displayImages.map((_, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setCurrentImageIndex(idx)}
+                        className={`w-2 h-2 rounded-full transition ${
+                          idx === currentImageIndex ? "bg-white" : "bg-white/50"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="grid grid-cols-5 gap-3 mb-8">
+              {displayImages.map((image, idx) => (
+                <button
+                  key={`${image}-${idx}`}
+                  type="button"
+                  onClick={() => setCurrentImageIndex(idx)}
+                  className={`h-20 sm:h-24 overflow-hidden rounded-lg border transition ${
+                    idx === currentImageIndex
+                      ? "border-primary ring-2 ring-primary/30"
+                      : "border-border hover:border-primary/60"
+                  }`}
+                >
+                  <img
+                    src={image}
+                    alt={`${field.name} ảnh ${idx + 1}`}
+                    onError={handleImageError}
+                    className="h-full w-full object-cover"
+                  />
+                </button>
+              ))}
             </div>
 
             <div className="mb-8">
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <h1 className="text-4xl font-bold text-foreground mb-2">{field.name}</h1>
+                  <h1 className="text-4xl font-bold text-foreground mb-2">
+                    {field.name}
+                  </h1>
+
                   <div className="flex flex-col sm:flex-row sm:items-center gap-4 text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <MapPin className="w-4 h-4" />
                       {field.location}
                     </div>
+
                     <div className="flex items-center gap-1">
                       <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
                       {field.rating} ({field.reviewCount} đánh giá)
                     </div>
                   </div>
                 </div>
+
                 <div className="text-right">
                   <div className="text-3xl font-bold text-primary">
                     {field.price.toLocaleString()} VND
@@ -319,19 +401,26 @@ export default function FieldDetailsPage() {
 
             <Card className="p-6 mb-8">
               <h2 className="text-2xl font-bold mb-4">Về sân này</h2>
-              <p className="text-muted-foreground mb-6">{field.description}</p>
+              <p className="text-muted-foreground mb-6">
+                {field.description}
+              </p>
 
               <h3 className="text-lg font-bold mb-3">Tiện nghi</h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {field.amenities.length > 0 ? (
                   field.amenities.map((amenity, idx) => (
-                    <div key={idx} className="flex items-center gap-2 text-foreground">
+                    <div
+                      key={idx}
+                      className="flex items-center gap-2 text-foreground"
+                    >
                       <div className="w-2 h-2 bg-primary rounded-full" />
                       {amenity}
                     </div>
                   ))
                 ) : (
-                  <p className="text-muted-foreground">Chưa có thông tin tiện ích</p>
+                  <p className="text-muted-foreground">
+                    Chưa có thông tin tiện ích
+                  </p>
                 )}
               </div>
             </Card>
@@ -348,24 +437,30 @@ export default function FieldDetailsPage() {
               <h3 className="text-lg font-bold mb-4">Chủ sân</h3>
               <div className="flex items-start justify-between">
                 <div>
-                  <h4 className="font-bold text-foreground mb-2">{field.owner.name}</h4>
+                  <h4 className="font-bold text-foreground mb-2">
+                    {field.owner.name}
+                  </h4>
+
                   <div className="flex items-center gap-1 mb-3">
                     <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
                     <span className="text-sm">
                       {field.owner.rating} ({field.owner.reviews} đánh giá)
                     </span>
                   </div>
+
                   <div className="space-y-2 text-sm text-muted-foreground">
                     <div className="flex items-center gap-2">
                       <Phone className="w-4 h-4" />
                       {field.owner.phone}
                     </div>
+
                     <div className="flex items-center gap-2">
                       <Mail className="w-4 h-4" />
                       {field.owner.email}
                     </div>
                   </div>
                 </div>
+
                 <Button variant="outline">Liên hệ chủ sân</Button>
               </div>
             </Card>
@@ -373,6 +468,7 @@ export default function FieldDetailsPage() {
             <Card className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-bold">Đánh giá khách hàng</h3>
+
                 <Link href={`/field/${field.id}/reviews`}>
                   <Button variant="outline" size="sm">
                     Xem tất cả ({field.reviewCount})
@@ -383,10 +479,16 @@ export default function FieldDetailsPage() {
               <div className="space-y-6">
                 {field.reviewsPreview.length > 0 ? (
                   field.reviewsPreview.map((review) => (
-                    <div key={review.id} className="pb-6 border-b border-border last:border-b-0">
+                    <div
+                      key={review.id}
+                      className="pb-6 border-b border-border last:border-b-0"
+                    >
                       <div className="flex items-start justify-between mb-2">
                         <div>
-                          <h4 className="font-bold text-foreground">{review.author}</h4>
+                          <h4 className="font-bold text-foreground">
+                            {review.author}
+                          </h4>
+
                           <div className="flex items-center gap-1">
                             {[...Array(5)].map((_, i) => (
                               <Star
@@ -400,8 +502,12 @@ export default function FieldDetailsPage() {
                             ))}
                           </div>
                         </div>
-                        <span className="text-sm text-muted-foreground">{review.date}</span>
+
+                        <span className="text-sm text-muted-foreground">
+                          {review.date}
+                        </span>
                       </div>
+
                       <p className="text-muted-foreground">{review.text}</p>
                     </div>
                   ))
@@ -423,6 +529,7 @@ export default function FieldDetailsPage() {
                     {field.price.toLocaleString()} VND
                   </span>
                 </div>
+
                 <div className="text-sm text-muted-foreground mt-3">
                   <p>• Đặt tối thiểu 1 giờ</p>
                   <p>• Phí dịch vụ: 50,000 VND</p>
@@ -433,6 +540,7 @@ export default function FieldDetailsPage() {
               <Link href={`/booking/${field.id}`}>
                 <Button className="w-full mb-3">Đặt sân ngay</Button>
               </Link>
+
               <Button
                 variant="outline"
                 className="w-full bg-transparent"
