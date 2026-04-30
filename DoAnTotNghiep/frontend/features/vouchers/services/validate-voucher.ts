@@ -34,10 +34,25 @@ export type ValidateVoucherResponse = {
   }
 }
 
+export type AvailableVouchersResponse = {
+  success: boolean
+  message: string
+  data: VoucherItem[]
+}
+
 export function validateVoucher(payload: ValidateVoucherPayload) {
   return apiRequest<ValidateVoucherResponse>("/vouchers/validate", {
     method: "POST",
     body: JSON.stringify(payload),
+    requireAuth: true,
+  })
+}
+
+export function getAvailableVouchers(ownerId?: number | null) {
+  const query = ownerId ? `?owner_id=${ownerId}` : ""
+
+  return apiRequest<AvailableVouchersResponse>(`/vouchers/available${query}`, {
+    method: "GET",
     requireAuth: true,
   })
 }

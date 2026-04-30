@@ -351,81 +351,79 @@ export const bookingsService = {
     };
   },
 
-  async createBooking(userId, payload) {
-    if (!currentUser || currentUser.role !== APP_ROLES.USER) {
-      throw new ForbiddenError("Chỉ khách hàng mới được đặt sân");
-    }
+  async createBooking(currentUser, payload) {
+  if (!currentUser || currentUser.role !== APP_ROLES.USER) {
+    throw new ForbiddenError("Chỉ khách hàng mới được đặt sân");
+  }
 
-    const userId = currentUser.id;
+  const userId = currentUser.id;
 
-    const availability = await this.checkAvailability(payload);
+  const availability = await this.checkAvailability(payload);
 
-    if (!availability.available) {
-      throw new ConflictError(
-        availability.reason || "Khung giờ không khả dụng",
-      );
-    }
+  if (!availability.available) {
+    throw new ConflictError(
+      availability.reason || "Khung giờ không khả dụng",
+    );
+  }
 
-    const field = availability.field;
+  const field = availability.field;
+  const approvalMode = field.approval_mode || "MANUAL";
+  const requestedPaymentMethod = payload.requested_payment_method || "ONSITE";
 
-    const field = availability.field;
-    const approvalMode = field.approval_mode || "MANUAL";
-    const requestedPaymentMethod = payload.requested_payment_method || "ONSITE";
+  const originalPrice = Number(availability.total_price);
+  let discountAmount = 0;
+  let finalPrice = originalPrice;
+  let voucherId = null;
 
-    const originalPrice = Number(availability.total_price);
-    let discountAmount = 0;
-    let finalPrice = originalPrice;
-    let voucherId = null;
-
-    if (payload.voucher_code) {
-      const voucherResult = await vouchersService.validateVoucher(userId, {
-        code: payload.voucher_code,
-        order_amount: originalPrice,
-        owner_id: field.owner_id,
-      });
-
-      voucherId = voucherResult.voucher.id;
-      discountAmount = Number(voucherResult.discount_amount || 0);
-      finalPrice = Number(voucherResult.final_amount || originalPrice);
-    }
-
-    let initialStatus = "PENDING_CONFIRM";
-
-    if (approvalMode === "AUTO") {
-      initialStatus =
-        requestedPaymentMethod === "BANK_TRANSFER"
-          ? "AWAITING_PAYMENT"
-          : "APPROVED";
-    }
-
-    const paymentExpiresAt =
-      initialStatus === "AWAITING_PAYMENT"
-        ? new Date(Date.now() + PAYMENT_EXPIRE_MINUTES * 60 * 1000)
-        : null;
-
-    const booking = await bookingsRepository.createBookingWithHistory({
-      field_id: payload.field_id,
-      user_id: userId,
-      start_datetime: payload.start_datetime,
-      end_datetime: payload.end_datetime,
-      notes: payload.notes,
-      contact_name: payload.contact_name,
-      contact_email: payload.contact_email,
-      contact_phone: payload.contact_phone,
-      approval_mode_snapshot: approvalMode,
-      requested_payment_method: requestedPaymentMethod,
-
-      original_price: originalPrice,
-      discount_amount: discountAmount,
-      total_price: finalPrice,
-      voucher_id: voucherId,
-
-      status: initialStatus,
-      payment_expires_at: paymentExpiresAt,
+  if (payload.voucher_code) {
+    const voucherResult = await vouchersService.validateVoucher(userId, {
+      code: payload.voucher_code,
+      order_amount: originalPrice,
+      owner_id: field.owner_id,
     });
 
-    return booking;
-  },
+    voucherId = voucherResult.voucher.id;
+    discountAmount = Number(voucherResult.discount_amount || 0);
+    finalPrice = Number(voucherResult.final_amount || originalPrice);
+  }
+
+  let initialStatus = "PENDING_CONFIRM";
+
+  if (approvalMode === "AUTO") {
+    initialStatus =
+      requestedPaymentMethod === "BANK_TRANSFER"
+        ? "AWAITING_PAYMENT"
+        : "APPROVED";
+  }
+
+  const paymentExpiresAt =
+    initialStatus === "AWAITING_PAYMENT"
+      ? new Date(Date.now() + PAYMENT_EXPIRE_MINUTES * 60 * 1000)
+      : null;
+
+  const booking = await bookingsRepository.createBookingWithHistory({
+    field_id: payload.field_id,
+    user_id: userId,
+    start_datetime: payload.start_datetime,
+    end_datetime: payload.end_datetime,
+    notes: payload.notes,
+    contact_name: payload.contact_name,
+    contact_email: payload.contact_email,
+    contact_phone: payload.contact_phone,
+    approval_mode_snapshot: approvalMode,
+    requested_payment_method: requestedPaymentMethod,
+
+    original_price: originalPrice,
+    discount_amount: discountAmount,
+    total_price: finalPrice,
+    voucher_id: voucherId,
+
+    status: initialStatus,
+    payment_expires_at: paymentExpiresAt,
+  });
+
+  return booking;
+},
   async getMyBookings(userId, query) {
     const { items, total } = await bookingsRepository.findMyBookings(
       userId,

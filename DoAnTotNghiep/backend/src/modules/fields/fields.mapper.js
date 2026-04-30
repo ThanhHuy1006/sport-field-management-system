@@ -79,6 +79,7 @@ export function toFieldDetail(field) {
 
   return {
     id: field.id,
+    owner_id: field.owner_id,
     field_name: field.field_name,
     sport_type: field.sport_type,
     description: field.description,
