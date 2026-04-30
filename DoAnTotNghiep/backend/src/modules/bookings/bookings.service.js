@@ -8,6 +8,7 @@ import {
   NotFoundError,
   ValidationError,
 } from "../../core/errors/index.js";
+import { APP_ROLES } from "../../config/constant.js";
 
 const CHECKIN_EARLY_MINUTES = 30;
 const CHECKIN_LATE_MINUTES = 60;
@@ -351,6 +352,12 @@ export const bookingsService = {
   },
 
   async createBooking(userId, payload) {
+    if (!currentUser || currentUser.role !== APP_ROLES.USER) {
+      throw new ForbiddenError("Chỉ khách hàng mới được đặt sân");
+    }
+
+    const userId = currentUser.id;
+
     const availability = await this.checkAvailability(payload);
 
     if (!availability.available) {
@@ -358,6 +365,8 @@ export const bookingsService = {
         availability.reason || "Khung giờ không khả dụng",
       );
     }
+
+    const field = availability.field;
 
     const field = availability.field;
     const approvalMode = field.approval_mode || "MANUAL";

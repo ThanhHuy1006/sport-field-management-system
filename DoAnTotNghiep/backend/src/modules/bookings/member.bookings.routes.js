@@ -13,6 +13,8 @@ import {
   validateBookingListQuery,
   validateAvailabilitySlotsQuery,
 } from "./bookings.validator.js";
+import { requireRole } from "../../core/middlewares/role.middleware.js";
+import { APP_ROLES } from "../../config/constant.js";
 
 const router = Router();
 
@@ -31,6 +33,7 @@ router.post(
 router.post(
   "/",
   requireAuth,
+  requireRole(APP_ROLES.USER),
   validateBody(validateCreateBookingPayload),
   bookingsController.createBooking
 );
@@ -61,6 +64,13 @@ router.get(
   requireAuth,
   validateParams(validateBookingIdParams),
   bookingsController.getMyBookingCheckInQr
+);
+router.post(
+  "/",
+  requireAuth,
+  requireRole(APP_ROLES.USER),
+  validateBody(validateCreateBookingPayload),
+  bookingsController.createBooking
 );
 
 export default router;
