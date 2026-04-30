@@ -1,7 +1,23 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import {
+  AlertCircle,
+  ArrowRight,
+  BarChart3,
+  Calendar,
+  CheckCircle,
+  Clock,
+  DollarSign,
+  MapPin,
+  Phone,
+  Star,
+  TicketPercent,
+  User,
+  Users,
+  XCircle,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -14,574 +30,787 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
-  TrendingUp,
-  Users,
-  Calendar,
-  DollarSign,
-  Clock,
-  AlertCircle,
-  ArrowRight,
-  User,
-  Star,
-  TicketPercent,
-  Phone,
-  MapPin,
-  CheckCircle,
-  XCircle,
-  BarChart3,
-} from "lucide-react"
+  approveOwnerBooking,
+  getOwnerDashboardSummary,
+  getRecentOwnerBookings,
+  getRecentOwnerNotifications,
+  rejectOwnerBooking,
+  type OwnerDashboardBooking,
+  type OwnerDashboardSummary,
+  type OwnerNotification,
+} from "@/features/owners/services/owner-dashboard"
+
+const emptySummary: OwnerDashboardSummary = {
+  total_fields: 0,
+  pending_bookings: 0,
+  total_bookings_this_month: 0,
+  total_revenue_this_month: 0,
+}
+
+function formatCurrency(value: string | number | null | undefined) {
+  const amount = Number(value || 0)
+
+  if (!Number.isFinite(amount)) return "0 VND"
+
+  return `${amount.toLocaleString("vi-VN")} VND`
+}
+
+function formatShortCurrency(value: string | number | null | undefined) {
+  const amount = Number(value || 0)
+
+  if (!Number.isFinite(amount)) return "0"
+
+  if (amount >= 1_000_000_000) {
+    return `${(amount / 1_000_000_000).toFixed(1)}B`
+  }
+
+  if (amount >= 1_000_000) {
+    return `${(amount / 1_000_000).toFixed(1)}M`
+  }
+
+  if (amount >= 1_000) {
+    return `${Math.round(amount / 1_000)}K`
+  }
+
+  return amount.toString()
+}
+
+function formatDate(value: string) {
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) return "--"
+
+  return date.toLocaleDateString("vi-VN", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  })
+}
+
+function formatTime(value: string) {
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) return "--:--"
+
+  return date.toLocaleTimeString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
+function getDurationHours(start: string, end: string) {
+  const startDate = new Date(start)
+  const endDate = new Date(end)
+
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return 0
+  }
+
+  const diffMs = endDate.getTime() - startDate.getTime()
+
+  return Math.max(diffMs / (1000 * 60 * 60), 0)
+}
+
+function getCustomerName(booking: OwnerDashboardBooking) {
+  return (
+    booking.contact_name ||
+    booking.users?.name ||
+    booking.contact_phone ||
+    "Khách hàng"
+  )
+}
+
+function getCustomerPhone(booking: OwnerDashboardBooking) {
+  return booking.contact_phone || booking.users?.phone || "Chưa có SĐT"
+}
+
+function getFieldName(booking: OwnerDashboardBooking) {
+  return booking.fields?.field_name || `Sân #${booking.field_id}`
+}
+
+function getFieldAddress(booking: OwnerDashboardBooking) {
+  return booking.fields?.address || "Chưa có địa chỉ"
+}
+
+function getStatusLabel(status: string) {
+  switch (status) {
+    case "PENDING_CONFIRM":
+      return "Chờ duyệt"
+    case "APPROVED":
+      return "Đã duyệt"
+    case "AWAITING_PAYMENT":
+      return "Chờ thanh toán"
+    case "PAID":
+      return "Đã thanh toán"
+    case "CHECKED_IN":
+      return "Đã check-in"
+    case "COMPLETED":
+      return "Hoàn thành"
+    case "REJECTED":
+      return "Đã từ chối"
+    case "CANCELLED":
+      return "Đã hủy"
+    case "PAY_FAILED":
+      return "Thanh toán lỗi"
+    case "PAYMENT_EXPIRED":
+      return "Hết hạn thanh toán"
+    default:
+      return status
+  }
+}
+
+function getStatusColor(status: string) {
+  switch (status) {
+    case "PENDING_CONFIRM":
+      return "bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-950 dark:text-orange-400 dark:border-orange-900"
+    case "APPROVED":
+      return "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-900"
+    case "AWAITING_PAYMENT":
+      return "bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-400 dark:border-yellow-900"
+    case "PAID":
+    case "CHECKED_IN":
+    case "COMPLETED":
+      return "bg-green-100 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-400 dark:border-green-900"
+    case "REJECTED":
+    case "CANCELLED":
+    case "PAY_FAILED":
+    case "PAYMENT_EXPIRED":
+      return "bg-red-100 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-900"
+    default:
+      return "bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-950 dark:text-gray-400 dark:border-gray-900"
+  }
+}
+
+function getNotificationTime(value: string) {
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) return ""
+
+  return date.toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
 
 export default function OwnerDashboard() {
-  const [selectedBooking, setSelectedBooking] = useState<(typeof todaysSchedule)[0] | null>(null)
+  const [summary, setSummary] = useState<OwnerDashboardSummary>(emptySummary)
+  const [recentBookings, setRecentBookings] = useState<OwnerDashboardBooking[]>([])
+  const [notifications, setNotifications] = useState<OwnerNotification[]>([])
+  const [selectedBooking, setSelectedBooking] =
+    useState<OwnerDashboardBooking | null>(null)
   const [showDetailDialog, setShowDetailDialog] = useState(false)
-  const [todaysSchedule, setTodayBookings] = useState([
-    {
-      id: 1,
-      time: "08:00",
-      endTime: "09:00",
-      fieldName: "Sân Bóng Đá Thảo Điền",
-      customerName: "Nguyễn Văn A",
-      phone: "0909123456",
-      status: "confirmed",
-      price: 1000000,
-      duration: 1,
-    },
-    {
-      id: 2,
-      time: "10:00",
-      endTime: "12:00",
-      fieldName: "Sân Bóng Rổ Quận 7",
-      customerName: "Trần Thị B",
-      phone: "0912345678",
-      status: "confirmed",
-      price: 800000,
-      duration: 2,
-    },
-    {
-      id: 3,
-      time: "14:00",
-      endTime: "15:00",
-      fieldName: "Sân Tennis Bình Thạnh",
-      customerName: "Lê Văn C",
-      phone: "0923456789",
-      status: "pending",
-      price: 600000,
-      duration: 1,
-    },
-    {
-      id: 4,
-      time: "16:00",
-      endTime: "18:00",
-      fieldName: "Sân Bóng Đá Thảo Điền",
-      customerName: "Phạm Thị D",
-      phone: "0934567890",
-      status: "confirmed",
-      price: 2000000,
-      duration: 2,
-    },
-    {
-      id: 5,
-      time: "19:00",
-      endTime: "20:00",
-      fieldName: "Sân Bóng Rổ Quận 7",
-      customerName: "Hoàng Văn E",
-      phone: "0945678901",
-      status: "pending",
-      price: 400000,
-      duration: 1,
-    },
-  ])
+  const [isLoading, setIsLoading] = useState(true)
+  const [actionLoadingId, setActionLoadingId] = useState<number | null>(null)
+  const [error, setError] = useState("")
 
-  const currentTime = new Date()
-  const currentHour = currentTime.getHours()
+  async function fetchDashboard() {
+    try {
+      setIsLoading(true)
+      setError("")
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "confirmed":
-        return "bg-green-100 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-400 dark:border-green-900"
-      case "pending":
-        return "bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-950 dark:text-orange-400 dark:border-orange-900"
-      case "completed":
-        return "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-900"
-      default:
-        return "bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-950 dark:text-gray-400 dark:border-gray-900"
+      const [summaryResult, bookingsResult, notificationsResult] =
+        await Promise.all([
+          getOwnerDashboardSummary(),
+          getRecentOwnerBookings(),
+          getRecentOwnerNotifications(),
+        ])
+
+      setSummary(summaryResult.data || emptySummary)
+      setRecentBookings(bookingsResult.data || [])
+      setNotifications(notificationsResult.data || [])
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Không thể tải dữ liệu dashboard owner",
+      )
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "confirmed":
-        return "Đã xác nhận"
-      case "pending":
-        return "Chờ duyệt"
-      case "completed":
-        return "Hoàn thành"
-      default:
-        return status
-    }
-  }
+  useEffect(() => {
+    fetchDashboard()
+  }, [])
 
-  const isCurrentBooking = (time: string) => {
-    const bookingHour = Number.parseInt(time.split(":")[0])
-    return currentHour === bookingHour
-  }
+  const pendingBookings = useMemo(
+    () =>
+      recentBookings.filter(
+        (booking) => booking.status === "PENDING_CONFIRM",
+      ),
+    [recentBookings],
+  )
 
-  const handleViewDetail = (booking: (typeof todaysSchedule)[0]) => {
+  const expectedRevenue = useMemo(
+    () =>
+      recentBookings
+        .filter((booking) =>
+          ["APPROVED", "AWAITING_PAYMENT", "PAID", "CHECKED_IN", "COMPLETED"].includes(
+            booking.status,
+          ),
+        )
+        .reduce((sum, booking) => sum + Number(booking.total_price || 0), 0),
+    [recentBookings],
+  )
+
+  const todayBookings = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10)
+
+    return recentBookings.filter((booking) => {
+      const date = new Date(booking.start_datetime)
+
+      if (Number.isNaN(date.getTime())) return false
+
+      return date.toISOString().slice(0, 10) === today
+    })
+  }, [recentBookings])
+
+  const displayBookings =
+    todayBookings.length > 0 ? todayBookings : recentBookings
+
+  const handleViewDetail = (booking: OwnerDashboardBooking) => {
     setSelectedBooking(booking)
     setShowDetailDialog(true)
   }
 
-  const handleApproveBooking = (bookingId: number) => {
-    setTodayBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status: "confirmed" as const } : b)))
-    setShowDetailDialog(false)
+  const handleApproveBooking = async (bookingId: number) => {
+    try {
+      setActionLoadingId(bookingId)
+      setError("")
+
+      await approveOwnerBooking(bookingId)
+
+      setShowDetailDialog(false)
+      setSelectedBooking(null)
+      await fetchDashboard()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Duyệt booking thất bại")
+    } finally {
+      setActionLoadingId(null)
+    }
   }
 
-  const handleRejectBooking = (bookingId: number) => {
-    setTodayBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status: "cancelled" as const } : b)))
-    setShowDetailDialog(false)
+  const handleRejectBooking = async (bookingId: number) => {
+    try {
+      setActionLoadingId(bookingId)
+      setError("")
+
+      await rejectOwnerBooking(bookingId, "Rejected from owner dashboard")
+
+      setShowDetailDialog(false)
+      setSelectedBooking(null)
+      await fetchDashboard()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Từ chối booking thất bại")
+    } finally {
+      setActionLoadingId(null)
+    }
   }
 
   return (
     <main className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
-        {/* Page Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-              <Link href="/" className="hover:text-primary">
-                Trang chủ
-              </Link>
-              <span>/</span>
-              <span className="text-foreground">Dashboard</span>
-            </div>
-            <h1 className="text-2xl font-bold">Bảng Điều Khiển Chủ Sân</h1>
-            <p className="text-sm text-muted-foreground mt-1">Tổng quan hoạt động kinh doanh của bạn</p>
+            <p className="text-sm text-muted-foreground mb-1">
+              Trang chủ / Dashboard
+            </p>
+            <h1 className="text-3xl font-bold">Bảng Điều Khiển Chủ Sân</h1>
+            <p className="text-muted-foreground mt-1">
+              Tổng quan hoạt động kinh doanh và đơn đặt sân của bạn
+            </p>
           </div>
-          <Link href="/owner/settings">
-            <Button variant="outline" size="sm">
-              Cài Đặt
-            </Button>
-          </Link>
         </div>
 
-        {/* Pending Bookings Alert */}
-        {todaysSchedule.filter((b) => b.status === "pending").length > 0 && (
-          <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950/30 dark:border-orange-800">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-                  <CardTitle className="text-orange-900 dark:text-orange-100">
-                    Có {todaysSchedule.filter((b) => b.status === "pending").length} đơn đặt sân chờ duyệt
-                  </CardTitle>
-                </div>
-                <Button asChild size="sm" className="bg-orange-600 hover:bg-orange-700">
-                  <Link href="/owner/schedule?status=pending">
-                    Xem Ngay
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Link>
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {todaysSchedule
-                  .filter((b) => b.status === "pending")
-                  .slice(0, 2)
-                  .map((booking) => (
-                    <div
-                      key={booking.id}
-                      className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border border-orange-100 dark:border-orange-900/50"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Clock className="w-4 h-4 text-orange-500 dark:text-orange-400" />
-                        <div>
-                          <p className="font-medium text-sm text-gray-900 dark:text-white">{booking.customerName}</p>
-                          <p className="text-xs text-gray-600 dark:text-gray-300">
-                            {booking.fieldName} •{" "}
-                            {new Date().toLocaleDateString("vi-VN", {
-                              weekday: "long",
-                              year: "numeric",
-                              month: "long",
-                              day: "numeric",
-                            })}{" "}
-                            • {booking.time}
-                          </p>
-                        </div>
-                      </div>
-                      <Badge
-                        variant="outline"
-                        className="text-orange-600 dark:text-orange-400 border-orange-600 dark:border-orange-400 bg-orange-50 dark:bg-orange-950/50"
-                      >
-                        {booking.price.toLocaleString()} VND
-                      </Badge>
-                    </div>
-                  ))}
-              </div>
+        {error && (
+          <Card className="border-red-200 bg-red-50 dark:bg-red-950/20">
+            <CardContent className="p-4 text-sm text-red-600">
+              {error}
             </CardContent>
           </Card>
         )}
 
-        {/* Stats Grid - Added clickable links to stats cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <Link href="/owner/reports">
-            <Card className="hover:shadow-md transition-shadow cursor-pointer">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Tổng Doanh Thu</CardTitle>
-                <DollarSign className="w-5 h-5 text-green-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl lg:text-2xl font-bold">132,000,000 VND</div>
-                <p className="text-xs text-green-600 flex items-center gap-1 mt-1">
-                  <TrendingUp className="w-3 h-3" />
-                  +12% từ tháng trước
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Link href="/owner/schedule">
-            <Card className="hover:shadow-md transition-shadow cursor-pointer">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Tổng Đặt Sân</CardTitle>
-                <Calendar className="w-5 h-5 text-blue-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl lg:text-2xl font-bold">206</div>
-                <p className="text-xs text-green-600 flex items-center gap-1 mt-1">
-                  <TrendingUp className="w-3 h-3" />
-                  +8% từ tháng trước
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Link href="/owner/fields">
-            <Card className="hover:shadow-md transition-shadow cursor-pointer">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Sân Hoạt Động</CardTitle>
-                <TrendingUp className="w-5 h-5 text-purple-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl lg:text-2xl font-bold">3</div>
-                <p className="text-xs text-muted-foreground mt-1">Tất cả đang hoạt động</p>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Link href="/owner/reports?tab=customers">
-            <Card className="hover:shadow-md transition-shadow cursor-pointer">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Tổng Khách Hàng</CardTitle>
-                <Users className="w-5 h-5 text-orange-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl lg:text-2xl font-bold">145</div>
-                <p className="text-xs text-green-600 flex items-center gap-1 mt-1">
-                  <TrendingUp className="w-3 h-3" />
-                  +15% từ tháng trước
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
-
-        {/* Today's Schedule */}
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <div>
-                <CardTitle className="text-xl">Lịch Hôm Nay</CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {new Date().toLocaleDateString("vi-VN", {
-                    weekday: "long",
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </p>
-              </div>
-              <Button asChild variant="outline" size="sm">
-                <Link href="/owner/schedule">
-                  Xem Toàn Bộ Lịch
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Link>
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {todaysSchedule.length === 0 ? (
-              <div className="text-center py-12">
-                <Calendar className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">Không có đặt sân nào hôm nay</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {todaysSchedule.map((booking) => (
-                  <div
-                    key={booking.id}
-                    className={`relative p-4 rounded-lg border-2 transition-all ${
-                      isCurrentBooking(booking.time)
-                        ? "border-blue-500 bg-blue-50 dark:bg-blue-950/20 shadow-lg"
-                        : "border-border bg-card hover:shadow-md"
-                    }`}
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <Clock
-                          className={`w-5 h-5 ${isCurrentBooking(booking.time) ? "text-blue-600" : "text-muted-foreground"}`}
-                        />
-                        <div>
-                          <p className={`font-bold ${isCurrentBooking(booking.time) ? "text-blue-600" : ""}`}>
-                            {booking.time}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{booking.duration}h</p>
-                        </div>
+        {isLoading ? (
+          <Card>
+            <CardContent className="p-6 text-center text-muted-foreground">
+              Đang tải dữ liệu dashboard...
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            {pendingBookings.length > 0 && (
+              <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-900">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-400">
+                    <AlertCircle className="w-5 h-5" />
+                    Có {pendingBookings.length} đơn đặt sân chờ duyệt
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {pendingBookings.slice(0, 2).map((booking) => (
+                    <div
+                      key={booking.id}
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg bg-background p-3 border border-orange-100 dark:border-orange-900"
+                    >
+                      <div>
+                        <p className="font-medium">
+                          {getCustomerName(booking)}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {getFieldName(booking)} •{" "}
+                          {formatDate(booking.start_datetime)} •{" "}
+                          {formatTime(booking.start_datetime)}
+                        </p>
                       </div>
 
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <div>
-                            <p className="font-semibold text-sm">{booking.fieldName}</p>
-                            <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                              <span className="flex items-center gap-1">
-                                <User className="w-3 h-3" />
-                                {booking.customerName}
-                              </span>
-                              <span>{booking.phone}</span>
-                            </div>
-                          </div>
-                          <Badge className={getStatusColor(booking.status)} variant="outline">
-                            {getStatusLabel(booking.status)}
-                          </Badge>
-                        </div>
-
-                        <div className="flex items-center justify-between mt-3 pt-3 border-t">
-                          <p className="font-semibold text-green-600">{booking.price.toLocaleString()} VND</p>
-                          {booking.status === "pending" ? (
-                            <div className="flex items-center gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-xs bg-transparent"
-                                onClick={() => handleViewDetail(booking)}
-                              >
-                                Xem Chi Tiết
-                              </Button>
-                              <Button
-                                size="sm"
-                                className="h-7 text-xs bg-green-600 hover:bg-green-700"
-                                onClick={() => handleApproveBooking(booking.id)}
-                              >
-                                Duyệt Ngay
-                              </Button>
-                            </div>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 text-xs bg-transparent"
-                              onClick={() => handleViewDetail(booking)}
-                            >
-                              Chi Tiết
-                            </Button>
-                          )}
-                        </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-green-600">
+                          {formatCurrency(booking.total_price)}
+                        </span>
+                        <Button
+                          size="sm"
+                          onClick={() => handleViewDetail(booking)}
+                        >
+                          Xem Ngay
+                        </Button>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </CardContent>
+              </Card>
             )}
 
-            {todaysSchedule.length > 0 && (
-              <div className="mt-6 pt-4 border-t flex flex-wrap items-center gap-6">
-                <div>
-                  <p className="text-sm text-muted-foreground">Tổng đặt sân</p>
-                  <p className="text-2xl font-bold">{todaysSchedule.length}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Doanh thu dự kiến</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    {todaysSchedule
-                      .filter((b) => b.status === "confirmed")
-                      .reduce((sum, b) => sum + b.price, 0)
-                      .toLocaleString()}{" "}
-                    VND
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Chờ duyệt</p>
-                  <p className="text-2xl font-bold text-orange-600">
-                    {todaysSchedule.filter((b) => b.status === "pending").length}
-                  </p>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <Link href="/owner/reports" className="block">
+                <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                        <DollarSign className="w-5 h-5 text-green-600" />
+                      </div>
+                      <Badge variant="outline" className="text-green-600">
+                        Tháng này
+                      </Badge>
+                    </div>
+                    <p className="text-2xl font-bold mt-3">
+                      {formatShortCurrency(summary.total_revenue_this_month)} VND
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Tổng Doanh Thu
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
 
-        {/* Quick Actions - Added Reports link, reorganized grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-          <Link href="/owner/fields" className="block h-full">
-            <Card className="p-4 lg:p-6 hover:shadow-lg transition cursor-pointer h-full flex flex-col">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm lg:text-base font-bold">Quản Lý Sân</h3>
-                <ArrowRight className="w-4 h-4 text-primary" />
-              </div>
-              <p className="text-xs lg:text-sm text-muted-foreground mb-3 flex-1">
-                Thêm, sửa, xóa sân và thiết lập giá
-              </p>
-              <Button variant="outline" size="sm" className="w-full bg-transparent">
-                Xem Sân
-              </Button>
-            </Card>
-          </Link>
+              <Link href="/owner/bookings" className="block">
+                <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                        <Calendar className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <Badge variant="outline" className="text-blue-600">
+                        Tháng này
+                      </Badge>
+                    </div>
+                    <p className="text-2xl font-bold mt-3">
+                      {summary.total_bookings_this_month}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Tổng Đặt Sân
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
 
-          <Link href="/owner/schedule" className="block h-full">
-            <Card className="p-4 lg:p-6 hover:shadow-lg transition cursor-pointer h-full flex flex-col">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm lg:text-base font-bold">Quản Lý Đặt Sân</h3>
-                <Calendar className="w-4 h-4 text-primary" />
-              </div>
-              <p className="text-xs lg:text-sm text-muted-foreground mb-3 flex-1">Xem lịch và duyệt đơn đặt sân</p>
-              <Button variant="outline" size="sm" className="w-full bg-transparent">
-                Xem Lịch
-              </Button>
-            </Card>
-          </Link>
+              <Link href="/owner/fields" className="block">
+                <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                        <MapPin className="w-5 h-5 text-purple-600" />
+                      </div>
+                      <Badge variant="outline" className="text-purple-600">
+                        Đang quản lý
+                      </Badge>
+                    </div>
+                    <p className="text-2xl font-bold mt-3">
+                      {summary.total_fields}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Sân Hoạt Động
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
 
-          <Link href="/owner/reports" className="block h-full">
-            <Card className="p-4 lg:p-6 hover:shadow-lg transition cursor-pointer h-full flex flex-col border-primary/20 bg-primary/5">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm lg:text-base font-bold">Báo Cáo & Thống Kê</h3>
-                <BarChart3 className="w-4 h-4 text-primary" />
-              </div>
-              <p className="text-xs lg:text-sm text-muted-foreground mb-3 flex-1">Phân tích doanh thu, khách hàng</p>
-              <Button variant="outline" size="sm" className="w-full bg-transparent">
-                Xem Báo Cáo
-              </Button>
-            </Card>
-          </Link>
+              <Link href="/owner/bookings" className="block">
+                <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                        <Clock className="w-5 h-5 text-orange-600" />
+                      </div>
+                      <Badge variant="outline" className="text-orange-600">
+                        Cần xử lý
+                      </Badge>
+                    </div>
+                    <p className="text-2xl font-bold mt-3">
+                      {summary.pending_bookings}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Đơn Chờ Duyệt
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
+            </div>
 
-          <Link href="/owner/vouchers" className="block h-full">
-            <Card className="p-4 lg:p-6 hover:shadow-lg transition cursor-pointer h-full flex flex-col">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm lg:text-base font-bold">Voucher</h3>
-                <TicketPercent className="w-4 h-4 text-purple-600" />
-              </div>
-              <p className="text-xs lg:text-sm text-muted-foreground mb-3 flex-1">Tạo mã giảm giá</p>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-xs">
-                  3 đang dùng
-                </Badge>
-              </div>
-            </Card>
-          </Link>
-
-          <Link href="/owner/reviews" className="block h-full">
-            <Card className="p-4 lg:p-6 hover:shadow-lg transition cursor-pointer h-full flex flex-col">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm lg:text-base font-bold">Đánh Giá</h3>
-                <Star className="w-4 h-4 text-yellow-500" />
-              </div>
-              <p className="text-xs lg:text-sm text-muted-foreground mb-3 flex-1">Xem và phản hồi đánh giá</p>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1">
-                  <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                  <span className="font-bold">4.8</span>
-                </div>
-                <Badge variant="outline" className="text-xs">
-                  2 mới
-                </Badge>
-              </div>
-            </Card>
-          </Link>
-        </div>
-
-        {/* Booking Detail Dialog */}
-        <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Chi Tiết Đặt Sân</DialogTitle>
-              <DialogDescription>Thông tin chi tiết về đơn đặt sân</DialogDescription>
-            </DialogHeader>
-            {selectedBooking && (
-              <div className="space-y-4">
-                <div className="p-4 bg-muted rounded-lg space-y-3">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-muted-foreground" />
-                    <span className="font-medium">{selectedBooking.fieldName}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-muted-foreground" />
-                    <span>
-                      {selectedBooking.time} - {selectedBooking.endTime} ({selectedBooking.duration}h)
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-muted-foreground" />
-                    <span>
+            <div className="grid lg:grid-cols-3 gap-6">
+              <Card className="lg:col-span-2">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle>
+                      {todayBookings.length > 0
+                        ? "Lịch Hôm Nay"
+                        : "Đơn Đặt Sân Gần Đây"}
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1">
                       {new Date().toLocaleDateString("vi-VN", {
                         weekday: "long",
                         year: "numeric",
                         month: "long",
                         day: "numeric",
                       })}
-                    </span>
+                    </p>
                   </div>
-                </div>
 
-                <div className="p-4 border rounded-lg space-y-3">
-                  <h4 className="font-medium">Thông tin khách hàng</h4>
-                  <div className="flex items-center gap-2">
+                  <Link href="/owner/schedule">
+                    <Button variant="outline" size="sm">
+                      Xem Toàn Bộ Lịch
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </Link>
+                </CardHeader>
+
+                <CardContent className="space-y-3">
+                  {displayBookings.length === 0 ? (
+                    <div className="text-center py-10 text-muted-foreground">
+                      Không có đặt sân nào
+                    </div>
+                  ) : (
+                    displayBookings.map((booking) => {
+                      const duration = getDurationHours(
+                        booking.start_datetime,
+                        booking.end_datetime,
+                      )
+
+                      return (
+                        <div
+                          key={booking.id}
+                          className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 rounded-lg border border-border p-4 hover:bg-muted/40 transition"
+                        >
+                          <div className="flex gap-4">
+                            <div className="text-center min-w-[72px]">
+                              <p className="text-lg font-bold">
+                                {formatTime(booking.start_datetime)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatTime(booking.end_datetime)}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {duration > 0 ? `${duration.toFixed(0)}h` : "--"}
+                              </p>
+                            </div>
+
+                            <div className="space-y-1">
+                              <p className="font-semibold">
+                                {getFieldName(booking)}
+                              </p>
+                              <p className="text-sm text-muted-foreground flex items-center gap-1">
+                                <User className="w-4 h-4" />
+                                {getCustomerName(booking)}
+                              </p>
+                              <p className="text-sm text-muted-foreground flex items-center gap-1">
+                                <Phone className="w-4 h-4" />
+                                {getCustomerPhone(booking)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatDate(booking.start_datetime)}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                            <Badge className={getStatusColor(booking.status)}>
+                              {getStatusLabel(booking.status)}
+                            </Badge>
+
+                            <p className="font-semibold text-green-600 min-w-[120px] text-right">
+                              {formatCurrency(booking.total_price)}
+                            </p>
+
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleViewDetail(booking)}
+                              >
+                                Chi Tiết
+                              </Button>
+
+                              {booking.status === "PENDING_CONFIRM" && (
+                                <Button
+                                  size="sm"
+                                  disabled={actionLoadingId === booking.id}
+                                  onClick={() => handleApproveBooking(booking.id)}
+                                >
+                                  Duyệt Ngay
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+
+                  {displayBookings.length > 0 && (
+                    <div className="grid grid-cols-3 gap-4 border-t border-border pt-4 mt-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">
+                          Tổng đơn hiển thị
+                        </p>
+                        <p className="text-xl font-bold">
+                          {displayBookings.length}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-sm text-muted-foreground">
+                          Doanh thu dự kiến
+                        </p>
+                        <p className="text-xl font-bold text-green-600">
+                          {formatShortCurrency(expectedRevenue)} VND
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-sm text-muted-foreground">
+                          Chờ duyệt
+                        </p>
+                        <p className="text-xl font-bold text-orange-600">
+                          {pendingBookings.length}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Thông Báo Gần Đây</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {notifications.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        Chưa có thông báo mới.
+                      </p>
+                    ) : (
+                      notifications.map((item) => (
+                        <div
+                          key={item.id}
+                          className="rounded-lg border border-border p-3"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="font-medium text-sm">{item.title}</p>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                {item.message}
+                              </p>
+                            </div>
+
+                            {!item.is_read && (
+                              <span className="w-2 h-2 rounded-full bg-primary mt-1" />
+                            )}
+                          </div>
+
+                          <p className="text-xs text-muted-foreground mt-2">
+                            {getNotificationTime(item.created_at)}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Thao Tác Nhanh</CardTitle>
+                  </CardHeader>
+
+                  <CardContent className="grid gap-3">
+                    <Link href="/owner/fields">
+                      <Button variant="outline" className="w-full justify-start">
+                        <MapPin className="w-4 h-4 mr-2" />
+                        Quản Lý Sân
+                      </Button>
+                    </Link>
+
+                    <Link href="/owner/bookings">
+                      <Button variant="outline" className="w-full justify-start">
+                        <Calendar className="w-4 h-4 mr-2" />
+                        Quản Lý Đặt Sân
+                      </Button>
+                    </Link>
+
+                    <Link href="/owner/reports">
+                      <Button variant="outline" className="w-full justify-start">
+                        <BarChart3 className="w-4 h-4 mr-2" />
+                        Báo Cáo & Thống Kê
+                      </Button>
+                    </Link>
+
+                    <Link href="/owner/vouchers">
+                      <Button variant="outline" className="w-full justify-start">
+                        <TicketPercent className="w-4 h-4 mr-2" />
+                        Voucher
+                      </Button>
+                    </Link>
+
+                    <Link href="/owner/reviews">
+                      <Button variant="outline" className="w-full justify-start">
+                        <Star className="w-4 h-4 mr-2" />
+                        Đánh Giá
+                      </Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
+        <DialogContent className="sm:max-w-[540px]">
+          <DialogHeader>
+            <DialogTitle>Chi Tiết Đặt Sân</DialogTitle>
+            <DialogDescription>
+              Thông tin chi tiết về đơn đặt sân
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedBooking && (
+            <div className="space-y-4">
+              <div className="rounded-lg bg-muted p-4 space-y-2">
+                <h3 className="font-semibold">
+                  {getFieldName(selectedBooking)}
+                </h3>
+                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                  <MapPin className="w-4 h-4" />
+                  {getFieldAddress(selectedBooking)}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {formatTime(selectedBooking.start_datetime)} -{" "}
+                  {formatTime(selectedBooking.end_datetime)} (
+                  {getDurationHours(
+                    selectedBooking.start_datetime,
+                    selectedBooking.end_datetime,
+                  ).toFixed(0)}
+                  h)
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {formatDate(selectedBooking.start_datetime)}
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-medium mb-2">Thông tin khách hàng</h4>
+                <div className="space-y-2 text-sm">
+                  <p className="flex items-center gap-2">
                     <User className="w-4 h-4 text-muted-foreground" />
-                    <span>{selectedBooking.customerName}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
+                    {getCustomerName(selectedBooking)}
+                  </p>
+                  <p className="flex items-center gap-2">
                     <Phone className="w-4 h-4 text-muted-foreground" />
-                    <span>{selectedBooking.phone}</span>
-                  </div>
+                    {getCustomerPhone(selectedBooking)}
+                  </p>
                 </div>
+              </div>
 
-                <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-950/30 rounded-lg">
-                  <span className="font-medium">Tổng tiền</span>
-                  <span className="text-xl font-bold text-green-600">{selectedBooking.price.toLocaleString()} VND</span>
-                </div>
+              <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                <span className="text-muted-foreground">Tổng tiền</span>
+                <span className="font-bold text-green-600">
+                  {formatCurrency(selectedBooking.total_price)}
+                </span>
+              </div>
 
-                <Badge className={`${getStatusColor(selectedBooking.status)} w-full justify-center py-2`}>
+              <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                <span className="text-muted-foreground">Trạng thái</span>
+                <Badge className={getStatusColor(selectedBooking.status)}>
                   {getStatusLabel(selectedBooking.status)}
                 </Badge>
               </div>
-            )}
-            <DialogFooter>
-              {selectedBooking?.status === "pending" ? (
-                <div className="flex gap-2 w-full">
-                  <Button
-                    variant="outline"
-                    className="flex-1 bg-transparent"
-                    onClick={() => handleRejectBooking(selectedBooking.id)}
-                  >
-                    <XCircle className="w-4 h-4 mr-2" />
-                    Từ Chối
-                  </Button>
-                  <Button
-                    className="flex-1 bg-green-600 hover:bg-green-700"
-                    onClick={() => handleApproveBooking(selectedBooking.id)}
-                  >
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                    Duyệt Đơn
-                  </Button>
+
+              {selectedBooking.requested_payment_method && (
+                <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                  <span className="text-muted-foreground">Thanh toán</span>
+                  <span className="font-medium">
+                    {selectedBooking.requested_payment_method === "BANK_TRANSFER"
+                      ? "Chuyển khoản"
+                      : "Tại sân"}
+                  </span>
                 </div>
-              ) : (
-                <Button variant="outline" onClick={() => setShowDetailDialog(false)} className="w-full">
-                  Đóng
-                </Button>
               )}
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+
+              {selectedBooking.notes && (
+                <div className="rounded-lg border border-border p-3">
+                  <p className="text-sm text-muted-foreground mb-1">Ghi chú</p>
+                  <p className="text-sm">{selectedBooking.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            {selectedBooking?.status === "PENDING_CONFIRM" ? (
+              <div className="flex w-full gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  disabled={actionLoadingId === selectedBooking.id}
+                  onClick={() => handleRejectBooking(selectedBooking.id)}
+                >
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Từ Chối
+                </Button>
+
+                <Button
+                  className="flex-1"
+                  disabled={actionLoadingId === selectedBooking.id}
+                  onClick={() => handleApproveBooking(selectedBooking.id)}
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Duyệt Đơn
+                </Button>
+              </div>
+            ) : (
+              <Button
+                className="w-full"
+                onClick={() => setShowDetailDialog(false)}
+              >
+                Đóng
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   )
 }
