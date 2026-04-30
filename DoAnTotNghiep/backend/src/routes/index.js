@@ -26,8 +26,8 @@ import ownerFieldsRoutes from "../modules/owners/owner.fields.routes.js";
 import ownerSchedulesRoutes from "../modules/owners/owner.schedules.routes.js";
 import uploadsRoutes from "../modules/uploads/uploads.routes.js";
 import publicReviewsRoutes from "../modules/reviews/public.reviews.routes.js";
-// import ownerReportsRoutes from "../modules/reports/owner.reports.routes.js";
-// import adminReportsRoutes from "../modules/reports/admin.reports.routes.js";
+import ownerReportsRoutes from "../modules/reports/owner.reports.routes.js";
+import adminReportsRoutes from "../modules/reports/admin.reports.routes.js";
 
 import adminRoutes from "../modules/admin/admin.routes.js";
 
@@ -58,7 +58,7 @@ router.use("/owner", ownerProfileRoutes);
 router.use("/owner", ownerDashboardRoutes);
 router.use("/owner", ownerFieldsRoutes);
 router.use("/owner", ownerSchedulesRoutes);
-// router.use("/owner/reports", ownerReportsRoutes);
+router.use("/owner/reports", ownerReportsRoutes);
 
 // Shared/public voucher routes
 router.use("/vouchers", vouchersRoutes);
@@ -68,6 +68,6 @@ router.use("/notifications", notificationsRoutes);
 
 // Admin
 router.use("/admin", adminRoutes);
-// router.use("/admin/reports", adminReportsRoutes);
+router.use("/admin/reports", adminReportsRoutes);
 
 export default router;
