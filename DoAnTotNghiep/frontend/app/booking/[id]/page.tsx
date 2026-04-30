@@ -19,7 +19,12 @@ import {
 } from "@/features/fields/services/get-field-detail";
 import { getBookingAvailabilitySlots } from "@/features/bookings/services/get-booking-availability-slots";
 import { createBooking } from "@/features/bookings/services/create-booking";
-import { validateVoucher } from "@/features/vouchers/services/validate-voucher";
+import {
+  getAvailableVouchers,
+  validateVoucher,
+  type VoucherItem,
+} from "@/features/vouchers/services/validate-voucher";
+import { getStoredUser } from "@/features/auth/lib/auth-storage";
 
 type FieldUi = {
   id: number;
@@ -44,11 +49,23 @@ type SlotUi = {
 function mapFieldDetailToUi(data: FieldDetailResponse["data"]): FieldUi {
   const source = data as FieldDetailResponse["data"] & {
     owner_id?: number | null;
+    ownerId?: number | null;
+    owner?: {
+      id?: number | null;
+      user_id?: number | null;
+    } | null;
   };
+
+  const ownerId =
+    source.owner_id ??
+    source.ownerId ??
+    source.owner?.id ??
+    source.owner?.user_id ??
+    null;
 
   return {
     id: data.id,
-    ownerId: source.owner_id ?? null,
+    ownerId,
     name: data.field_name ?? "Chưa có tên sân",
     location: data.address ?? "Chưa cập nhật địa chỉ",
     image: data.images?.[0]?.url ?? null,
@@ -60,6 +77,28 @@ function mapFieldDetailToUi(data: FieldDetailResponse["data"]): FieldUi {
 
 function formatCurrency(value: number) {
   return value.toLocaleString("vi-VN");
+}
+
+function formatVoucherDiscount(voucher: VoucherItem) {
+  if (voucher.type === "PERCENT") {
+    const maxDiscount = voucher.max_discount_amount
+      ? `, tối đa ${formatCurrency(voucher.max_discount_amount)} VND`
+      : "";
+
+    return `Giảm ${voucher.discount_value ?? 0}%${maxDiscount}`;
+  }
+
+  return `Giảm ${formatCurrency(Number(voucher.discount_value ?? 0))} VND`;
+}
+
+function formatVoucherCondition(voucher: VoucherItem) {
+  const minOrder = Number(voucher.min_order_value ?? 0);
+
+  if (minOrder > 0) {
+    return `Đơn tối thiểu ${formatCurrency(minOrder)} VND`;
+  }
+
+  return "Không yêu cầu đơn tối thiểu";
 }
 
 function buildDateTime(date: string, time: string) {
@@ -99,6 +138,8 @@ export default function BookingPage() {
   const [isApplyingVoucher, setIsApplyingVoucher] = useState(false);
   const [voucherError, setVoucherError] = useState("");
   const [voucherMessage, setVoucherMessage] = useState("");
+  const [availableVouchers, setAvailableVouchers] = useState<VoucherItem[]>([]);
+  const [vouchersLoading, setVouchersLoading] = useState(false);
   const [appliedVoucher, setAppliedVoucher] = useState<null | {
     voucher: {
       id: number;
@@ -114,6 +155,34 @@ export default function BookingPage() {
   useEffect(() => {
     if (!fieldId || Number.isNaN(fieldId)) return;
 
+    const user = getStoredUser();
+    const role = String(user?.role ?? "").toUpperCase();
+
+    if (!user) {
+      router.replace(`/login?redirect=/booking/${fieldId}`);
+      return;
+    }
+
+    if (role !== "USER") {
+      setError("Chỉ tài khoản khách hàng mới được đặt sân");
+
+      if (role === "OWNER") {
+        router.replace("/owner/dashboard");
+        return;
+      }
+
+      if (role === "ADMIN") {
+        router.replace("/admin/dashboard");
+        return;
+      }
+
+      router.replace("/browse");
+    }
+  }, [fieldId, router]);
+
+  useEffect(() => {
+    if (!fieldId || Number.isNaN(fieldId)) return;
+
     let cancelled = false;
 
     async function fetchField() {
@@ -124,8 +193,10 @@ export default function BookingPage() {
         const result = await getFieldDetail(fieldId);
 
         if (cancelled) return;
+        console.log("FIELD DETAIL RESPONSE:", result.data);
 
         setField(mapFieldDetailToUi(result.data));
+        
       } catch (err) {
         if (cancelled) return;
         setError(
@@ -142,6 +213,39 @@ export default function BookingPage() {
       cancelled = true;
     };
   }, [fieldId]);
+
+  useEffect(() => {
+    if (!field?.ownerId) {
+      setAvailableVouchers([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function fetchAvailableVouchers() {
+      try {
+        setVouchersLoading(true);
+
+        const result = await getAvailableVouchers(field?.ownerId ?? null);
+
+        if (cancelled) return;
+
+        setAvailableVouchers(result.data ?? []);
+      } catch (err) {
+        if (cancelled) return;
+        setAvailableVouchers([]);
+        console.error("LOAD AVAILABLE VOUCHERS ERROR:", err);
+      } finally {
+        if (!cancelled) setVouchersLoading(false);
+      }
+    }
+
+    fetchAvailableVouchers();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [field?.ownerId]);
 
   useEffect(() => {
     if (!fieldId || !bookingData.date) {
@@ -207,24 +311,25 @@ export default function BookingPage() {
     setVoucherError("");
   };
 
-const handleDurationChange = (delta: number) => {
-  setBookingData((prev) => {
-    const next = Math.min(4, Math.max(1, prev.durationHours + delta));
-    return {
-      ...prev,
-      durationHours: next,
-      selectedSlot: null,
-    };
-  });
+  const handleDurationChange = (delta: number) => {
+    setBookingData((prev) => {
+      const next = Math.min(4, Math.max(1, prev.durationHours + delta));
+      return {
+        ...prev,
+        durationHours: next,
+        selectedSlot: null,
+      };
+    });
 
-  setAppliedVoucher(null);
-  setVoucherMessage("");
-  setVoucherError("");
-};
-  const handleApplyVoucher = async () => {
+    setAppliedVoucher(null);
+    setVoucherMessage("");
+    setVoucherError("");
+  };
+
+  const handleApplyVoucher = async (codeOverride?: string) => {
     if (!field) return;
 
-    const code = voucherCode.trim().toUpperCase();
+    const code = (codeOverride ?? voucherCode).trim().toUpperCase();
 
     if (!code) {
       setVoucherError("Vui lòng nhập mã voucher");
@@ -283,6 +388,19 @@ const handleDurationChange = (delta: number) => {
   };
 
   const handleCreateBooking = async () => {
+    const user = getStoredUser();
+    const role = String(user?.role ?? "").toUpperCase();
+
+    if (!user) {
+      router.push(`/login?redirect=/booking/${fieldId}`);
+      return;
+    }
+
+    if (role !== "USER") {
+      setError("Chỉ tài khoản khách hàng mới được đặt sân");
+      return;
+    }
+
     if (!field) return;
 
     if (!bookingData.date || !bookingData.selectedSlot) {
@@ -714,11 +832,81 @@ const handleDurationChange = (delta: number) => {
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={handleApplyVoucher}
+                        onClick={() => handleApplyVoucher()}
                         disabled={isApplyingVoucher || !voucherCode.trim()}
                       >
                         {isApplyingVoucher ? "Đang áp dụng..." : "Áp dụng"}
                       </Button>
+                    )}
+                  </div>
+
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-medium">Voucher khả dụng</p>
+                      {vouchersLoading && (
+                        <span className="text-xs text-muted-foreground">
+                          Đang tải...
+                        </span>
+                      )}
+                    </div>
+
+                    {vouchersLoading ? (
+                      <div className="text-sm text-muted-foreground border border-dashed border-border rounded-lg p-3">
+                        Đang tải voucher khả dụng...
+                      </div>
+                    ) : availableVouchers.length === 0 ? (
+                      <div className="text-sm text-muted-foreground border border-dashed border-border rounded-lg p-3">
+                        Hiện chưa có voucher khả dụng cho sân này.
+                      </div>
+                    ) : (
+                      <div className="grid gap-2">
+                        {availableVouchers.map((voucher) => {
+                          const isSelected =
+                            appliedVoucher?.voucher.code === voucher.code ||
+                            voucherCode === voucher.code;
+
+                          return (
+                            <button
+                              key={voucher.id}
+                              type="button"
+                              disabled={Boolean(appliedVoucher) || isApplyingVoucher}
+                              onClick={() => {
+                                setVoucherCode(voucher.code);
+                                setVoucherError("");
+                                setVoucherMessage("");
+                                void handleApplyVoucher(voucher.code);
+                              }}
+                              className={`text-left rounded-lg border p-3 transition ${
+                                isSelected
+                                  ? "border-primary bg-primary/10"
+                                  : "border-border hover:border-primary/50"
+                              } ${
+                                Boolean(appliedVoucher) || isApplyingVoucher
+                                  ? "opacity-70 cursor-not-allowed"
+                                  : ""
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <div className="font-semibold text-sm">
+                                    {voucher.code}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground mt-1">
+                                    {formatVoucherDiscount(voucher)}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground mt-1">
+                                    {formatVoucherCondition(voucher)}
+                                  </div>
+                                </div>
+
+                                <span className="text-xs font-medium text-primary whitespace-nowrap">
+                                  {isSelected ? "Đã chọn" : "Dùng mã"}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
 
@@ -851,7 +1039,6 @@ const handleDurationChange = (delta: number) => {
                   </div>
                 )}
 
-                
                 <div className="flex justify-between border-t border-border pt-3 text-base">
                   <span className="font-semibold">Tổng cộng</span>
                   <span className="font-bold text-primary">

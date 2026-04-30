@@ -35,7 +35,7 @@ export const bookingsController = {
 
   createBooking: asyncHandler(async (req, res) => {
     const payload = req.validated?.body ?? req.body;
-    const booking = await bookingsService.createBooking(req.user.id, payload);
+    const booking = await bookingsService.createBooking(req.user, payload);
     return createdResponse(
       res,
       toBookingDetail(booking),
