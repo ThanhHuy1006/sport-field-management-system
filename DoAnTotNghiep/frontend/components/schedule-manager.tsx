@@ -415,18 +415,6 @@ export function ScheduleManager({
         </Card>
       </div>
 
-      {/* Admin Info Banner */}
-      {isAdmin && (
-        <div className="flex items-start gap-3 p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg">
-          <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
-          <div>
-            <p className="font-medium text-blue-800 dark:text-blue-200">Chế độ xem Admin</p>
-            <p className="text-sm text-blue-700 dark:text-blue-300">
-              Admin chỉ có quyền xem tổng quan đặt sân. Việc duyệt/từ chối đơn do Chủ sân thực hiện.
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* Filters & Controls */}
       <Card className="p-4">
@@ -743,9 +731,9 @@ export function ScheduleManager({
                               <Badge className={`text-[10px] px-1.5 py-0 ${getStatusColor(booking.status)}`}>
                                 {getStatusText(booking.status)}
                               </Badge>
-                              <span className="text-[10px] text-muted-foreground">
+                              {/* <span className="text-[10px] text-muted-foreground">
                                 {booking.startTime} - {booking.endTime}
-                              </span>
+                              </span> */}
                             </div>
                             <p className="text-xs font-medium truncate flex items-center gap-1">
                               <User className="w-3 h-3" />
@@ -756,9 +744,9 @@ export function ScheduleManager({
                                 <Phone className="w-2.5 h-2.5" />
                                 {booking.customerPhone}
                               </span>
-                              <span className="text-xs font-semibold text-primary">
+                              {/* <span className="text-xs font-semibold text-primary">
                                 {formatCurrency(booking.price)}
-                              </span>
+                              </span> */}
                             </div>
                           </div>
                         </div>

@@ -25,7 +25,7 @@ const adminNavItems = [
   { href: "/admin/schedule", label: "Quản lý đặt sân", icon: Calendar },
   { href: "/admin/reviews", label: "Đánh giá", icon: Star },
   { href: "/admin/reports", label: "Báo cáo", icon: BarChart3 },
-  { href: "/admin/settings", label: "Cài đặt", icon: Settings },
+  // { href: "/admin/settings", label: "Cài đặt", icon: Settings },
 ]
 
 export function AdminSidebar() {

@@ -30,7 +30,7 @@ const ownerNavItems = [
   { href: "/owner/vouchers", label: "Voucher", icon: TicketPercent },
   { href: "/owner/reviews", label: "Đánh giá", icon: Star },
   { href: "/owner/profile", label: "Hồ sơ", icon: User },
-  { href: "/owner/settings", label: "Cài đặt", icon: Settings },
+  // { href: "/owner/settings", label: "Cài đặt", icon: Settings },
 ]
 
 function MobileNav() {

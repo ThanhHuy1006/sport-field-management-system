@@ -1,37 +1,202 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { User, LogOut, Settings, Heart, Clock, ArrowLeft, Camera } from "lucide-react"
+import { getMe, updateMe, type Me } from "@/features/users/services/me"
+import { uploadAvatar } from "@/features/uploads/services/upload-avatar"
 
-export default function ProfilePage() {
-  const [isEditing, setIsEditing] = useState(false)
-  const [profileData, setProfileData] = useState({
-    fullName: "Nguyễn Văn A",
-    email: "nguyenvana@example.com",
-    phone: "+84 123 456 789",
-    address: "123 Đường Thể Thao, Quận 1, TP.HCM",
+type ProfileData = {
+  fullName: string
+  email: string
+  phone: string
+  address: string
+  city: string
+  country: string
+  joinDate: string
+  avatar: string
+}
+
+const emptyProfile: ProfileData = {
+  fullName: "",
+  email: "",
+  phone: "",
+  address: "Chưa cập nhật",
+  city: "Thành phố Hồ Chí Minh",
+  country: "Việt Nam",
+  joinDate: new Date().toISOString(),
+  avatar: "/placeholder.svg",
+}
+
+function mapMeToProfile(user: Me): ProfileData {
+  return {
+    fullName: user.name ?? "",
+    email: user.email ?? "",
+    phone: user.phone ?? "",
+    address: "Chưa cập nhật",
     city: "Thành phố Hồ Chí Minh",
     country: "Việt Nam",
-    joinDate: "2024-06-15",
-    avatar: "/placeholder.svg",
-  })
+    joinDate: user.created_at ?? new Date().toISOString(),
+    avatar: user.avatar_url || "/placeholder.svg",
+  }
+}
 
-  const [editData, setEditData] = useState(profileData)
+function getApiOrigin() {
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api/v1"
+  return apiBaseUrl.replace(/\/api\/v1\/?$/, "")
+}
+
+function toAvatarSrc(url: string | null | undefined) {
+  if (!url) return "/placeholder.svg"
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
+    return url
+  }
+  if (url.startsWith("/uploads/")) {
+    return `${getApiOrigin()}${url}`
+  }
+  return url
+}
+
+function syncStoredUserProfile(user: Me) {
+  if (typeof window === "undefined") return
+
+  const possibleKeys = ["currentUser", "user"]
+
+  for (const key of possibleKeys) {
+    const raw = window.localStorage.getItem(key)
+    if (!raw) continue
+
+    try {
+      const parsed = JSON.parse(raw)
+
+      if (parsed && typeof parsed === "object") {
+        window.localStorage.setItem(
+          key,
+          JSON.stringify({
+            ...parsed,
+            name: user.name,
+            phone: user.phone,
+            avatar_url: user.avatar_url,
+          }),
+        )
+      }
+    } catch {
+      // Bỏ qua nếu localStorage không phải JSON user đơn giản.
+    }
+  }
+}
+
+export default function ProfilePage() {
+  const avatarInputRef = useRef<HTMLInputElement | null>(null)
+  const [isEditing, setIsEditing] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const [error, setError] = useState("")
+  const [message, setMessage] = useState("")
+  const [profileData, setProfileData] = useState<ProfileData>(emptyProfile)
+  const [editData, setEditData] = useState<ProfileData>(emptyProfile)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function fetchProfile() {
+      try {
+        setIsLoading(true)
+        setError("")
+
+        const result = await getMe()
+        if (cancelled) return
+
+        const mapped = mapMeToProfile(result.data)
+        setProfileData(mapped)
+        setEditData(mapped)
+      } catch (err) {
+        if (cancelled) return
+        setError(err instanceof Error ? err.message : "Không thể tải thông tin cá nhân")
+      } finally {
+        if (!cancelled) setIsLoading(false)
+      }
+    }
+
+    fetchProfile()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setEditData((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleSave = () => {
-    setProfileData(editData)
-    setIsEditing(false)
+  const handleSave = async () => {
+    try {
+      setIsSaving(true)
+      setError("")
+      setMessage("")
+
+      const result = await updateMe({
+        name: editData.fullName,
+        phone: editData.phone || null,
+      })
+
+      syncStoredUserProfile(result.data)
+
+      const mapped = mapMeToProfile(result.data)
+      setProfileData(mapped)
+      setEditData(mapped)
+      setIsEditing(false)
+      setMessage("Cập nhật thông tin cá nhân thành công")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Cập nhật thông tin thất bại")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ""
+
+    if (!file) return
+
+    try {
+      setIsUploadingAvatar(true)
+      setError("")
+      setMessage("")
+
+      const uploadResult = await uploadAvatar(file)
+      const avatarUrl = uploadResult.data.file.url
+      const updateResult = await updateMe({ avatar_url: avatarUrl })
+
+      syncStoredUserProfile(updateResult.data)
+
+      const mapped = mapMeToProfile(updateResult.data)
+      setProfileData(mapped)
+      setEditData(mapped)
+      setMessage("Cập nhật ảnh đại diện thành công")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Cập nhật ảnh đại diện thất bại")
+    } finally {
+      setIsUploadingAvatar(false)
+    }
+  }
+
+  const handleLogout = () => {
+    if (typeof window === "undefined") return
+
+    window.localStorage.removeItem("accessToken")
+    window.localStorage.removeItem("refreshToken")
+    window.localStorage.removeItem("currentUser")
+    window.localStorage.removeItem("user")
+    window.location.href = "/login"
   }
 
   const stats = [
@@ -42,12 +207,22 @@ export default function ProfilePage() {
   ]
 
   const getInitials = (name: string) => {
-    return name
+    return (name || "U")
       .split(" ")
       .map((n) => n[0])
       .join("")
       .toUpperCase()
       .slice(0, 2)
+  }
+
+  if (isLoading) {
+    return (
+      <main className="min-h-screen bg-background">
+        <div className="max-w-7xl mx-auto px-4 py-12 text-center">
+          <p className="text-lg text-muted-foreground">Đang tải thông tin cá nhân...</p>
+        </div>
+      </main>
+    )
   }
 
   return (
@@ -94,7 +269,11 @@ export default function ProfilePage() {
                     Cài Đặt
                   </button>
                 </Link>
-                <button className="w-full text-left px-4 py-2 rounded-lg hover:bg-muted transition text-foreground">
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="w-full text-left px-4 py-2 rounded-lg hover:bg-muted transition text-foreground"
+                >
                   <LogOut className="w-4 h-4 inline mr-2" />
                   Đăng Xuất
                 </button>
@@ -104,6 +283,18 @@ export default function ProfilePage() {
 
           {/* Main Content */}
           <div className="lg:col-span-3">
+            {error && (
+              <Card className="p-4 mb-6 border-destructive/40 bg-destructive/5 text-destructive">
+                {error}
+              </Card>
+            )}
+
+            {message && (
+              <Card className="p-4 mb-6 border-green-500/40 bg-green-500/5 text-green-700">
+                {message}
+              </Card>
+            )}
+
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
               {stats.map((stat, idx) => (
@@ -119,17 +310,32 @@ export default function ProfilePage() {
               <div className="flex flex-col items-center mb-8">
                 <div className="relative group">
                   <Avatar className="h-32 w-32">
-                    <AvatarImage src={profileData.avatar || "/placeholder.svg"} alt={profileData.fullName} />
+                    <AvatarImage src={toAvatarSrc(profileData.avatar)} alt={profileData.fullName} />
                     <AvatarFallback className="bg-primary text-primary-foreground text-3xl">
                       {getInitials(profileData.fullName)}
                     </AvatarFallback>
                   </Avatar>
-                  <button className="absolute bottom-0 right-0 bg-primary text-primary-foreground rounded-full p-2 shadow-lg hover:bg-primary/90 transition">
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg,image/webp"
+                    className="hidden"
+                    onChange={handleAvatarFileChange}
+                  />
+                  <button
+                    type="button"
+                    disabled={isUploadingAvatar}
+                    onClick={() => avatarInputRef.current?.click()}
+                    className="absolute bottom-0 right-0 bg-primary text-primary-foreground rounded-full p-2 shadow-lg hover:bg-primary/90 transition disabled:opacity-60"
+                  >
                     <Camera className="h-4 w-4" />
                   </button>
                 </div>
-                <h2 className="text-2xl font-bold mt-4">{profileData.fullName}</h2>
+                <h2 className="text-2xl font-bold mt-4">{profileData.fullName || "Người dùng"}</h2>
                 <p className="text-muted-foreground">{profileData.email}</p>
+                {isUploadingAvatar && (
+                  <p className="text-sm text-muted-foreground mt-2">Đang cập nhật ảnh đại diện...</p>
+                )}
               </div>
 
               <div className="flex items-center justify-between mb-6">
@@ -146,7 +352,7 @@ export default function ProfilePage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="text-sm text-muted-foreground">Họ Tên</label>
-                      <p className="text-lg font-medium text-foreground">{profileData.fullName}</p>
+                      <p className="text-lg font-medium text-foreground">{profileData.fullName || "Chưa cập nhật"}</p>
                     </div>
                     <div>
                       <label className="text-sm text-muted-foreground">Email</label>
@@ -154,7 +360,7 @@ export default function ProfilePage() {
                     </div>
                     <div>
                       <label className="text-sm text-muted-foreground">Số Điện Thoại</label>
-                      <p className="text-lg font-medium text-foreground">{profileData.phone}</p>
+                      <p className="text-lg font-medium text-foreground">{profileData.phone || "Chưa cập nhật"}</p>
                     </div>
                     <div>
                       <label className="text-sm text-muted-foreground">Quốc Gia</label>
@@ -181,7 +387,7 @@ export default function ProfilePage() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-2">Email</label>
-                      <Input type="email" name="email" value={editData.email} onChange={handleChange} />
+                      <Input type="email" name="email" value={editData.email} disabled />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-2">Số Điện Thoại</label>
@@ -189,24 +395,27 @@ export default function ProfilePage() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-2">Quốc Gia</label>
-                      <Input name="country" value={editData.country} onChange={handleChange} />
+                      <Input name="country" value={editData.country} disabled />
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-foreground mb-2">Địa Chỉ</label>
-                      <Input name="address" value={editData.address} onChange={handleChange} />
+                      <Input name="address" value={editData.address} disabled />
                     </div>
                   </div>
 
                   <div className="flex gap-4 pt-4">
-                    <Button onClick={handleSave} className="flex-1">
-                      Lưu Thay Đổi
+                    <Button onClick={handleSave} disabled={isSaving} className="flex-1">
+                      {isSaving ? "Đang lưu..." : "Lưu Thay Đổi"}
                     </Button>
                     <Button
                       variant="outline"
                       onClick={() => {
                         setEditData(profileData)
                         setIsEditing(false)
+                        setError("")
+                        setMessage("")
                       }}
+                      disabled={isSaving}
                       className="flex-1"
                     >
                       Hủy
