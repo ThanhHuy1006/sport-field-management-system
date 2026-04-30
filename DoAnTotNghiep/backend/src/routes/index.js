@@ -1,7 +1,7 @@
 import { Router } from "express";
 
 import authRoutes from "../modules/auth/auth.routes.js";
-// import usersRoutes from "../modules/users/users.routes.js";
+import usersRoutes from "../modules/users/users.routes.js";
 
 import fieldsRoutes from "../modules/fields/fields.routes.js";
 import publicSchedulesRoutes from "../modules/schedules/public.schedules.routes.js";
@@ -35,7 +35,7 @@ const router = Router();
 
 // Auth / User
 router.use("/auth", authRoutes);
-// router.use("/users", usersRoutes);
+router.use("/users", usersRoutes);
 router.use("/uploads", uploadsRoutes);
 
 // Public fields + public schedules
