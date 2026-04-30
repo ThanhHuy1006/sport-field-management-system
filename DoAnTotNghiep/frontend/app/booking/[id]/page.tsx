@@ -25,6 +25,7 @@ import {
   type VoucherItem,
 } from "@/features/vouchers/services/validate-voucher";
 import { getStoredUser } from "@/features/auth/lib/auth-storage";
+import { getImageUrl } from "@/lib/image-url";
 
 type FieldUi = {
   id: number;
@@ -45,7 +46,6 @@ type SlotUi = {
   available: boolean;
   reason: string | null;
 };
-
 function mapFieldDetailToUi(data: FieldDetailResponse["data"]): FieldUi {
   const source = data as FieldDetailResponse["data"] & {
     owner_id?: number | null;
@@ -68,7 +68,7 @@ function mapFieldDetailToUi(data: FieldDetailResponse["data"]): FieldUi {
     ownerId,
     name: data.field_name ?? "Chưa có tên sân",
     location: data.address ?? "Chưa cập nhật địa chỉ",
-    image: data.images?.[0]?.url ?? null,
+    image: getImageUrl(data.images?.[0]?.url ?? null),
     pricePerHour: Number(data.base_price_per_hour ?? 0),
     openTime: data.openTime ?? null,
     closeTime: data.closeTime ?? null,
@@ -196,7 +196,6 @@ export default function BookingPage() {
         console.log("FIELD DETAIL RESPONSE:", result.data);
 
         setField(mapFieldDetailToUi(result.data));
-        
       } catch (err) {
         if (cancelled) return;
         setError(
@@ -869,7 +868,9 @@ export default function BookingPage() {
                             <button
                               key={voucher.id}
                               type="button"
-                              disabled={Boolean(appliedVoucher) || isApplyingVoucher}
+                              disabled={
+                                Boolean(appliedVoucher) || isApplyingVoucher
+                              }
                               onClick={() => {
                                 setVoucherCode(voucher.code);
                                 setVoucherError("");
@@ -996,6 +997,9 @@ export default function BookingPage() {
               <img
                 src={field.image || "/placeholder.svg"}
                 alt={field.name}
+                onError={(event) => {
+                  event.currentTarget.src = "/placeholder.svg";
+                }}
                 className="w-full h-48 object-cover rounded-lg mb-4"
               />
 
