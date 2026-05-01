@@ -16,6 +16,7 @@ import {
   Share2,
   ChevronLeft,
   ChevronRight,
+  Flag,
 } from "lucide-react";
 import {
   getFieldDetail,
@@ -23,6 +24,7 @@ import {
 } from "@/features/fields/services/get-field-detail";
 import { getFieldOwnerInfo } from "@/features/fields/services/get-field-owner-info";
 import { getFieldReviews } from "@/features/fields/services/get-field-reviews";
+import { ReportFieldDialog } from "@/components/report-field-dialog";
 import { getImageUrl } from "@/lib/image-url";
 
 type DetailFieldUi = {
@@ -154,6 +156,7 @@ export default function FieldDetailsPage() {
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isReportOpen, setIsReportOpen] = useState(false);
 
   useEffect(() => {
     if (!fieldId) return;
@@ -548,10 +551,26 @@ export default function FieldDetailsPage() {
               >
                 {isWishlisted ? "Đã thêm vào yêu thích" : "Thêm vào yêu thích"}
               </Button>
+
+              <Button
+                variant="ghost"
+                className="mt-3 w-full text-muted-foreground hover:text-destructive"
+                onClick={() => setIsReportOpen(true)}
+              >
+                <Flag className="mr-2 h-4 w-4" />
+                Báo cáo sân
+              </Button>
             </Card>
           </div>
         </div>
       </div>
+
+      <ReportFieldDialog
+        open={isReportOpen}
+        onOpenChange={setIsReportOpen}
+        fieldId={field.id}
+        fieldName={field.name}
+      />
     </main>
   );
 }

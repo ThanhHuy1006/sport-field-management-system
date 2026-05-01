@@ -8,6 +8,7 @@ import {
   MAX_DOCUMENT_SIZE_BYTES,
   MAX_FIELD_IMAGES,
   MAX_IMAGE_SIZE_BYTES,
+  MAX_FIELD_REPORT_IMAGES,
   UPLOAD_FOLDERS,
   UPLOAD_ROOT_DIR,
 } from "./uploads.constants.js";
@@ -87,4 +88,11 @@ export const uploadDocumentsMiddleware = createUploadMiddleware({
   maxFiles: 5,
   allowedMimeTypes: DOCUMENT_MIME_TYPES,
   maxFileSize: MAX_DOCUMENT_SIZE_BYTES,
+});
+export const uploadFieldReportImagesMiddleware = createUploadMiddleware({
+  folderName: UPLOAD_FOLDERS.FIELD_REPORTS,
+  fieldName: "images",
+  maxFiles: MAX_FIELD_REPORT_IMAGES,
+  allowedMimeTypes: IMAGE_MIME_TYPES,
+  maxFileSize: MAX_IMAGE_SIZE_BYTES,
 });

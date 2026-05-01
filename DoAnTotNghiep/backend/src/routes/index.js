@@ -30,6 +30,8 @@ import ownerReportsRoutes from "../modules/reports/owner.reports.routes.js";
 import adminReportsRoutes from "../modules/reports/admin.reports.routes.js";
 
 import adminRoutes from "../modules/admin/admin.routes.js";
+import fieldReportsRoutes from "../modules/field-reports/field-reports.routes.js";
+import adminFieldReportsRoutes from "../modules/field-reports/admin.field-reports.routes.js";
 
 const router = Router();
 
@@ -69,5 +71,8 @@ router.use("/notifications", notificationsRoutes);
 // Admin
 router.use("/admin", adminRoutes);
 router.use("/admin/reports", adminReportsRoutes);
+//field-reports
+router.use("/field-reports", fieldReportsRoutes);
+router.use("/admin/field-reports", adminFieldReportsRoutes);
 
 export default router;

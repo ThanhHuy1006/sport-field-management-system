@@ -48,38 +48,39 @@ model booking_status_history {
 }
 
 model bookings {
-  id                       Int                      @id @default(autoincrement())
-  user_id                  Int
-  field_id                 Int
-  start_datetime           DateTime                 @db.DateTime(0)
-  end_datetime             DateTime                 @db.DateTime(0)
-  status                   bookings_status?         @default(PENDING_CONFIRM)
+  id             Int              @id @default(autoincrement())
+  user_id        Int
+  field_id       Int
+  start_datetime DateTime         @db.DateTime(0)
+  end_datetime   DateTime         @db.DateTime(0)
+  status         bookings_status? @default(PENDING_CONFIRM)
 
-  original_price           Decimal?                 @db.Decimal(12, 2)
-  discount_amount          Decimal?                 @default(0.00) @db.Decimal(12, 2)
-  total_price              Decimal?                 @db.Decimal(12, 2)
-  voucher_id               Int?
+  original_price  Decimal? @db.Decimal(12, 2)
+  discount_amount Decimal? @default(0.00) @db.Decimal(12, 2)
+  total_price     Decimal? @db.Decimal(12, 2)
+  voucher_id      Int?
 
-  notes                    String?                  @db.VarChar(255)
-  contact_name             String?                  @db.VarChar(120)
-  contact_email            String?                  @db.VarChar(160)
-  contact_phone            String?                  @db.VarChar(30)
-  payment_expires_at       DateTime?                @db.DateTime(0)
-  approval_mode_snapshot   field_approval_mode?     @default(MANUAL)
+  notes                    String?              @db.VarChar(255)
+  contact_name             String?              @db.VarChar(120)
+  contact_email            String?              @db.VarChar(160)
+  contact_phone            String?              @db.VarChar(30)
+  payment_expires_at       DateTime?            @db.DateTime(0)
+  approval_mode_snapshot   field_approval_mode? @default(MANUAL)
   requested_payment_method payments_provider?
-  created_at               DateTime?                @default(now()) @db.DateTime(0)
-  updated_at               DateTime?                @default(now()) @db.DateTime(0)
+  created_at               DateTime?            @default(now()) @db.DateTime(0)
+  updated_at               DateTime?            @default(now()) @db.DateTime(0)
 
-  booking_status_history   booking_status_history[]
-  fields                   fields                   @relation(fields: [field_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_booking_field")
-  users                    users                    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_booking_user")
-  voucher                  vouchers?                @relation(fields: [voucher_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_booking_voucher")
-  payments                 payments?
-  reviews                  reviews[]
+  booking_status_history booking_status_history[]
+  field_reports          field_reports[]
+  fields                 fields                   @relation(fields: [field_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_booking_field")
+  users                  users                    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_booking_user")
+  voucher                vouchers?                @relation(fields: [voucher_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_booking_voucher")
+  payments               payments?
+  reviews                reviews[]
 
-  checked_in_at            DateTime?                @db.DateTime(0)
-  checked_in_by            Int?
-  checkin_method           String?                  @db.VarChar(20)
+  checked_in_at  DateTime? @db.DateTime(0)
+  checked_in_by  Int?
+  checkin_method String?   @db.VarChar(20)
 
   @@index([field_id], map: "fk_booking_field")
   @@index([user_id], map: "fk_booking_user")
@@ -151,6 +152,7 @@ model fields {
   operating_hours     operating_hours[]
   reports_daily       reports_daily[]
   reviews             reviews[]
+  field_reports       field_reports[]
 
   @@index([owner_id], map: "fk_field_owner")
   @@index([province])
@@ -244,6 +246,47 @@ model reports_daily {
   @@index([owner_id], map: "fk_report_owner")
 }
 
+model field_reports {
+  id          Int                  @id @default(autoincrement())
+  reporter_id Int
+  field_id    Int
+  booking_id  Int?
+  reason      field_reports_reason
+  description String?              @db.Text
+  status      field_reports_status @default(PENDING)
+  admin_note  String?              @db.Text
+  handled_by  Int?
+  handled_at  DateTime?            @db.DateTime(0)
+  created_at  DateTime?            @default(now()) @db.DateTime(0)
+  updated_at  DateTime?            @default(now()) @db.DateTime(0)
+
+  reporter    users                      @relation("field_reports_reporter", fields: [reporter_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_field_report_reporter")
+  field       fields                     @relation(fields: [field_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_field_report_field")
+  booking     bookings?                  @relation(fields: [booking_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_field_report_booking")
+  admin       users?                     @relation("field_reports_admin", fields: [handled_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_field_report_admin")
+  attachments field_report_attachments[]
+
+  @@index([reporter_id], map: "fk_field_report_reporter")
+  @@index([field_id], map: "fk_field_report_field")
+  @@index([booking_id], map: "fk_field_report_booking")
+  @@index([handled_by], map: "fk_field_report_admin")
+  @@index([status])
+}
+
+model field_report_attachments {
+  id         Int       @id @default(autoincrement())
+  report_id  Int
+  image_url  String    @db.VarChar(500)
+  file_name  String?   @db.VarChar(255)
+  mime_type  String?   @db.VarChar(100)
+  file_size  Int?
+  created_at DateTime? @default(now()) @db.DateTime(0)
+
+  report field_reports @relation(fields: [report_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_field_report_attachment_report")
+
+  @@index([report_id], map: "fk_field_report_attachment_report")
+}
+
 model reviews {
   id         Int       @id @default(autoincrement())
   booking_id Int
@@ -310,6 +353,8 @@ model users {
   user_vouchers                                    user_vouchers[]
   vouchers_vouchers_created_byTousers              vouchers[]               @relation("vouchers_created_byTousers")
   vouchers_vouchers_owner_idTousers                vouchers[]               @relation("vouchers_owner_idTousers")
+  field_reports_reporter                           field_reports[]          @relation("field_reports_reporter")
+  field_reports_admin                              field_reports[]          @relation("field_reports_admin")
 }
 
 model vouchers {
@@ -327,7 +372,7 @@ model vouchers {
   owner_id                         Int?
   created_by                       Int?
   created_at                       DateTime?        @default(now()) @db.DateTime(0)
-  bookings bookings[]
+  bookings                         bookings[]
   user_vouchers                    user_vouchers[]
   users_vouchers_created_byTousers users?           @relation("vouchers_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_voucher_creator")
   users_vouchers_owner_idTousers   users?           @relation("vouchers_owner_idTousers", fields: [owner_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_voucher_owner")
@@ -461,4 +506,20 @@ enum field_pricing_day_type {
   WEEKEND
   HOLIDAY
   CUSTOM
+}
+
+enum field_reports_reason {
+  WRONG_INFO
+  FAKE_IMAGE
+  FIELD_CLOSED
+  BAD_QUALITY
+  OWNER_ATTITUDE
+  OTHER
+}
+
+enum field_reports_status {
+  PENDING
+  REVIEWING
+  RESOLVED
+  REJECTED
 }

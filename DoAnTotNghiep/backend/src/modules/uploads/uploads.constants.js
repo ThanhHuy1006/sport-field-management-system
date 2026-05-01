@@ -7,6 +7,7 @@ export const UPLOAD_FOLDERS = {
   AVATARS: "avatars",
   FIELDS: "fields",
   DOCUMENTS: "documents",
+  FIELD_REPORTS: "field-reports",
 };
 
 export const IMAGE_MIME_TYPES = [
@@ -25,5 +26,6 @@ export const DOCUMENT_MIME_TYPES = [
 
 export const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 export const MAX_DOCUMENT_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+export const MAX_FIELD_REPORT_IMAGES = 3;
 
 export const MAX_FIELD_IMAGES = 5;

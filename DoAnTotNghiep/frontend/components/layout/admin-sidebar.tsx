@@ -14,6 +14,7 @@ import {
   LogOut,
   ChevronLeft,
   Menu,
+  Flag,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useState } from "react"
@@ -23,8 +24,12 @@ const adminNavItems = [
   { href: "/admin/users", label: "Người dùng", icon: Users },
   { href: "/admin/fields", label: "Quản lý sân", icon: MapPin },
   { href: "/admin/schedule", label: "Quản lý đặt sân", icon: Calendar },
-  { href: "/admin/reviews", label: "Đánh giá", icon: Star },
-  { href: "/admin/reports", label: "Báo cáo", icon: BarChart3 },
+
+  { href: "/admin/field-reports", label: "Báo cáo sân", icon: Flag },
+  { href: "/admin/reviews", label: "Báo cáo đánh giá", icon: Star },
+
+  { href: "/admin/reports", label: "Thống kê", icon: BarChart3 },
+
   // { href: "/admin/settings", label: "Cài đặt", icon: Settings },
 ]
 
