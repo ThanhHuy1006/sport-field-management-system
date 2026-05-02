@@ -1,4 +1,6 @@
 import { paymentsRepository } from "./payments.repository.js";
+import { bookingsRepository } from "../bookings/bookings.repository.js";
+import { notificationsService } from "../notifications/notifications.service.js";
 import {
   ConflictError,
   ForbiddenError,
@@ -6,12 +8,25 @@ import {
   ValidationError,
 } from "../../core/errors/index.js";
 
+async function safeCreateNotification(payload) {
+  try {
+    await notificationsService.createNotification(payload);
+  } catch (error) {
+    console.error("[NOTIFICATION_ERROR]", error);
+  }
+}
+
 export const paymentsService = {
   async createPayment(userId, payload) {
     const booking = await paymentsRepository.findBookingForPayment(
       userId,
       payload.booking_id,
     );
+
+    if (!booking) {
+      throw new NotFoundError("Không tìm thấy booking");
+    }
+
     if (
       booking.status !== "AWAITING_PAYMENT" &&
       booking.status !== "PAY_FAILED"
@@ -31,21 +46,20 @@ export const paymentsService = {
         "Payment expired before creating payment",
       );
 
-      throw new ForbiddenError("Booking đã quá hạn thanh toán");
-    }
+      await safeCreateNotification({
+        user_id: booking.user_id,
+        title: "Booking đã quá hạn thanh toán",
+        body: "Đơn đặt sân của bạn đã quá thời gian thanh toán. Vui lòng đặt lại nếu vẫn có nhu cầu.",
+        type: "PAYMENT",
+      });
 
-    if (!booking) {
-      throw new NotFoundError("Không tìm thấy booking");
+      throw new ForbiddenError("Booking đã quá hạn thanh toán");
     }
 
     if (booking.requested_payment_method !== "BANK_TRANSFER") {
       throw new ForbiddenError(
         "Booking này thanh toán tại sân, không cần thanh toán online",
       );
-    }
-
-    if (!["AWAITING_PAYMENT", "PAY_FAILED"].includes(booking.status)) {
-      throw new ForbiddenError("Booking hiện chưa thể thanh toán");
     }
 
     if (!booking.total_price || Number(booking.total_price) <= 0) {
@@ -97,7 +111,33 @@ export const paymentsService = {
       throw new ConflictError("Payment đã thành công trước đó");
     }
 
-    return paymentsRepository.markPaymentSuccess(paymentId);
+    const updatedPayment = await paymentsRepository.markPaymentSuccess(paymentId);
+
+    const booking = updatedPayment.bookings || payment.bookings;
+
+    if (booking?.user_id) {
+      await safeCreateNotification({
+        user_id: booking.user_id,
+        title: "Thanh toán thành công",
+        body: "Thanh toán của bạn đã được xác nhận. Bạn có thể sử dụng mã QR để check-in.",
+        type: "PAYMENT",
+      });
+    }
+
+    const ownerId = booking?.fields?.owner_id;
+
+    if (ownerId) {
+      await safeCreateNotification({
+        user_id: ownerId,
+        title: "Khách hàng đã thanh toán",
+        body: `Một đơn đặt sân tại ${
+          booking.fields?.field_name || "sân của bạn"
+        } đã được thanh toán thành công.`,
+        type: "PAYMENT",
+      });
+    }
+
+    return updatedPayment;
   },
 
   async simulateFailed(userId, paymentId) {
@@ -117,6 +157,19 @@ export const paymentsService = {
       throw new ConflictError("Payment đã failed trước đó");
     }
 
-    return paymentsRepository.markPaymentFailed(paymentId);
+    const updatedPayment = await paymentsRepository.markPaymentFailed(paymentId);
+
+    const booking = updatedPayment.bookings || payment.bookings;
+
+    if (booking?.user_id) {
+      await safeCreateNotification({
+        user_id: booking.user_id,
+        title: "Thanh toán thất bại",
+        body: "Thanh toán của bạn chưa thành công. Vui lòng thử lại.",
+        type: "PAYMENT",
+      });
+    }
+
+    return updatedPayment;
   },
 };

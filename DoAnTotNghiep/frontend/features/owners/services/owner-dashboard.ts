@@ -48,12 +48,20 @@ export type RecentOwnerBookingsResponse = {
   data: OwnerDashboardBooking[]
 }
 
+export type OwnerNotificationType =
+  | "BOOKING"
+  | "PAYMENT"
+  | "SYSTEM"
+  | "PROMO"
+  | string
+  | null
+
 export type OwnerNotification = {
   id: number
   user_id: number
   title: string
-  message: string
-  type: string | null
+  body: string
+  type: OwnerNotificationType
   is_read: boolean
   created_at: string
 }
@@ -62,6 +70,12 @@ export type RecentOwnerNotificationsResponse = {
   success: boolean
   message: string
   data: OwnerNotification[]
+}
+
+export type MarkOwnerNotificationAsReadResponse = {
+  success: boolean
+  message: string
+  data: OwnerNotification
 }
 
 export type ApproveOwnerBookingResponse = {
@@ -93,11 +107,26 @@ export function getRecentOwnerBookings() {
   )
 }
 
-export function getRecentOwnerNotifications() {
-  return apiRequest<RecentOwnerNotificationsResponse>(
-    "/owner/dashboard/recent-notifications",
+export async function getRecentOwnerNotifications() {
+  const result = await apiRequest<RecentOwnerNotificationsResponse>(
+    "/notifications/me",
     {
       method: "GET",
+      requireAuth: true,
+    },
+  )
+
+  return {
+    ...result,
+    data: (result.data || []).slice(0, 5),
+  }
+}
+
+export function markOwnerNotificationAsRead(notificationId: number) {
+  return apiRequest<MarkOwnerNotificationAsReadResponse>(
+    `/notifications/${notificationId}/read`,
+    {
+      method: "PATCH",
       requireAuth: true,
     },
   )
@@ -113,7 +142,10 @@ export function approveOwnerBooking(bookingId: number) {
   )
 }
 
-export function rejectOwnerBooking(bookingId: number, note = "Rejected from owner dashboard") {
+export function rejectOwnerBooking(
+  bookingId: number,
+  note = "Rejected from owner dashboard",
+) {
   return apiRequest<RejectOwnerBookingResponse>(
     `/owner/bookings/${bookingId}/reject`,
     {

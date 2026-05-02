@@ -15,14 +15,20 @@ const router = Router();
 
 router.get("/me", requireAuth, notificationsController.getMyNotifications);
 
+router.get(
+  "/unread-count",
+  requireAuth,
+  notificationsController.getMyUnreadCount
+);
+
+router.patch("/read-all", requireAuth, notificationsController.markAllAsRead);
+
 router.patch(
   "/:notificationId/read",
   requireAuth,
   validateParams(validateNotificationIdParams),
   notificationsController.markAsRead
 );
-
-router.patch("/read-all", requireAuth, notificationsController.markAllAsRead);
 
 router.delete(
   "/:notificationId",

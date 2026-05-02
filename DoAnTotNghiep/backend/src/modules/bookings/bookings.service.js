@@ -8,10 +8,21 @@ import {
   NotFoundError,
   ValidationError,
 } from "../../core/errors/index.js";
+import { notificationsService } from "../notifications/notifications.service.js";
 
 const CHECKIN_EARLY_MINUTES = 30;
 const CHECKIN_LATE_MINUTES = 60;
 const PAYMENT_EXPIRE_MINUTES = 30;
+// Nếu tạo booking thành công nhưng tạo notification lỗi
+// → Không nên làm booking fail
+// → Chỉ log lỗi notification
+async function safeCreateNotification(payload) {
+  try {
+    await notificationsService.createNotification(payload);
+  } catch (error) {
+    console.error("[NOTIFICATION_ERROR]", error);
+  }
+}
 
 function diffMinutes(start, end) {
   return Math.floor((end.getTime() - start.getTime()) / 60000);
@@ -281,9 +292,7 @@ export const bookingsService = {
         start_time: `${pad2(slotStart.getHours())}:${pad2(
           slotStart.getMinutes(),
         )}`,
-        end_time: `${pad2(slotEnd.getHours())}:${pad2(
-          slotEnd.getMinutes(),
-        )}`,
+        end_time: `${pad2(slotEnd.getHours())}:${pad2(slotEnd.getMinutes())}`,
         available,
         reason,
         booking_status,
@@ -413,6 +422,27 @@ export const bookingsService = {
       payment_expires_at: paymentExpiresAt,
     });
 
+    await safeCreateNotification({
+      user_id: booking.user_id,
+      title: "Đặt sân thành công",
+      body:
+        initialStatus === "AWAITING_PAYMENT"
+          ? "Yêu cầu đặt sân của bạn đã được xác nhận tự động. Vui lòng tiến hành thanh toán."
+          : "Yêu cầu đặt sân của bạn đã được ghi nhận. Vui lòng chờ chủ sân xác nhận.",
+      type: "BOOKING",
+    });
+
+    const ownerId = booking.fields?.owner_id || field.owner_id;
+
+    if (ownerId) {
+      await safeCreateNotification({
+        user_id: ownerId,
+        title: "Có yêu cầu đặt sân mới",
+        body: `Sân ${field.field_name || "của bạn"} vừa có một yêu cầu đặt sân mới.`,
+        type: "BOOKING",
+      });
+    }
+
     return booking;
   },
 
@@ -468,7 +498,25 @@ export const bookingsService = {
       throw new ForbiddenError("Không thể hủy booking đã bắt đầu hoặc đã qua");
     }
 
-    return bookingsRepository.cancelMyBooking(userId, bookingId);
+    const cancelledBooking = await bookingsRepository.cancelMyBooking(
+      userId,
+      bookingId,
+    );
+
+    const ownerId = cancelledBooking.fields?.owner_id;
+
+    if (ownerId) {
+      await safeCreateNotification({
+        user_id: ownerId,
+        title: "Khách hàng đã hủy đơn đặt sân",
+        body: `Một đơn đặt sân tại sân ${
+          cancelledBooking.fields?.field_name || ""
+        } đã bị khách hàng hủy.`,
+        type: "BOOKING",
+      });
+    }
+
+    return cancelledBooking;
   },
 
   async getMyBookingCheckInQr(userId, bookingId) {
@@ -570,11 +618,23 @@ export const bookingsService = {
         ? "AWAITING_PAYMENT"
         : "APPROVED";
 
-    return bookingsRepository.approveOwnerBooking(
+    const updatedBooking = await bookingsRepository.approveOwnerBooking(
       ownerId,
       bookingId,
       nextStatus,
     );
+
+    await safeCreateNotification({
+      user_id: updatedBooking.user_id,
+      title: "Đơn đặt sân đã được duyệt",
+      body:
+        nextStatus === "AWAITING_PAYMENT"
+          ? "Chủ sân đã xác nhận đơn đặt sân của bạn. Vui lòng tiến hành thanh toán."
+          : "Chủ sân đã xác nhận đơn đặt sân của bạn. Vui lòng đến sân đúng giờ.",
+      type: "BOOKING",
+    });
+
+    return updatedBooking;
   },
 
   async rejectOwnerBooking(ownerId, bookingId, payload) {
@@ -593,13 +653,23 @@ export const bookingsService = {
       );
     }
 
-    return bookingsRepository.rejectOwnerBooking(
+    const updatedBooking = await bookingsRepository.rejectOwnerBooking(
       ownerId,
       bookingId,
       payload.note,
     );
-  },
 
+    await safeCreateNotification({
+      user_id: updatedBooking.user_id,
+      title: "Đơn đặt sân bị từ chối",
+      body:
+        payload.note ||
+        "Rất tiếc, đơn đặt sân của bạn đã bị từ chối. Vui lòng chọn khung giờ khác.",
+      type: "BOOKING",
+    });
+
+    return updatedBooking;
+  },
   async checkInOwnerBooking(ownerId, bookingId, payload) {
     const booking = await bookingsRepository.findOwnerBookingById(
       ownerId,

@@ -7,7 +7,18 @@ export const notificationsRepository = {
       where: {
         user_id: userId,
       },
-      orderBy: { created_at: "desc" },
+      orderBy: {
+        created_at: "desc",
+      },
+    });
+  },
+
+  countMyUnreadNotifications(userId) {
+    return prisma.notifications.count({
+      where: {
+        user_id: userId,
+        is_read: false,
+      },
     });
   },
 
@@ -20,12 +31,25 @@ export const notificationsRepository = {
     });
   },
 
+  createNotification(payload) {
+    return prisma.notifications.create({
+      data: {
+        user_id: payload.user_id,
+        type: payload.type,
+        title: payload.title,
+        body: payload.body,
+        is_read: false,
+      },
+    });
+  },
+
   markAsRead(notificationId) {
     return prisma.notifications.update({
-      where: { id: notificationId },
+      where: {
+        id: notificationId,
+      },
       data: {
         is_read: true,
-        read_at: new Date(),
       },
     });
   },
@@ -38,14 +62,15 @@ export const notificationsRepository = {
       },
       data: {
         is_read: true,
-        read_at: new Date(),
       },
     });
   },
 
   deleteMyNotification(notificationId) {
     return prisma.notifications.delete({
-      where: { id: notificationId },
+      where: {
+        id: notificationId,
+      },
     });
   },
 
@@ -54,7 +79,9 @@ export const notificationsRepository = {
       where: {
         status: USER_STATUS.ACTIVE,
       },
-      select: { id: true },
+      select: {
+        id: true,
+      },
     });
   },
 
@@ -64,8 +91,7 @@ export const notificationsRepository = {
         user_id: user.id,
         type: payload.type,
         title: payload.title,
-        message: payload.message,
-        data: payload.data ? JSON.stringify(payload.data) : null,
+        body: payload.body,
         is_read: false,
       })),
     });

@@ -9,6 +9,33 @@ export const notificationsService = {
     return notificationsRepository.findMyNotifications(userId);
   },
 
+  async getMyUnreadCount(userId) {
+    const count = await notificationsRepository.countMyUnreadNotifications(
+      userId
+    );
+
+    return {
+      unread_count: count,
+    };
+  },
+
+  async createNotification(payload) {
+    if (!payload?.user_id) {
+      return null;
+    }
+
+    if (!payload?.title || !payload?.body) {
+      throw new ValidationError("title và body là bắt buộc");
+    }
+
+    return notificationsRepository.createNotification({
+      user_id: Number(payload.user_id),
+      title: payload.title,
+      body: payload.body,
+      type: payload.type || "SYSTEM",
+    });
+  },
+
   async markAsRead(userId, notificationId) {
     const item = await notificationsRepository.findMyNotificationById(
       userId,

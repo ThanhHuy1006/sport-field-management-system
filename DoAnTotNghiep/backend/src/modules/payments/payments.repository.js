@@ -1,5 +1,53 @@
 import prisma from "../../config/prisma.js";
 
+const bookingForPaymentSelect = {
+  id: true,
+  user_id: true,
+  field_id: true,
+  status: true,
+  total_price: true,
+  start_datetime: true,
+  end_datetime: true,
+  requested_payment_method: true,
+  payment_expires_at: true,
+  fields: {
+    select: {
+      id: true,
+      owner_id: true,
+      field_name: true,
+    },
+  },
+  payments: {
+    select: {
+      id: true,
+      status: true,
+    },
+  },
+};
+
+const paymentWithBookingInclude = {
+  bookings: {
+    select: {
+      id: true,
+      user_id: true,
+      field_id: true,
+      status: true,
+      total_price: true,
+      start_datetime: true,
+      end_datetime: true,
+      requested_payment_method: true,
+      payment_expires_at: true,
+      fields: {
+        select: {
+          id: true,
+          owner_id: true,
+          field_name: true,
+        },
+      },
+    },
+  },
+};
+
 export const paymentsRepository = {
   findBookingForPayment(userId, bookingId) {
     return prisma.bookings.findFirst({
@@ -7,22 +55,7 @@ export const paymentsRepository = {
         id: bookingId,
         user_id: userId,
       },
-      select: {
-        id: true,
-        user_id: true,
-        field_id: true,
-        status: true,
-        total_price: true,
-        start_datetime: true,
-        end_datetime: true,
-        requested_payment_method: true,
-        payments: {
-       select: {
-          id: true,
-          status: true,
-        }
-        },
-      },
+      select: bookingForPaymentSelect,
     });
   },
 
@@ -34,17 +67,7 @@ export const paymentsRepository = {
           user_id: userId,
         },
       },
-      include: {
-        bookings: {
-          select: {
-            id: true,
-            status: true,
-            total_price: true,
-            start_datetime: true,
-            end_datetime: true,
-          },
-        },
-      },
+      include: paymentWithBookingInclude,
     });
   },
 
@@ -56,25 +79,16 @@ export const paymentsRepository = {
           user_id: userId,
         },
       },
-      include: {
-        bookings: {
-          select: {
-            id: true,
-            status: true,
-            total_price: true,
-            start_datetime: true,
-            end_datetime: true,
-          },
-        },
-      },
+      include: paymentWithBookingInclude,
     });
   },
 
   createOrReusePayment(booking, provider) {
-    try {
     return prisma.$transaction(async (tx) => {
       const existed = await tx.payments.findFirst({
-        where: { booking_id: booking.id },
+        where: {
+          booking_id: booking.id,
+        },
       });
 
       const transaction_code = `PAY-${booking.id}-${Date.now()}`;
@@ -83,7 +97,9 @@ export const paymentsRepository = {
 
       if (existed) {
         payment = await tx.payments.update({
-          where: { id: existed.id },
+          where: {
+            id: existed.id,
+          },
           data: {
             provider,
             amount: booking.total_price,
@@ -109,8 +125,12 @@ export const paymentsRepository = {
 
       if (booking.status === "APPROVED" || booking.status === "PAY_FAILED") {
         await tx.bookings.update({
-          where: { id: booking.id },
-          data: { status: "AWAITING_PAYMENT" },
+          where: {
+            id: booking.id,
+          },
+          data: {
+            status: "AWAITING_PAYMENT",
+          },
         });
 
         await tx.booking_status_history.create({
@@ -118,46 +138,35 @@ export const paymentsRepository = {
             booking_id: booking.id,
             from_status: booking.status,
             to_status: "AWAITING_PAYMENT",
-            // note: "Payment initiated",
             reason: "Payment initiated",
           },
         });
       }
 
       return tx.payments.findUnique({
-        where: { id: payment.id },
-        include: {
-          bookings: {
-            select: {
-              id: true,
-              status: true,
-              total_price: true,
-              start_datetime: true,
-              end_datetime: true,
-            },
-          },
+        where: {
+          id: payment.id,
         },
+        include: paymentWithBookingInclude,
       });
     });
-    } catch (error) {
-    console.error("[PAYMENT REPOSITORY ERROR]", error);
-    throw error;
-  }
   },
 
   markPaymentSuccess(paymentId) {
     return prisma.$transaction(async (tx) => {
       const payment = await tx.payments.findUnique({
-        where: { id: paymentId },
-        include: {
-          bookings: true,
+        where: {
+          id: paymentId,
         },
+        include: paymentWithBookingInclude,
       });
 
       if (!payment) return null;
 
       const updatedPayment = await tx.payments.update({
-        where: { id: paymentId },
+        where: {
+          id: paymentId,
+        },
         data: {
           status: "success",
           paid_at: new Date(),
@@ -171,7 +180,9 @@ export const paymentsRepository = {
 
       if (payment.bookings && payment.bookings.status !== "PAID") {
         await tx.bookings.update({
-          where: { id: payment.booking_id },
+          where: {
+            id: payment.booking_id,
+          },
           data: {
             status: "PAID",
           },
@@ -182,25 +193,16 @@ export const paymentsRepository = {
             booking_id: payment.booking_id,
             from_status: payment.bookings.status,
             to_status: "PAID",
-            // note: "Payment success",
             reason: "Payment success",
           },
         });
       }
 
       return tx.payments.findUnique({
-        where: { id: updatedPayment.id },
-        include: {
-          bookings: {
-            select: {
-              id: true,
-              status: true,
-              total_price: true,
-              start_datetime: true,
-              end_datetime: true,
-            },
-          },
+        where: {
+          id: updatedPayment.id,
         },
+        include: paymentWithBookingInclude,
       });
     });
   },
@@ -208,16 +210,18 @@ export const paymentsRepository = {
   markPaymentFailed(paymentId) {
     return prisma.$transaction(async (tx) => {
       const payment = await tx.payments.findUnique({
-        where: { id: paymentId },
-        include: {
-          bookings: true,
+        where: {
+          id: paymentId,
         },
+        include: paymentWithBookingInclude,
       });
 
       if (!payment) return null;
 
       const updatedPayment = await tx.payments.update({
-        where: { id: paymentId },
+        where: {
+          id: paymentId,
+        },
         data: {
           status: "failed",
           raw_response: JSON.stringify({
@@ -230,7 +234,9 @@ export const paymentsRepository = {
 
       if (payment.bookings && payment.bookings.status !== "PAY_FAILED") {
         await tx.bookings.update({
-          where: { id: payment.booking_id },
+          where: {
+            id: payment.booking_id,
+          },
           data: {
             status: "PAY_FAILED",
           },
@@ -241,25 +247,16 @@ export const paymentsRepository = {
             booking_id: payment.booking_id,
             from_status: payment.bookings.status,
             to_status: "PAY_FAILED",
-            // note: "Payment failed",
             reason: "Payment failed",
           },
         });
       }
 
       return tx.payments.findUnique({
-        where: { id: updatedPayment.id },
-        include: {
-          bookings: {
-            select: {
-              id: true,
-              status: true,
-              total_price: true,
-              start_datetime: true,
-              end_datetime: true,
-            },
-          },
+        where: {
+          id: updatedPayment.id,
         },
+        include: paymentWithBookingInclude,
       });
     });
   },

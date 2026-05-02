@@ -6,16 +6,18 @@ import {
   AlertCircle,
   ArrowRight,
   BarChart3,
+  Bell,
   Calendar,
   CheckCircle,
   Clock,
+  CreditCard,
   DollarSign,
   MapPin,
+  Megaphone,
   Phone,
   Star,
   TicketPercent,
   User,
-  Users,
   XCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -195,9 +197,64 @@ function getNotificationTime(value: string) {
   })
 }
 
+function getNotificationIcon(type: string | null) {
+  switch (type) {
+    case "BOOKING":
+      return Calendar
+    case "PAYMENT":
+      return CreditCard
+    case "PROMO":
+      return TicketPercent
+    case "SYSTEM":
+      return Megaphone
+    default:
+      return Bell
+  }
+}
+
+function getNotificationStyle(type: string | null) {
+  switch (type) {
+    case "BOOKING":
+      return {
+        iconWrap:
+          "bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-400",
+        badge:
+          "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-900",
+      }
+    case "PAYMENT":
+      return {
+        iconWrap:
+          "bg-green-100 text-green-600 dark:bg-green-950 dark:text-green-400",
+        badge:
+          "bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-400 dark:border-green-900",
+      }
+    case "PROMO":
+      return {
+        iconWrap:
+          "bg-purple-100 text-purple-600 dark:bg-purple-950 dark:text-purple-400",
+        badge:
+          "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-400 dark:border-purple-900",
+      }
+    case "SYSTEM":
+      return {
+        iconWrap:
+          "bg-orange-100 text-orange-600 dark:bg-orange-950 dark:text-orange-400",
+        badge:
+          "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950 dark:text-orange-400 dark:border-orange-900",
+      }
+    default:
+      return {
+        iconWrap: "bg-muted text-muted-foreground",
+        badge: "bg-muted text-muted-foreground border-border",
+      }
+  }
+}
+
 export default function OwnerDashboard() {
   const [summary, setSummary] = useState<OwnerDashboardSummary>(emptySummary)
-  const [recentBookings, setRecentBookings] = useState<OwnerDashboardBooking[]>([])
+  const [recentBookings, setRecentBookings] = useState<OwnerDashboardBooking[]>(
+    [],
+  )
   const [notifications, setNotifications] = useState<OwnerNotification[]>([])
   const [selectedBooking, setSelectedBooking] =
     useState<OwnerDashboardBooking | null>(null)
@@ -248,9 +305,13 @@ export default function OwnerDashboard() {
     () =>
       recentBookings
         .filter((booking) =>
-          ["APPROVED", "AWAITING_PAYMENT", "PAID", "CHECKED_IN", "COMPLETED"].includes(
-            booking.status,
-          ),
+          [
+            "APPROVED",
+            "AWAITING_PAYMENT",
+            "PAID",
+            "CHECKED_IN",
+            "COMPLETED",
+          ].includes(booking.status),
         )
         .reduce((sum, booking) => sum + Number(booking.total_price || 0), 0),
     [recentBookings],
@@ -270,6 +331,10 @@ export default function OwnerDashboard() {
 
   const displayBookings =
     todayBookings.length > 0 ? todayBookings : recentBookings
+
+  const unreadNotificationCount = notifications.filter(
+    (item) => !item.is_read,
+  ).length
 
   const handleViewDetail = (booking: OwnerDashboardBooking) => {
     setSelectedBooking(booking)
@@ -396,7 +461,8 @@ export default function OwnerDashboard() {
                       </Badge>
                     </div>
                     <p className="text-2xl font-bold mt-3">
-                      {formatShortCurrency(summary.total_revenue_this_month)} VND
+                      {formatShortCurrency(summary.total_revenue_this_month)}{" "}
+                      VND
                     </p>
                     <p className="text-sm text-muted-foreground">
                       Tổng Doanh Thu
@@ -522,7 +588,9 @@ export default function OwnerDashboard() {
                                 {formatTime(booking.end_datetime)}
                               </p>
                               <p className="text-xs text-muted-foreground mt-1">
-                                {duration > 0 ? `${duration.toFixed(0)}h` : "--"}
+                                {duration > 0
+                                  ? `${duration.toFixed(0)}h`
+                                  : "--"}
                               </p>
                             </div>
 
@@ -566,7 +634,9 @@ export default function OwnerDashboard() {
                                 <Button
                                   size="sm"
                                   disabled={actionLoadingId === booking.id}
-                                  onClick={() => handleApproveBooking(booking.id)}
+                                  onClick={() =>
+                                    handleApproveBooking(booking.id)
+                                  }
                                 >
                                   Duyệt Ngay
                                 </Button>
@@ -612,39 +682,97 @@ export default function OwnerDashboard() {
               </Card>
 
               <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Thông Báo Gần Đây</CardTitle>
+                <Card className="overflow-hidden">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+                          <Bell className="h-4 w-4" />
+                        </div>
+                        Thông Báo Gần Đây
+                      </CardTitle>
+
+                      {unreadNotificationCount > 0 && (
+                        <Badge variant="outline" className="text-primary">
+                          {unreadNotificationCount} mới
+                        </Badge>
+                      )}
+                    </div>
                   </CardHeader>
+
                   <CardContent className="space-y-3">
                     {notifications.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        Chưa có thông báo mới.
-                      </p>
-                    ) : (
-                      notifications.map((item) => (
-                        <div
-                          key={item.id}
-                          className="rounded-lg border border-border p-3"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="font-medium text-sm">{item.title}</p>
-                              <p className="text-sm text-muted-foreground mt-1">
-                                {item.message}
-                              </p>
-                            </div>
-
-                            {!item.is_read && (
-                              <span className="w-2 h-2 rounded-full bg-primary mt-1" />
-                            )}
-                          </div>
-
-                          <p className="text-xs text-muted-foreground mt-2">
-                            {getNotificationTime(item.created_at)}
-                          </p>
+                      <div className="rounded-xl border border-dashed border-border p-5 text-center">
+                        <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                          <Bell className="h-5 w-5 text-muted-foreground" />
                         </div>
-                      ))
+                        <p className="text-sm font-medium">
+                          Chưa có thông báo mới
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Các cập nhật về đặt sân và thanh toán sẽ hiển thị tại
+                          đây.
+                        </p>
+                      </div>
+                    ) : (
+                      notifications.map((item) => {
+                        const NotificationIcon = getNotificationIcon(item.type)
+                        const style = getNotificationStyle(item.type)
+
+                        return (
+                          <div
+                            key={item.id}
+                            className={`group relative overflow-hidden rounded-xl border p-3 transition hover:-translate-y-0.5 hover:shadow-sm ${
+                              item.is_read
+                                ? "border-border bg-background"
+                                : "border-primary/20 bg-primary/[0.03]"
+                            }`}
+                          >
+                            {!item.is_read && (
+                              <span className="absolute left-0 top-0 h-full w-1 bg-primary" />
+                            )}
+
+                            <div className="flex gap-3">
+                              <div
+                                className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${style.iconWrap}`}
+                              >
+                                <NotificationIcon className="h-4 w-4" />
+                              </div>
+
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-start justify-between gap-2">
+                                  <p className="line-clamp-1 text-sm font-semibold">
+                                    {item.title}
+                                  </p>
+
+                                  <Badge
+                                    variant="outline"
+                                    className={`shrink-0 text-[10px] ${style.badge}`}
+                                  >
+                                    {item.type || "INFO"}
+                                  </Badge>
+                                </div>
+
+                                <p className="mt-1 line-clamp-2 text-sm leading-5 text-muted-foreground">
+                                  {item.body}
+                                </p>
+
+                                <div className="mt-3 flex items-center justify-between">
+                                  <p className="text-xs text-muted-foreground">
+                                    {getNotificationTime(item.created_at)}
+                                  </p>
+
+                                  {!item.is_read && (
+                                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                                      Chưa đọc
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })
                     )}
                   </CardContent>
                 </Card>
@@ -762,7 +890,8 @@ export default function OwnerDashboard() {
                 <div className="flex items-center justify-between rounded-lg border border-border p-3">
                   <span className="text-muted-foreground">Thanh toán</span>
                   <span className="font-medium">
-                    {selectedBooking.requested_payment_method === "BANK_TRANSFER"
+                    {selectedBooking.requested_payment_method ===
+                    "BANK_TRANSFER"
                       ? "Chuyển khoản"
                       : "Tại sân"}
                   </span>

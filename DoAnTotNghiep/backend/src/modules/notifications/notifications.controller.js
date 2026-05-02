@@ -20,6 +20,20 @@ export const notificationsController = {
     }
   },
 
+  async getMyUnreadCount(req, res, next) {
+    try {
+      const result = await notificationsService.getMyUnreadCount(req.user.id);
+
+      return successResponse(
+        res,
+        result,
+        "Lấy số notification chưa đọc thành công"
+      );
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async markAsRead(req, res, next) {
     try {
       const { notificationId } = req.validated?.params ?? req.params;
