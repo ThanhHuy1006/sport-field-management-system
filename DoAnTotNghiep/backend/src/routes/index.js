@@ -33,6 +33,9 @@ import adminRoutes from "../modules/admin/admin.routes.js";
 import fieldReportsRoutes from "../modules/field-reports/field-reports.routes.js";
 import adminFieldReportsRoutes from "../modules/field-reports/admin.field-reports.routes.js";
 
+import reviewReportsRoutes from "../modules/review-reports/review-reports.routes.js";
+import adminReviewReportsRoutes from "../modules/review-reports/admin.review-reports.routes.js";
+
 const router = Router();
 
 // Auth / User
@@ -74,5 +77,8 @@ router.use("/admin/reports", adminReportsRoutes);
 //field-reports
 router.use("/field-reports", fieldReportsRoutes);
 router.use("/admin/field-reports", adminFieldReportsRoutes);
+
+router.use("/review-reports", reviewReportsRoutes);
+router.use("/admin/review-reports", adminReviewReportsRoutes);
 
 export default router;

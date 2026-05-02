@@ -297,14 +297,44 @@ model reviews {
   visible    Boolean?  @default(true)
   reply_text String?   @db.Text // owner reply nội dung
   reply_at   DateTime? // thời gian owner reply
-  created_at DateTime? @default(now()) @db.DateTime(0)
-  bookings   bookings  @relation(fields: [booking_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_review_booking")
-  fields     fields    @relation(fields: [field_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_review_field")
-  users      users     @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_review_user")
+
+  review_reports review_reports[]
+  created_at     DateTime?        @default(now()) @db.DateTime(0)
+  bookings       bookings         @relation(fields: [booking_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_review_booking")
+  fields         fields           @relation(fields: [field_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_review_field")
+  users          users            @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_review_user")
 
   @@index([booking_id], map: "fk_review_booking")
   @@index([field_id], map: "fk_review_field")
   @@index([user_id], map: "fk_review_user")
+}
+
+model review_reports {
+  id          Int                   @id @default(autoincrement())
+  reporter_id Int
+  review_id   Int
+  reason      review_reports_reason
+  description String?               @db.Text
+  status      review_reports_status @default(PENDING)
+  admin_note  String?               @db.Text
+  handled_by  Int?
+  handled_at  DateTime?             @db.DateTime(0)
+
+  review_rating_snapshot    Int?
+  review_comment_snapshot   String? @db.Text
+  review_author_id_snapshot Int?
+
+  created_at DateTime? @default(now()) @db.DateTime(0)
+  updated_at DateTime? @default(now()) @db.DateTime(0)
+
+  reporter users   @relation("review_reports_reporter", fields: [reporter_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_review_report_reporter")
+  review   reviews @relation(fields: [review_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_review_report_review")
+  admin    users?  @relation("review_reports_admin", fields: [handled_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_review_report_admin")
+
+  @@index([reporter_id], map: "fk_review_report_reporter")
+  @@index([review_id], map: "fk_review_report_review")
+  @@index([handled_by], map: "fk_review_report_admin")
+  @@index([status])
 }
 
 model system_policies {
@@ -355,6 +385,8 @@ model users {
   vouchers_vouchers_owner_idTousers                vouchers[]               @relation("vouchers_owner_idTousers")
   field_reports_reporter                           field_reports[]          @relation("field_reports_reporter")
   field_reports_admin                              field_reports[]          @relation("field_reports_admin")
+  review_reports_reporter                          review_reports[]         @relation("review_reports_reporter")
+  review_reports_admin                             review_reports[]         @relation("review_reports_admin")
 }
 
 model vouchers {
@@ -518,6 +550,22 @@ enum field_reports_reason {
 }
 
 enum field_reports_status {
+  PENDING
+  REVIEWING
+  RESOLVED
+  REJECTED
+}
+
+enum review_reports_reason {
+  SPAM
+  OFFENSIVE_LANGUAGE
+  FAKE_REVIEW
+  IRRELEVANT
+  HARASSMENT
+  OTHER
+}
+
+enum review_reports_status {
   PENDING
   REVIEWING
   RESOLVED
