@@ -23,6 +23,10 @@ import {
   simulatePaymentSuccess,
   type PaymentResponse,
 } from "@/features/payments/services/payment"
+import {
+  getStoredAccessToken,
+  getStoredUser,
+} from "@/features/auth/lib/auth-storage"
 
 function formatCurrency(value: string | number) {
   return Number(value || 0).toLocaleString("vi-VN") + " VND"
@@ -45,18 +49,21 @@ function getPaymentStatusUi(status?: string) {
         className:
           "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
       }
+
     case "failed":
       return {
         text: "Thanh toán thất bại",
         className:
           "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
       }
+
     case "pending":
       return {
         text: "Chờ thanh toán",
         className:
           "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
       }
+
     default:
       return {
         text: "Chưa tạo giao dịch",
@@ -77,8 +84,42 @@ export default function PaymentPage() {
   const [isCreating, setIsCreating] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [authChecked, setAuthChecked] = useState(false)
 
   const statusUi = useMemo(() => getPaymentStatusUi(payment?.status), [payment])
+
+  useEffect(() => {
+    if (!bookingId || Number.isNaN(bookingId)) {
+      router.replace("/browse")
+      return
+    }
+
+    const token = getStoredAccessToken()
+    const user = getStoredUser()
+    const role = String(user?.role ?? "").toUpperCase()
+
+    if (!token || !user) {
+      router.replace(`/login?redirect=/payment/${bookingId}`)
+      return
+    }
+
+    if (role === "OWNER") {
+      router.replace("/owner/dashboard")
+      return
+    }
+
+    if (role === "ADMIN") {
+      router.replace("/admin/dashboard")
+      return
+    }
+
+    if (role !== "USER") {
+      router.replace("/browse")
+      return
+    }
+
+    setAuthChecked(true)
+  }, [bookingId, router])
 
   const loadPayment = async () => {
     if (!bookingId || Number.isNaN(bookingId)) {
@@ -110,9 +151,11 @@ export default function PaymentPage() {
   }
 
   useEffect(() => {
+    if (!authChecked) return
+
     loadPayment()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookingId])
+  }, [authChecked, bookingId])
 
   const handleCreatePayment = async () => {
     try {
@@ -142,59 +185,33 @@ export default function PaymentPage() {
     }
   }
 
-  // const handleSimulateSuccess = async () => {
-  //   if (!payment) return
-
-  //   try {
-  //     setIsSubmitting(true)
-
-  //     const res = await simulatePaymentSuccess(payment.id)
-
-  //     toast({
-  //       title: "Thanh toán thành công",
-  //       description: "Booking đã được chuyển sang trạng thái PAID.",
-  //     })
-
-  //     router.push(
-  //       `/payment/success?bookingId=${bookingId}&paymentId=${res.data.id}`,
-  //     )
-  //   } catch (error) {
-  //     toast({
-  //       title: "Không thể giả lập thành công",
-  //       description: error instanceof Error ? error.message : "Đã có lỗi xảy ra",
-  //       variant: "destructive",
-  //     })
-  //   } finally {
-  //     setIsSubmitting(false)
-  //   }
-  // }
   const handleSimulateSuccess = async () => {
-  if (!payment) return;
+    if (!payment) return
 
-  try {
-    setIsSubmitting(true);
+    try {
+      setIsSubmitting(true)
 
-    const res = await simulatePaymentSuccess(payment.id);
+      const res = await simulatePaymentSuccess(payment.id)
 
-    toast({
-      title: "Thanh toán thành công",
-      description: "Booking đã được chuyển sang trạng thái PAID.",
-    });
+      toast({
+        title: "Thanh toán thành công",
+        description: "Booking đã được chuyển sang trạng thái PAID.",
+      })
 
-    router.replace(
-      `/payment/success?bookingId=${res.data.booking_id}&paymentId=${res.data.id}`
-    );
-    return;
-  } catch (error) {
-    toast({
-      title: "Không thể giả lập thành công",
-      description: error instanceof Error ? error.message : "Đã có lỗi xảy ra",
-      variant: "destructive",
-    });
-  } finally {
-    setIsSubmitting(false);
+      router.replace(
+        `/payment/success?bookingId=${res.data.booking_id}&paymentId=${res.data.id}`,
+      )
+      return
+    } catch (error) {
+      toast({
+        title: "Không thể giả lập thành công",
+        description: error instanceof Error ? error.message : "Đã có lỗi xảy ra",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
-};
 
   const handleSimulateFailed = async () => {
     if (!payment) return
@@ -221,6 +238,10 @@ export default function PaymentPage() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  if (!authChecked) {
+    return null
   }
 
   return (
@@ -285,8 +306,8 @@ export default function PaymentPage() {
                           <p className="font-medium">Chuyển khoản ngân hàng</p>
                           <p className="text-xs text-muted-foreground mt-1">
                             Đây là thanh toán chuyển khoản giả lập. Sau khi tạo
-                            giao dịch, anh có thể giả lập thành công hoặc thất bại
-                            để test flow.
+                            giao dịch, anh có thể giả lập thành công hoặc thất
+                            bại để test flow.
                           </p>
                         </div>
                       </div>

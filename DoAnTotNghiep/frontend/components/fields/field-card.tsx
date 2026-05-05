@@ -1,32 +1,48 @@
-import Link from "next/link";
-import { Star, MapPin, Clock } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import type { Field } from "@/types";
-import { FIELD_IMAGES } from "@/lib/constants";
-import { getImageUrl } from "@/lib/image-url";
+"use client"
+
+import type React from "react"
+import Link from "next/link"
+import { Star, MapPin, Clock } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import type { Field } from "@/types"
+import { FIELD_IMAGES } from "@/lib/constants"
+import { getImageUrl } from "@/lib/image-url"
+import { getStoredUser } from "@/features/auth/lib/auth-storage"
 
 interface FieldCardProps {
-  field: Field;
-  viewMode?: "grid" | "list";
+  field: Field
+  viewMode?: "grid" | "list"
 }
 
 function getFieldImage(type: string, fallbackImage?: string | null): string {
-  const image = fallbackImage || FIELD_IMAGES[type] || null;
-  return getImageUrl(image);
+  const image = fallbackImage || FIELD_IMAGES[type] || null
+  return getImageUrl(image)
 }
 
 function handleImageError(event: React.SyntheticEvent<HTMLImageElement>) {
-  const img = event.currentTarget;
+  const img = event.currentTarget
 
-  if (img.src.includes("/placeholder.svg")) return;
+  if (img.src.includes("/placeholder.svg")) return
 
-  img.src = "/placeholder.svg";
+  img.src = "/placeholder.svg"
+}
+
+function getActionLabel() {
+  const user = getStoredUser()
+  const role = String(user?.role ?? "").toUpperCase()
+
+  if (role === "OWNER" || role === "ADMIN") {
+    return "Xem chi tiết"
+  }
+
+  return "Đặt ngay"
 }
 
 export function FieldCard({ field, viewMode = "grid" }: FieldCardProps) {
-  const imageSrc = getFieldImage(field.type, field.image);
+  const imageSrc = getFieldImage(field.type, field.image)
+  const actionLabel = getActionLabel()
 
   if (viewMode === "list") {
     return (
@@ -99,14 +115,14 @@ export function FieldCard({ field, viewMode = "grid" }: FieldCardProps) {
 
               <Link href={`/field/${field.id}`}>
                 <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                  Xem chi tiết
+                  {actionLabel}
                 </Button>
               </Link>
             </div>
           </CardContent>
         </div>
       </Card>
-    );
+    )
   }
 
   return (
@@ -172,11 +188,11 @@ export function FieldCard({ field, viewMode = "grid" }: FieldCardProps) {
             </div>
 
             <div className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90">
-              Đặt ngay
+              {actionLabel}
             </div>
           </div>
         </CardContent>
       </Card>
     </Link>
-  );
+  )
 }

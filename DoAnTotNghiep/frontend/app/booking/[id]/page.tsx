@@ -24,7 +24,10 @@ import {
   validateVoucher,
   type VoucherItem,
 } from "@/features/vouchers/services/validate-voucher";
-import { getStoredUser } from "@/features/auth/lib/auth-storage";
+import {
+  getStoredAccessToken,
+  getStoredUser,
+} from "@/features/auth/lib/auth-storage";
 import { getImageUrl } from "@/lib/image-url";
 
 type FieldUi = {
@@ -115,6 +118,7 @@ export default function BookingPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [authChecked, setAuthChecked] = useState(false);
 
   const [bookingData, setBookingData] = useState({
     date: "",
@@ -153,33 +157,37 @@ export default function BookingPage() {
   }>(null);
 
   useEffect(() => {
-    if (!fieldId || Number.isNaN(fieldId)) return;
+    if (!fieldId || Number.isNaN(fieldId)) {
+      router.replace("/browse");
+      return;
+    }
 
+    const token = getStoredAccessToken();
     const user = getStoredUser();
     const role = String(user?.role ?? "").toUpperCase();
 
-    if (!user) {
+    if (!token || !user) {
       router.replace(`/login?redirect=/booking/${fieldId}`);
       return;
     }
 
-    if (role !== "USER") {
-      setError("Chỉ tài khoản khách hàng mới được đặt sân");
-
-      if (role === "OWNER") {
-        router.replace("/owner/dashboard");
-        return;
-      }
-
-      if (role === "ADMIN") {
-        router.replace("/admin/dashboard");
-        return;
-      }
-
-      router.replace("/browse");
+    if (role === "OWNER") {
+      router.replace("/owner/dashboard");
+      return;
     }
-  }, [fieldId, router]);
 
+    if (role === "ADMIN") {
+      router.replace("/admin/dashboard");
+      return;
+    }
+
+    if (role !== "USER") {
+      router.replace("/browse");
+      return;
+    }
+
+    setAuthChecked(true);
+  }, [fieldId, router]);
   useEffect(() => {
     if (!fieldId || Number.isNaN(fieldId)) return;
 
@@ -211,9 +219,10 @@ export default function BookingPage() {
     return () => {
       cancelled = true;
     };
-  }, [fieldId]);
+  }, [authChecked, fieldId]);
 
   useEffect(() => {
+    if (!authChecked) return;
     if (!field?.ownerId) {
       setAvailableVouchers([]);
       return;
@@ -287,7 +296,7 @@ export default function BookingPage() {
     return () => {
       cancelled = true;
     };
-  }, [fieldId, bookingData.date, bookingData.durationHours]);
+  }, [authChecked, fieldId, bookingData.date, bookingData.durationHours]);
 
   const selectedEndTime = bookingData.selectedSlot?.end_time ?? "";
   const subtotal = useMemo(() => {
@@ -387,10 +396,11 @@ export default function BookingPage() {
   };
 
   const handleCreateBooking = async () => {
+    const token = getStoredAccessToken();
     const user = getStoredUser();
     const role = String(user?.role ?? "").toUpperCase();
 
-    if (!user) {
+    if (!token || !user) {
       router.push(`/login?redirect=/booking/${fieldId}`);
       return;
     }
@@ -461,6 +471,9 @@ export default function BookingPage() {
       );
     }
   };
+  if (!authChecked) {
+    return null;
+  }
 
   if (isLoading) {
     return (

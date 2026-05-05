@@ -13,8 +13,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { User, Settings, LogOut, LayoutDashboard, Building2, Shield, Heart, Clock } from "lucide-react"
-import { clearAuthSession, getStoredUser } from "@/features/auth/lib/auth-storage"
+import {
+  User,
+  Settings,
+  LogOut,
+  LayoutDashboard,
+  Building2,
+  Shield,
+  Heart,
+  Clock,
+} from "lucide-react"
+import {
+  clearAuthSession,
+  getStoredUser,
+} from "@/features/auth/lib/auth-storage"
 
 type UserRole = "USER" | "OWNER" | "ADMIN"
 
@@ -26,14 +38,16 @@ interface UserData {
 }
 
 function mapBackendRoleToUiRole(role?: string | null): UserRole {
-  if (role === "OWNER") return "OWNER"
-  if (role === "ADMIN") return "ADMIN"
+  const normalizedRole = role?.toUpperCase()
+
+  if (normalizedRole === "OWNER") return "OWNER"
+  if (normalizedRole === "ADMIN") return "ADMIN"
+
   return "USER"
 }
 
 export function UserNav() {
   const router = useRouter()
-
   const storedUser = getStoredUser()
 
   const user = useMemo<UserData>(() => {
@@ -48,6 +62,7 @@ export function UserNav() {
   const getInitials = (name: string) => {
     return name
       .split(" ")
+      .filter(Boolean)
       .map((n) => n[0])
       .join("")
       .toUpperCase()
@@ -74,26 +89,63 @@ export function UserNav() {
           { href: "/wishlist", icon: Heart, label: "Yêu thích" },
           { href: "/settings", icon: Settings, label: "Cài đặt" },
         ]
+
       case "OWNER":
         return [
-          { href: "/owner/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-          { href: "/owner/profile", icon: User, label: "Hồ sơ của tôi" },
-          { href: "/owner/fields", icon: Building2, label: "Quản lý sân" },
-          { href: "/owner/settings", icon: Settings, label: "Cài đặt" },
+          {
+            href: "/owner/dashboard",
+            icon: LayoutDashboard,
+            label: "Dashboard",
+          },
+          {
+            href: "/owner/profile",
+            icon: User,
+            label: "Hồ sơ của tôi",
+          },
+          {
+            href: "/owner/fields",
+            icon: Building2,
+            label: "Quản lý sân",
+          },
+          {
+            href: "/owner/settings",
+            icon: Settings,
+            label: "Cài đặt",
+          },
         ]
+
       case "ADMIN":
         return [
-          { href: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-          { href: "/admin/profile", icon: User, label: "Hồ sơ của tôi" },
-          { href: "/admin/users", icon: Shield, label: "Quản lý users" },
-          { href: "/admin/settings", icon: Settings, label: "Cài đặt" },
+          {
+            href: "/admin/dashboard",
+            icon: LayoutDashboard,
+            label: "Dashboard",
+          },
+          {
+            href: "/admin/profile",
+            icon: User,
+            label: "Hồ sơ của tôi",
+          },
+          {
+            href: "/admin/users",
+            icon: Shield,
+            label: "Quản lý người dùng",
+          },
+          {
+            href: "/admin/settings",
+            icon: Settings,
+            label: "Cài đặt",
+          },
         ]
     }
   }
 
   const handleLogout = () => {
     clearAuthSession()
-    router.push("/login")
+
+    window.dispatchEvent(new Event("auth-changed"))
+
+    router.replace("/login")
     router.refresh()
   }
 
@@ -102,32 +154,50 @@ export function UserNav() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-10 w-10 rounded-full">
           <Avatar className="h-10 w-10">
-            <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
-            <AvatarFallback className="bg-primary text-primary-foreground">{getInitials(user.name)}</AvatarFallback>
+            <AvatarImage
+              src={user.avatar || "/placeholder.svg"}
+              alt={user.name}
+            />
+            <AvatarFallback className="bg-primary text-primary-foreground">
+              {getInitials(user.name)}
+            </AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
+
       <DropdownMenuContent className="w-64" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">{user.name}</p>
-            <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
-            <p className="text-xs leading-none text-primary font-medium pt-1">{getRoleLabel(user.role)}</p>
+            <p className="text-xs leading-none text-muted-foreground">
+              {user.email}
+            </p>
+            <p className="text-xs leading-none text-primary font-medium pt-1">
+              {getRoleLabel(user.role)}
+            </p>
           </div>
         </DropdownMenuLabel>
+
         <DropdownMenuSeparator />
+
         {getRoleLinks().map((link) => {
           const Icon = link.icon
+
           return (
             <DropdownMenuItem key={link.href} asChild>
-              <Link href={link.href} className="flex items-center gap-2 cursor-pointer">
+              <Link
+                href={link.href}
+                className="flex items-center gap-2 cursor-pointer"
+              >
                 <Icon className="h-4 w-4" />
                 <span>{link.label}</span>
               </Link>
             </DropdownMenuItem>
           )
         })}
+
         <DropdownMenuSeparator />
+
         <DropdownMenuItem
           className="text-red-600 dark:text-red-400 cursor-pointer"
           onClick={handleLogout}

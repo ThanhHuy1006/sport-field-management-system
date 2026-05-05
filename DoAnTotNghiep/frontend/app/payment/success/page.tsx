@@ -6,7 +6,14 @@ import { CheckCircle2, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { getPaymentByBooking, type PaymentResponse } from "@/features/payments/services/payment";
+import {
+  getPaymentByBooking,
+  type PaymentResponse,
+} from "@/features/payments/services/payment";
+import {
+  getStoredAccessToken,
+  getStoredUser,
+} from "@/features/auth/lib/auth-storage";
 
 function formatCurrency(value: string | number) {
   return Number(value || 0).toLocaleString("vi-VN") + " VND";
@@ -31,8 +38,43 @@ export default function PaymentSuccessPage() {
   const [payment, setPayment] = useState<PaymentResponse["data"] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
+    const token = getStoredAccessToken();
+    const user = getStoredUser();
+    const role = String(user?.role ?? "").toUpperCase();
+
+    if (!token || !user) {
+      router.replace(
+        `/login?redirect=${encodeURIComponent(
+          `/payment/success?bookingId=${bookingId}&paymentId=${paymentId}`
+        )}`
+      );
+      return;
+    }
+
+    if (role === "OWNER") {
+      router.replace("/owner/dashboard");
+      return;
+    }
+
+    if (role === "ADMIN") {
+      router.replace("/admin/dashboard");
+      return;
+    }
+
+    if (role !== "USER") {
+      router.replace("/browse");
+      return;
+    }
+
+    setAuthChecked(true);
+  }, [bookingId, paymentId, router]);
+
+  useEffect(() => {
+    if (!authChecked) return;
+
     async function loadPayment() {
       if (!bookingId || Number.isNaN(bookingId)) {
         setErrorMessage("bookingId không hợp lệ");
@@ -58,7 +100,11 @@ export default function PaymentSuccessPage() {
     }
 
     loadPayment();
-  }, [bookingId]);
+  }, [authChecked, bookingId]);
+
+  if (!authChecked) {
+    return null;
+  }
 
   if (isLoading) {
     return (

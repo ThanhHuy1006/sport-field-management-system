@@ -3,13 +3,27 @@
 import type React from "react"
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { User, LogOut, Settings, Heart, Clock, ArrowLeft, Camera } from "lucide-react"
+import {
+  User,
+  LogOut,
+  Settings,
+  Heart,
+  Clock,
+  ArrowLeft,
+  Camera,
+} from "lucide-react"
 import { getMe, updateMe, type Me } from "@/features/users/services/me"
 import { uploadAvatar } from "@/features/uploads/services/upload-avatar"
+import {
+  clearAuthSession,
+  getStoredAccessToken,
+  getStoredUser,
+} from "@/features/auth/lib/auth-storage"
 
 type ProfileData = {
   fullName: string
@@ -47,18 +61,27 @@ function mapMeToProfile(user: Me): ProfileData {
 }
 
 function getApiOrigin() {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api/v1"
+  const apiBaseUrl =
+    process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api/v1"
+
   return apiBaseUrl.replace(/\/api\/v1\/?$/, "")
 }
 
 function toAvatarSrc(url: string | null | undefined) {
   if (!url) return "/placeholder.svg"
-  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
+
+  if (
+    url.startsWith("http://") ||
+    url.startsWith("https://") ||
+    url.startsWith("data:")
+  ) {
     return url
   }
+
   if (url.startsWith("/uploads/")) {
     return `${getApiOrigin()}${url}`
   }
+
   return url
 }
 
@@ -89,10 +112,15 @@ function syncStoredUserProfile(user: Me) {
       // Bỏ qua nếu localStorage không phải JSON user đơn giản.
     }
   }
+
+  window.dispatchEvent(new Event("auth-changed"))
 }
 
 export default function ProfilePage() {
+  const router = useRouter()
   const avatarInputRef = useRef<HTMLInputElement | null>(null)
+
+  const [authChecked, setAuthChecked] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -103,6 +131,36 @@ export default function ProfilePage() {
   const [editData, setEditData] = useState<ProfileData>(emptyProfile)
 
   useEffect(() => {
+    const token = getStoredAccessToken()
+    const user = getStoredUser()
+    const role = String(user?.role ?? "").toUpperCase()
+
+    if (!token || !user) {
+      router.replace("/login?redirect=/profile")
+      return
+    }
+
+    if (role === "OWNER") {
+      router.replace("/owner/dashboard")
+      return
+    }
+
+    if (role === "ADMIN") {
+      router.replace("/admin/dashboard")
+      return
+    }
+
+    if (role !== "USER") {
+      router.replace("/browse")
+      return
+    }
+
+    setAuthChecked(true)
+  }, [router])
+
+  useEffect(() => {
+    if (!authChecked) return
+
     let cancelled = false
 
     async function fetchProfile() {
@@ -118,7 +176,12 @@ export default function ProfilePage() {
         setEditData(mapped)
       } catch (err) {
         if (cancelled) return
-        setError(err instanceof Error ? err.message : "Không thể tải thông tin cá nhân")
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Không thể tải thông tin cá nhân",
+        )
       } finally {
         if (!cancelled) setIsLoading(false)
       }
@@ -129,10 +192,11 @@ export default function ProfilePage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [authChecked])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
+
     setEditData((prev) => ({ ...prev, [name]: value }))
   }
 
@@ -155,13 +219,17 @@ export default function ProfilePage() {
       setIsEditing(false)
       setMessage("Cập nhật thông tin cá nhân thành công")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Cập nhật thông tin thất bại")
+      setError(
+        err instanceof Error ? err.message : "Cập nhật thông tin thất bại",
+      )
     } finally {
       setIsSaving(false)
     }
   }
 
-  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarFileChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = e.target.files?.[0]
     e.target.value = ""
 
@@ -183,7 +251,11 @@ export default function ProfilePage() {
       setEditData(mapped)
       setMessage("Cập nhật ảnh đại diện thành công")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Cập nhật ảnh đại diện thất bại")
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Cập nhật ảnh đại diện thất bại",
+      )
     } finally {
       setIsUploadingAvatar(false)
     }
@@ -192,11 +264,14 @@ export default function ProfilePage() {
   const handleLogout = () => {
     if (typeof window === "undefined") return
 
-    window.localStorage.removeItem("accessToken")
+    clearAuthSession()
+
     window.localStorage.removeItem("refreshToken")
-    window.localStorage.removeItem("currentUser")
     window.localStorage.removeItem("user")
-    window.location.href = "/login"
+    window.dispatchEvent(new Event("auth-changed"))
+
+    router.replace("/login")
+    router.refresh()
   }
 
   const stats = [
@@ -209,17 +284,24 @@ export default function ProfilePage() {
   const getInitials = (name: string) => {
     return (name || "U")
       .split(" ")
+      .filter(Boolean)
       .map((n) => n[0])
       .join("")
       .toUpperCase()
       .slice(0, 2)
   }
 
+  if (!authChecked) {
+    return null
+  }
+
   if (isLoading) {
     return (
       <main className="min-h-screen bg-background">
         <div className="max-w-7xl mx-auto px-4 py-12 text-center">
-          <p className="text-lg text-muted-foreground">Đang tải thông tin cá nhân...</p>
+          <p className="text-lg text-muted-foreground">
+            Đang tải thông tin cá nhân...
+          </p>
         </div>
       </main>
     )
@@ -230,7 +312,10 @@ export default function ProfilePage() {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-background border-b border-border">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 text-primary hover:text-primary/80">
+          <Link
+            href="/"
+            className="flex items-center gap-2 text-primary hover:text-primary/80"
+          >
             <ArrowLeft className="w-5 h-5" />
             Quay lại
           </Link>
@@ -299,8 +384,12 @@ export default function ProfilePage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
               {stats.map((stat, idx) => (
                 <Card key={idx} className="p-4 text-center">
-                  <div className="text-2xl font-bold text-primary">{stat.value}</div>
-                  <div className="text-sm text-muted-foreground">{stat.label}</div>
+                  <div className="text-2xl font-bold text-primary">
+                    {stat.value}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {stat.label}
+                  </div>
                 </Card>
               ))}
             </div>
@@ -310,7 +399,10 @@ export default function ProfilePage() {
               <div className="flex flex-col items-center mb-8">
                 <div className="relative group">
                   <Avatar className="h-32 w-32">
-                    <AvatarImage src={toAvatarSrc(profileData.avatar)} alt={profileData.fullName} />
+                    <AvatarImage
+                      src={toAvatarSrc(profileData.avatar)}
+                      alt={profileData.fullName}
+                    />
                     <AvatarFallback className="bg-primary text-primary-foreground text-3xl">
                       {getInitials(profileData.fullName)}
                     </AvatarFallback>
@@ -331,10 +423,14 @@ export default function ProfilePage() {
                     <Camera className="h-4 w-4" />
                   </button>
                 </div>
-                <h2 className="text-2xl font-bold mt-4">{profileData.fullName || "Người dùng"}</h2>
+                <h2 className="text-2xl font-bold mt-4">
+                  {profileData.fullName || "Người dùng"}
+                </h2>
                 <p className="text-muted-foreground">{profileData.email}</p>
                 {isUploadingAvatar && (
-                  <p className="text-sm text-muted-foreground mt-2">Đang cập nhật ảnh đại diện...</p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Đang cập nhật ảnh đại diện...
+                  </p>
                 )}
               </div>
 
@@ -351,29 +447,53 @@ export default function ProfilePage() {
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="text-sm text-muted-foreground">Họ Tên</label>
-                      <p className="text-lg font-medium text-foreground">{profileData.fullName || "Chưa cập nhật"}</p>
+                      <label className="text-sm text-muted-foreground">
+                        Họ Tên
+                      </label>
+                      <p className="text-lg font-medium text-foreground">
+                        {profileData.fullName || "Chưa cập nhật"}
+                      </p>
                     </div>
                     <div>
-                      <label className="text-sm text-muted-foreground">Email</label>
-                      <p className="text-lg font-medium text-foreground">{profileData.email}</p>
+                      <label className="text-sm text-muted-foreground">
+                        Email
+                      </label>
+                      <p className="text-lg font-medium text-foreground">
+                        {profileData.email}
+                      </p>
                     </div>
                     <div>
-                      <label className="text-sm text-muted-foreground">Số Điện Thoại</label>
-                      <p className="text-lg font-medium text-foreground">{profileData.phone || "Chưa cập nhật"}</p>
+                      <label className="text-sm text-muted-foreground">
+                        Số Điện Thoại
+                      </label>
+                      <p className="text-lg font-medium text-foreground">
+                        {profileData.phone || "Chưa cập nhật"}
+                      </p>
                     </div>
                     <div>
-                      <label className="text-sm text-muted-foreground">Quốc Gia</label>
-                      <p className="text-lg font-medium text-foreground">{profileData.country}</p>
+                      <label className="text-sm text-muted-foreground">
+                        Quốc Gia
+                      </label>
+                      <p className="text-lg font-medium text-foreground">
+                        {profileData.country}
+                      </p>
                     </div>
                     <div className="md:col-span-2">
-                      <label className="text-sm text-muted-foreground">Địa Chỉ</label>
-                      <p className="text-lg font-medium text-foreground">{profileData.address}</p>
+                      <label className="text-sm text-muted-foreground">
+                        Địa Chỉ
+                      </label>
+                      <p className="text-lg font-medium text-foreground">
+                        {profileData.address}
+                      </p>
                     </div>
                     <div>
-                      <label className="text-sm text-muted-foreground">Thành Viên Từ</label>
+                      <label className="text-sm text-muted-foreground">
+                        Thành Viên Từ
+                      </label>
                       <p className="text-lg font-medium text-foreground">
-                        {new Date(profileData.joinDate).toLocaleDateString("vi-VN")}
+                        {new Date(profileData.joinDate).toLocaleDateString(
+                          "vi-VN",
+                        )}
                       </p>
                     </div>
                   </div>
@@ -382,29 +502,64 @@ export default function ProfilePage() {
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">Họ Tên</label>
-                      <Input name="fullName" value={editData.fullName} onChange={handleChange} />
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Họ Tên
+                      </label>
+                      <Input
+                        name="fullName"
+                        value={editData.fullName}
+                        onChange={handleChange}
+                      />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">Email</label>
-                      <Input type="email" name="email" value={editData.email} disabled />
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Email
+                      </label>
+                      <Input
+                        type="email"
+                        name="email"
+                        value={editData.email}
+                        disabled
+                      />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">Số Điện Thoại</label>
-                      <Input name="phone" value={editData.phone} onChange={handleChange} />
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Số Điện Thoại
+                      </label>
+                      <Input
+                        name="phone"
+                        value={editData.phone}
+                        onChange={handleChange}
+                      />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">Quốc Gia</label>
-                      <Input name="country" value={editData.country} disabled />
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Quốc Gia
+                      </label>
+                      <Input
+                        name="country"
+                        value={editData.country}
+                        disabled
+                      />
                     </div>
                     <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-foreground mb-2">Địa Chỉ</label>
-                      <Input name="address" value={editData.address} disabled />
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Địa Chỉ
+                      </label>
+                      <Input
+                        name="address"
+                        value={editData.address}
+                        disabled
+                      />
                     </div>
                   </div>
 
                   <div className="flex gap-4 pt-4">
-                    <Button onClick={handleSave} disabled={isSaving} className="flex-1">
+                    <Button
+                      onClick={handleSave}
+                      disabled={isSaving}
+                      className="flex-1"
+                    >
                       {isSaving ? "Đang lưu..." : "Lưu Thay Đổi"}
                     </Button>
                     <Button
@@ -428,7 +583,9 @@ export default function ProfilePage() {
             {/* Payment Methods */}
             <Card className="p-8">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">Phương Thức Thanh Toán</h2>
+                <h2 className="text-2xl font-bold">
+                  Phương Thức Thanh Toán
+                </h2>
                 <Button>Thêm Phương Thức</Button>
               </div>
 
@@ -436,13 +593,19 @@ export default function ProfilePage() {
                 <div className="flex items-center justify-between p-4 border border-border rounded-lg">
                   <div>
                     <p className="font-medium text-foreground">Thẻ Visa</p>
-                    <p className="text-sm text-muted-foreground">**** **** **** 4242</p>
+                    <p className="text-sm text-muted-foreground">
+                      **** **** **** 4242
+                    </p>
                   </div>
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm">
                       Sửa
                     </Button>
-                    <Button variant="outline" size="sm" className="text-destructive bg-transparent">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive bg-transparent"
+                    >
                       Xóa
                     </Button>
                   </div>
@@ -450,14 +613,22 @@ export default function ProfilePage() {
 
                 <div className="flex items-center justify-between p-4 border border-border rounded-lg">
                   <div>
-                    <p className="font-medium text-foreground">Chuyển Khoản Ngân Hàng</p>
-                    <p className="text-sm text-muted-foreground">Vietcombank - Tài khoản kết thúc 5678</p>
+                    <p className="font-medium text-foreground">
+                      Chuyển Khoản Ngân Hàng
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Vietcombank - Tài khoản kết thúc 5678
+                    </p>
                   </div>
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm">
                       Sửa
                     </Button>
-                    <Button variant="outline" size="sm" className="text-destructive bg-transparent">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive bg-transparent"
+                    >
                       Xóa
                     </Button>
                   </div>

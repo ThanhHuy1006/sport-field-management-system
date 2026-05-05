@@ -1,20 +1,63 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { XCircle, RefreshCw, Home, HelpCircle } from "lucide-react"
+import {
+  getStoredAccessToken,
+  getStoredUser,
+} from "@/features/auth/lib/auth-storage"
 
 export default function PaymentFailedPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
+
   const bookingId = searchParams.get("bookingId")
+  const paymentId = searchParams.get("paymentId")
+
+  const [authChecked, setAuthChecked] = useState(false)
+
+  useEffect(() => {
+    const token = getStoredAccessToken()
+    const user = getStoredUser()
+    const role = String(user?.role ?? "").toUpperCase()
+
+    if (!token || !user) {
+      const redirectUrl = `/payment/failed?bookingId=${bookingId ?? ""}&paymentId=${paymentId ?? ""}`
+
+      router.replace(`/login?redirect=${encodeURIComponent(redirectUrl)}`)
+      return
+    }
+
+    if (role === "OWNER") {
+      router.replace("/owner/dashboard")
+      return
+    }
+
+    if (role === "ADMIN") {
+      router.replace("/admin/dashboard")
+      return
+    }
+
+    if (role !== "USER") {
+      router.replace("/browse")
+      return
+    }
+
+    setAuthChecked(true)
+  }, [bookingId, paymentId, router])
 
   const handleRetry = () => {
     if (bookingId) {
       router.push(`/payment/${bookingId}`)
     }
+  }
+
+  if (!authChecked) {
+    return null
   }
 
   return (
@@ -27,14 +70,18 @@ export default function PaymentFailedPage() {
           </div>
 
           {/* Error Message */}
-          <h1 className="text-3xl font-bold text-foreground mb-3">Thanh toán thất bại</h1>
+          <h1 className="text-3xl font-bold text-foreground mb-3">
+            Thanh toán thất bại
+          </h1>
           <p className="text-muted-foreground mb-8">
             Giao dịch của bạn không thể hoàn tất. Vui lòng thử lại hoặc liên hệ hỗ trợ.
           </p>
 
           {/* Error Details */}
           <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 p-6 rounded-lg mb-8 text-left">
-            <h3 className="font-semibold text-red-900 dark:text-red-100 mb-3">Lý do có thể:</h3>
+            <h3 className="font-semibold text-red-900 dark:text-red-100 mb-3">
+              Lý do có thể:
+            </h3>
             <ul className="text-sm text-red-800 dark:text-red-200 space-y-2">
               <li>• Thông tin thẻ không chính xác</li>
               <li>• Số dư tài khoản không đủ</li>
@@ -56,7 +103,9 @@ export default function PaymentFailedPage() {
 
           {/* Suggestions */}
           <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 p-4 rounded-lg mb-8 text-left">
-            <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">Đề xuất:</h3>
+            <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
+              Đề xuất:
+            </h3>
             <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
               <li>• Kiểm tra lại thông tin thẻ và thử lại</li>
               <li>• Sử dụng phương thức thanh toán khác</li>

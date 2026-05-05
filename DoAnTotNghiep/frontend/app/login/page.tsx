@@ -13,6 +13,28 @@ import { Mail, Lock, ArrowLeft, AlertCircle } from "lucide-react"
 import { login } from "@/features/auth/services/auth.service"
 import { saveAuthSession } from "@/features/auth/lib/auth-storage"
 
+function getDefaultRouteByRole(role?: string | null) {
+  const normalizedRole = role?.toUpperCase()
+
+  if (normalizedRole === "ADMIN") {
+    return "/admin/dashboard"
+  }
+
+  if (normalizedRole === "OWNER") {
+    return "/owner/dashboard"
+  }
+
+  return "/browse"
+}
+
+function isUserAllowedRedirect(role?: string | null, redirect?: string | null) {
+  if (!redirect) return false
+
+  const normalizedRole = role?.toUpperCase()
+
+  return normalizedRole === "USER"
+}
+
 export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -38,22 +60,14 @@ export default function LoginPage() {
       saveAuthSession(result.data.token, result.data.user)
 
       const redirect = searchParams.get("redirect")
-      if (redirect) {
-        router.push(redirect)
+      const role = result.data.user.role?.toUpperCase()
+
+      if (isUserAllowedRedirect(role, redirect)) {
+        router.push(redirect as string)
         return
       }
 
-      if (result.data.user.role === "admin") {
-        router.push("/admin")
-        return
-      }
-
-      if (result.data.user.role === "owner") {
-        router.push("/owner")
-        return
-      }
-
-      router.push("/browse")
+      router.push(getDefaultRouteByRole(role))
     } catch (err) {
       setError(err instanceof Error ? err.message : "Đăng nhập thất bại")
     } finally {

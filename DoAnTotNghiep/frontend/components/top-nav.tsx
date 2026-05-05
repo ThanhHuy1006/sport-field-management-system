@@ -6,25 +6,45 @@ import { useEffect, useMemo, useState } from "react"
 import { UserNav } from "./user-nav"
 import { ThemeToggle } from "./theme-toggle"
 import { Button } from "@/components/ui/button"
-import { LayoutList, LayoutDashboard, Building2, Calendar, Users, ShieldCheck, FileText, Menu } from "lucide-react"
+import {
+  LayoutList,
+  LayoutDashboard,
+  Building2,
+  Calendar,
+  Users,
+  FileText,
+  Menu,
+  MapPin,
+  Star,
+  BarChart3,
+  Flag,
+} from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { NotificationsPanel } from "@/components/notifications-panel"
 import { useNotifications } from "@/hooks/use-notifications"
-import { getStoredAccessToken, getStoredUser } from "@/features/auth/lib/auth-storage"
+import {
+  getStoredAccessToken,
+  getStoredUser,
+} from "@/features/auth/lib/auth-storage"
 
 type UserRole = "USER" | "OWNER" | "ADMIN" | null
 
 function mapBackendRoleToUiRole(role?: string | null): UserRole {
-  if (role === "USER") return "USER"
-  if (role === "ADMIN") return "ADMIN"
-  if (role === "OWNER") return "OWNER"
+  const normalizedRole = role?.toUpperCase()
+
+  if (normalizedRole === "USER") return "USER"
+  if (normalizedRole === "OWNER") return "OWNER"
+  if (normalizedRole === "ADMIN") return "ADMIN"
+
   return null
 }
 
 export function TopNav() {
   const [currentRole, setCurrentRole] = useState<UserRole>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications()
+
+  const { notifications, unreadCount, markAsRead, markAllAsRead } =
+    useNotifications()
 
   useEffect(() => {
     const syncAuthState = () => {
@@ -72,21 +92,70 @@ export function TopNav() {
           { href: "/bookings", label: "Đơn đặt sân", icon: Calendar },
           { href: "/help", label: "Trợ giúp", icon: FileText },
         ]
+
       case "OWNER":
         return [
-          { href: "/owner/dashboard", label: "Dashboard", icon: LayoutDashboard },
-          { href: "/owner/fields", label: "Quản lý sân", icon: Building2 },
-          { href: "/owner/bookings", label: "Đơn đặt", icon: Calendar },
-          { href: "/owner/schedule", label: "Lịch trình", icon: Calendar },
+          {
+            href: "/owner/dashboard",
+            label: "Dashboard",
+            icon: LayoutDashboard,
+          },
+          {
+            href: "/owner/fields",
+            label: "Quản lý sân",
+            icon: Building2,
+          },
+          {
+            href: "/owner/schedule",
+            label: "Đơn đặt",
+            icon: Calendar,
+          },
+          {
+            href: "/owner/reports",
+            label: "Báo cáo",
+            icon: FileText,
+          },
         ]
+
       case "ADMIN":
         return [
-          { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-          { href: "/admin/users", label: "Users", icon: Users },
-          { href: "/admin/fields", label: "Fields", icon: Building2 },
-          { href: "/admin/bookings", label: "Bookings", icon: Calendar },
-          { href: "/admin/approvals", label: "Approvals", icon: ShieldCheck },
+          {
+            href: "/admin/dashboard",
+            label: "Dashboard",
+            icon: LayoutDashboard,
+          },
+          {
+            href: "/admin/users",
+            label: "Người dùng",
+            icon: Users,
+          },
+          {
+            href: "/admin/fields",
+            label: "Quản lý sân",
+            icon: MapPin,
+          },
+          {
+            href: "/admin/schedule",
+            label: "Quản lý đặt sân",
+            icon: Calendar,
+          },
+          // {
+          //   href: "/admin/field-reports",
+          //   label: "Báo cáo sân",
+          //   icon: Flag,
+          // },
+          // {
+          //   href: "/admin/reviews",
+          //   label: "Báo cáo đánh giá",
+          //   icon: Star,
+          // },
+          {
+            href: "/admin/reports",
+            label: "Thống kê",
+            icon: BarChart3,
+          },
         ]
+
       default:
         return []
     }
@@ -97,19 +166,34 @@ export function TopNav() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center gap-8">
-            <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+            <Link
+              href="/"
+              className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+            >
               <div className="relative w-10 h-10 flex items-center justify-center">
-                <Image src="/hcmut-logo.png" alt="HCMUT Logo" width={40} height={40} className="object-contain" />
+                <Image
+                  src="/hcmut-logo.png"
+                  alt="HCMUT Logo"
+                  width={40}
+                  height={40}
+                  className="object-contain"
+                />
               </div>
+
               <div className="flex flex-col -space-y-1">
-                <span className="font-bold text-lg text-foreground">HCMUT</span>
-                <span className="text-xs text-muted-foreground hidden sm:inline">Sport Field Management System</span>
+                <span className="font-bold text-lg text-foreground">
+                  HCMUT
+                </span>
+                <span className="text-xs text-muted-foreground hidden sm:inline">
+                  Sport Field Management System
+                </span>
               </div>
             </Link>
 
             <div className="hidden lg:flex items-center gap-1">
               {navLinks.map((link) => {
                 const Icon = link.icon
+
                 return (
                   <Button
                     key={link.href}
@@ -156,7 +240,12 @@ export function TopNav() {
                   <Button variant="ghost" size="sm" asChild>
                     <Link href="/login">Đăng nhập</Link>
                   </Button>
-                  <Button size="sm" className="bg-green-600 hover:bg-green-700" asChild>
+
+                  <Button
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700"
+                    asChild
+                  >
                     <Link href="/register">Đăng ký</Link>
                   </Button>
                 </div>
@@ -169,15 +258,22 @@ export function TopNav() {
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
+
               <SheetContent side="right" className="w-[300px] sm:w-[400px]">
                 <nav className="flex flex-col gap-4 mt-8">
                   <div className="flex items-center gap-3 pb-4 border-b">
-                    <Image src="/hcmut-logo.png" alt="HCMUT Logo" width={32} height={32} />
+                    <Image
+                      src="/hcmut-logo.png"
+                      alt="HCMUT Logo"
+                      width={32}
+                      height={32}
+                    />
                     <span className="font-bold text-lg">HCMUT Sport</span>
                   </div>
 
                   {navLinks.map((link) => {
                     const Icon = link.icon
+
                     return (
                       <Link
                         key={link.href}
@@ -198,10 +294,18 @@ export function TopNav() {
                       </div>
                     ) : (
                       <div className="flex flex-col gap-2 sm:hidden">
-                        <Button variant="outline" className="w-full bg-transparent" asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full bg-transparent"
+                          asChild
+                        >
                           <Link href="/login">Đăng nhập</Link>
                         </Button>
-                        <Button className="w-full bg-green-600 hover:bg-green-700" asChild>
+
+                        <Button
+                          className="w-full bg-green-600 hover:bg-green-700"
+                          asChild
+                        >
                           <Link href="/register">Đăng ký</Link>
                         </Button>
                       </div>

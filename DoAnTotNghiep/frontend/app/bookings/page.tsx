@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -57,6 +58,10 @@ import {
 import { cancelMyBooking } from "@/features/bookings/services/cancel-my-booking";
 import { getMyBookingCheckInQr } from "@/features/bookings/services/get-my-booking-checkin-qr";
 import { createReview } from "@/features/reviews/services/create-review";
+import {
+  getStoredAccessToken,
+  getStoredUser,
+} from "@/features/auth/lib/auth-storage";
 
 type BookingPaymentMethod = "ONSITE" | "BANK_TRANSFER";
 
@@ -98,6 +103,9 @@ type Booking = {
 };
 
 export default function BookingsPage() {
+  const router = useRouter();
+
+  const [authChecked, setAuthChecked] = useState(false);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [activeTab, setActiveTab] = useState("upcoming");
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
@@ -137,6 +145,35 @@ export default function BookingsPage() {
     completed: 0,
     cancelled: 0,
   });
+
+  useEffect(() => {
+    const token = getStoredAccessToken();
+    const user = getStoredUser();
+    const role = String(user?.role ?? "").toUpperCase();
+
+    if (!token || !user) {
+      router.replace("/login?redirect=/bookings");
+      return;
+    }
+
+    if (role === "OWNER") {
+      router.replace("/owner/dashboard");
+      return;
+    }
+
+    if (role === "ADMIN") {
+      router.replace("/admin/dashboard");
+      return;
+    }
+
+    if (role !== "USER") {
+      router.replace("/browse");
+      return;
+    }
+
+    setAuthChecked(true);
+  }, [router]);
+
   /////
   const formatLocalDate = (iso: string) => {
     const d = new Date(iso);
@@ -319,14 +356,18 @@ export default function BookingsPage() {
   }, [activeTab]);
 
   useEffect(() => {
+    if (!authChecked) return;
+
     loadBookings(currentPage, activeTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, activeTab]);
+  }, [authChecked, currentPage, activeTab]);
 
   useEffect(() => {
+    if (!authChecked) return;
+
     loadTabTotals();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [authChecked]);
 
   const calculateRefund = (booking: Booking) => {
     const bookingDateTime = new Date(
@@ -698,6 +739,10 @@ export default function BookingsPage() {
         return { text: status, className: "bg-gray-100 text-gray-700" };
     }
   };
+
+  if (!authChecked) {
+    return null;
+  }
 
   return (
     <main className="min-h-screen bg-background">

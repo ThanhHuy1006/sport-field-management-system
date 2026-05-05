@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { MapPin, Star, Heart, ArrowLeft } from "lucide-react"
@@ -17,6 +18,10 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Pagination } from "@/components/pagination"
+import {
+  getStoredAccessToken,
+  getStoredUser,
+} from "@/features/auth/lib/auth-storage"
 
 const mockWishlist = [
   {
@@ -52,15 +57,55 @@ const mockWishlist = [
 ]
 
 export default function WishlistPage() {
+  const router = useRouter()
+
+  const [authChecked, setAuthChecked] = useState(false)
   const [wishlist, setWishlist] = useState(mockWishlist)
   const [currentPage, setCurrentPage] = useState(1)
+
   const itemsPerPage = 9
 
+  useEffect(() => {
+    const token = getStoredAccessToken()
+    const user = getStoredUser()
+    const role = String(user?.role ?? "").toUpperCase()
+
+    if (!token || !user) {
+      router.replace("/login?redirect=/wishlist")
+      return
+    }
+
+    if (role === "OWNER") {
+      router.replace("/owner/dashboard")
+      return
+    }
+
+    if (role === "ADMIN") {
+      router.replace("/admin/dashboard")
+      return
+    }
+
+    if (role !== "USER") {
+      router.replace("/browse")
+      return
+    }
+
+    setAuthChecked(true)
+  }, [router])
+
   const totalPages = Math.ceil(wishlist.length / itemsPerPage)
-  const paginatedWishlist = wishlist.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+
+  const paginatedWishlist = wishlist.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage,
+  )
 
   const handleRemove = (fieldId: number) => {
     setWishlist(wishlist.filter((field) => field.id !== fieldId))
+  }
+
+  if (!authChecked) {
+    return null
   }
 
   return (
@@ -68,7 +113,10 @@ export default function WishlistPage() {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-background border-b border-border">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/profile" className="flex items-center gap-2 text-primary hover:text-primary/80">
+          <Link
+            href="/profile"
+            className="flex items-center gap-2 text-primary hover:text-primary/80"
+          >
             <ArrowLeft className="w-5 h-5" />
             Quay lại
           </Link>
@@ -79,14 +127,18 @@ export default function WishlistPage() {
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="mb-6">
-          <p className="text-muted-foreground">Bạn có {wishlist.length} sân trong danh sách yêu thích</p>
+          <p className="text-muted-foreground">
+            Bạn có {wishlist.length} sân trong danh sách yêu thích
+          </p>
         </div>
 
         {wishlist.length === 0 ? (
           <Card className="p-12 text-center">
             <Heart className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
             <h2 className="text-xl font-bold mb-2">Chưa có sân yêu thích</h2>
-            <p className="text-muted-foreground mb-6">Thêm các sân bạn thích vào danh sách để dễ dàng tìm lại sau</p>
+            <p className="text-muted-foreground mb-6">
+              Thêm các sân bạn thích vào danh sách để dễ dàng tìm lại sau
+            </p>
             <Link href="/browse">
               <Button>Khám phá sân</Button>
             </Link>
@@ -95,7 +147,10 @@ export default function WishlistPage() {
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
               {paginatedWishlist.map((field) => (
-                <Card key={field.id} className="overflow-hidden hover:shadow-lg transition h-full">
+                <Card
+                  key={field.id}
+                  className="overflow-hidden hover:shadow-lg transition h-full"
+                >
                   <div className="relative">
                     <Link href={`/field/${field.id}`}>
                       <img
@@ -104,42 +159,65 @@ export default function WishlistPage() {
                         className="w-full h-48 object-cover"
                       />
                     </Link>
+
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <button className="absolute top-3 right-3 p-2 bg-white rounded-full hover:bg-muted transition">
                           <Heart className="w-5 h-5 fill-red-500 text-red-500" />
                         </button>
                       </AlertDialogTrigger>
+
                       <AlertDialogContent>
                         <AlertDialogHeader>
-                          <AlertDialogTitle>Xóa khỏi yêu thích?</AlertDialogTitle>
+                          <AlertDialogTitle>
+                            Xóa khỏi yêu thích?
+                          </AlertDialogTitle>
                           <AlertDialogDescription>
-                            Bạn có chắc muốn xóa {field.name} khỏi danh sách yêu thích?
+                            Bạn có chắc muốn xóa {field.name} khỏi danh sách yêu
+                            thích?
                           </AlertDialogDescription>
                         </AlertDialogHeader>
+
                         <AlertDialogFooter>
                           <AlertDialogCancel>Hủy</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleRemove(field.id)}>Xóa</AlertDialogAction>
+                          <AlertDialogAction
+                            onClick={() => handleRemove(field.id)}
+                          >
+                            Xóa
+                          </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
                   </div>
+
                   <div className="p-4">
                     <Link href={`/field/${field.id}`}>
-                      <h3 className="font-bold text-lg mb-2 hover:text-primary transition">{field.name}</h3>
+                      <h3 className="font-bold text-lg mb-2 hover:text-primary transition">
+                        {field.name}
+                      </h3>
                     </Link>
+
                     <div className="flex items-center gap-1 text-sm text-muted-foreground mb-3">
                       <MapPin className="w-4 h-4" />
                       {field.location}
                     </div>
+
                     <div className="flex items-center justify-between mb-4">
-                      <span className="text-primary font-bold">{field.price.toLocaleString()} VND</span>
+                      <span className="text-primary font-bold">
+                        {field.price.toLocaleString()} VND
+                      </span>
+
                       <div className="flex items-center gap-1">
                         <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                        <span className="text-sm font-medium">{field.rating}</span>
-                        <span className="text-xs text-muted-foreground">({field.reviews})</span>
+                        <span className="text-sm font-medium">
+                          {field.rating}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          ({field.reviews})
+                        </span>
                       </div>
                     </div>
+
                     <Link href={`/booking/${field.id}`}>
                       <Button className="w-full">Đặt ngay</Button>
                     </Link>

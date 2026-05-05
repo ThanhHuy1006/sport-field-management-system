@@ -26,6 +26,7 @@ import { getFieldOwnerInfo } from "@/features/fields/services/get-field-owner-in
 import { getFieldReviews } from "@/features/fields/services/get-field-reviews";
 import { ReportFieldDialog } from "@/components/report-field-dialog";
 import { getImageUrl } from "@/lib/image-url";
+import { getStoredUser } from "@/features/auth/lib/auth-storage";
 
 type DetailFieldUi = {
   id: number;
@@ -157,6 +158,10 @@ export default function FieldDetailsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [isReportOpen, setIsReportOpen] = useState(false);
+
+  const storedUser = getStoredUser();
+  const currentRole = String(storedUser?.role ?? "").toUpperCase();
+  const canBookField = !storedUser || currentRole === "USER";
 
   useEffect(() => {
     if (!fieldId) return;
@@ -540,9 +545,15 @@ export default function FieldDetailsPage() {
                 </div>
               </div>
 
-              <Link href={`/booking/${field.id}`}>
-                <Button className="w-full mb-3">Đặt sân ngay</Button>
-              </Link>
+              {canBookField ? (
+                <Link href={`/booking/${field.id}`}>
+                  <Button className="w-full mb-3">Đặt sân ngay</Button>
+                </Link>
+              ) : (
+                <Button className="w-full mb-3" disabled>
+                  Chỉ khách hàng mới được đặt sân
+                </Button>
+              )}
 
               <Button
                 variant="outline"
