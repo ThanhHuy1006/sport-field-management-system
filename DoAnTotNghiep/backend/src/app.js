@@ -6,6 +6,8 @@ import { requestContextMiddleware } from "./core/middlewares/request-context.mid
 import { requestLoggerMiddleware } from "./core/middlewares/request-logger.middleware.js";
 import { notFoundMiddleware } from "./core/middlewares/not-found.middleware.js";
 import { errorMiddleware } from "./core/middlewares/error.middleware.js";
+import swaggerUi from "swagger-ui-express";
+import { swaggerSpec } from "./config/swagger.config.js";
 
 const app = express();
 
@@ -63,7 +65,11 @@ app.get("/health/ready", (req, res) => {
     },
   });
 });
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
+app.get("/api-docs.json", (req, res) => {
+  res.json(swaggerSpec);
+});
 app.use("/api/v1", routes);
 
 app.use(notFoundMiddleware);

@@ -1,0 +1,602 @@
+[
+  {
+    "method": "GET",
+    "path": "/api/v1/admin/dashboard/summary",
+    "module": "Admin",
+    "middlewares": "wrappedHandler"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/admin/field-reports",
+    "module": "Admin Field Reports",
+    "middlewares": "anonymous, getAdminFieldReports"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/admin/field-reports/:reportId",
+    "module": "Admin Field Reports",
+    "middlewares": "anonymous, getAdminFieldReportDetail"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/admin/field-reports/:reportId/status",
+    "module": "Admin Field Reports",
+    "middlewares": "anonymous, anonymous, updateAdminFieldReportStatus"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/admin/reports",
+    "module": "Admin Reports",
+    "middlewares": "anonymous, getAdminReports"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/admin/review-reports",
+    "module": "Admin Review Reports",
+    "middlewares": "anonymous, getAdminReviewReports"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/admin/review-reports/:reportId",
+    "module": "Admin Review Reports",
+    "middlewares": "anonymous, getAdminReviewReportDetail"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/admin/review-reports/:reportId/status",
+    "module": "Admin Review Reports",
+    "middlewares": "anonymous, anonymous, updateAdminReviewReportStatus"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/auth/change-password",
+    "module": "Auth",
+    "middlewares": "requireAuth, anonymous, wrappedHandler"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/auth/login",
+    "module": "Auth",
+    "middlewares": "anonymous, wrappedHandler"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/auth/me",
+    "module": "Auth",
+    "middlewares": "requireAuth, wrappedHandler"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/auth/register",
+    "module": "Auth",
+    "middlewares": "anonymous, wrappedHandler"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/field-reports",
+    "module": "Field Reports",
+    "middlewares": "requireAuth, anonymous, multerMiddleware, createFieldReport"
+  },
+  {
+    "method": "GET",
+    "path": "/health",
+    "module": "Health",
+    "middlewares": "anonymous"
+  },
+  {
+    "method": "GET",
+    "path": "/health/live",
+    "module": "Health",
+    "middlewares": "anonymous"
+  },
+  {
+    "method": "GET",
+    "path": "/health/ready",
+    "module": "Health",
+    "middlewares": "anonymous"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/admin/bookings",
+    "module": "Member Bookings",
+    "middlewares": "wrappedHandler"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/admin/bookings/:bookingId",
+    "module": "Member Bookings",
+    "middlewares": "anonymous, wrappedHandler"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/bookings",
+    "module": "Member Bookings",
+    "middlewares": "requireAuth, anonymous, anonymous, wrappedHandler"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/bookings/availability-slots",
+    "module": "Member Bookings",
+    "middlewares": "anonymous, wrappedHandler"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/bookings/check-availability",
+    "module": "Member Bookings",
+    "middlewares": "anonymous, wrappedHandler"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/bookings/my",
+    "module": "Member Bookings",
+    "middlewares": "requireAuth, anonymous, wrappedHandler"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/bookings/my/:bookingId",
+    "module": "Member Bookings",
+    "middlewares": "requireAuth, anonymous, wrappedHandler"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/bookings/my/:bookingId/cancel",
+    "module": "Member Bookings",
+    "middlewares": "requireAuth, anonymous, wrappedHandler"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/bookings/my/:bookingId/check-in-qr",
+    "module": "Member Bookings",
+    "middlewares": "requireAuth, anonymous, wrappedHandler"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/notifications/:notificationId",
+    "module": "Notifications",
+    "middlewares": "requireAuth, anonymous, deleteMyNotification"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/notifications/:notificationId/read",
+    "module": "Notifications",
+    "middlewares": "requireAuth, anonymous, markAsRead"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/notifications/admin/broadcast",
+    "module": "Notifications",
+    "middlewares": "requireAuth, anonymous, anonymous, broadcastNotification"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/notifications/me",
+    "module": "Notifications",
+    "middlewares": "requireAuth, getMyNotifications"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/notifications/read-all",
+    "module": "Notifications",
+    "middlewares": "requireAuth, markAllAsRead"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/notifications/unread-count",
+    "module": "Notifications",
+    "middlewares": "requireAuth, getMyUnreadCount"
+  },
+  {
+    "method": "GET",
+    "path": "/api-docs.json",
+    "module": "Other",
+    "middlewares": "anonymous"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/owner/bookings",
+    "module": "Owner Bookings",
+    "middlewares": "anonymous, wrappedHandler"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/owner/bookings/:bookingId",
+    "module": "Owner Bookings",
+    "middlewares": "anonymous, wrappedHandler"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/owner/bookings/:bookingId/approve",
+    "module": "Owner Bookings",
+    "middlewares": "anonymous, wrappedHandler"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/owner/bookings/:bookingId/check-in",
+    "module": "Owner Bookings",
+    "middlewares": "anonymous, anonymous, wrappedHandler"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/owner/bookings/:bookingId/complete",
+    "module": "Owner Bookings",
+    "middlewares": "anonymous, anonymous, wrappedHandler"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/owner/bookings/:bookingId/reject",
+    "module": "Owner Bookings",
+    "middlewares": "anonymous, anonymous, wrappedHandler"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/owner/bookings/check-in/scan",
+    "module": "Owner Bookings",
+    "middlewares": "anonymous, wrappedHandler"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/owner/reviews",
+    "module": "Owner Reviews",
+    "middlewares": "getOwnerReviews"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/owner/reviews/:reviewId/reply",
+    "module": "Owner Reviews",
+    "middlewares": "anonymous, anonymous, replyOwnerReview"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/owner/reviews/:reviewId/reply",
+    "module": "Owner Reviews",
+    "middlewares": "anonymous, anonymous, replyOwnerReview"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/owner/vouchers",
+    "module": "Owner Vouchers",
+    "middlewares": "getOwnerVouchers"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/owner/vouchers",
+    "module": "Owner Vouchers",
+    "middlewares": "getOwnerVouchers"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/owner/vouchers/:voucherId",
+    "module": "Owner Vouchers",
+    "middlewares": "anonymous, getOwnerVoucherDetail"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/owner/vouchers/:voucherId",
+    "module": "Owner Vouchers",
+    "middlewares": "anonymous, getOwnerVoucherDetail"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/owner/vouchers/:voucherId/status",
+    "module": "Owner Vouchers",
+    "middlewares": "anonymous, anonymous, updateOwnerVoucherStatus"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/admin/owner-registrations",
+    "module": "Owners",
+    "middlewares": "wrappedHandler"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/admin/owner-registrations/:userId",
+    "module": "Owners",
+    "middlewares": "anonymous, wrappedHandler"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/admin/owner-registrations/:userId/approve",
+    "module": "Owners",
+    "middlewares": "anonymous, wrappedHandler"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/admin/owner-registrations/:userId/reject",
+    "module": "Owners",
+    "middlewares": "anonymous, anonymous, wrappedHandler"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/owner/blackout-dates/:blackoutDateId",
+    "module": "Owners",
+    "middlewares": "anonymous, wrappedHandler"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/owner/dashboard/recent-bookings",
+    "module": "Owners",
+    "middlewares": "wrappedHandler"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/owner/dashboard/recent-notifications",
+    "module": "Owners",
+    "middlewares": "wrappedHandler"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/owner/dashboard/summary",
+    "module": "Owners",
+    "middlewares": "wrappedHandler"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/owner/profile/me",
+    "module": "Owners",
+    "middlewares": "requireAuth, anonymous, anonymous, wrappedHandler"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/owner/profile/me",
+    "module": "Owners",
+    "middlewares": "requireAuth, anonymous, anonymous, wrappedHandler"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/owner/registration",
+    "module": "Owners",
+    "middlewares": "requireAuth, anonymous, wrappedHandler"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/owner/registration/me",
+    "module": "Owners",
+    "middlewares": "requireAuth, wrappedHandler"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/owner/registration/me",
+    "module": "Owners",
+    "middlewares": "requireAuth, wrappedHandler"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/owner/reports",
+    "module": "Owners",
+    "middlewares": "anonymous, getOwnerReports"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/payments/:paymentId",
+    "module": "Payments",
+    "middlewares": "requireAuth, anonymous, getPaymentDetail"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/payments/:paymentId/simulate-failed",
+    "module": "Payments",
+    "middlewares": "requireAuth, anonymous, simulateFailed"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/payments/:paymentId/simulate-success",
+    "module": "Payments",
+    "middlewares": "requireAuth, anonymous, simulateSuccess"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/payments/by-booking/:bookingId",
+    "module": "Payments",
+    "middlewares": "requireAuth, anonymous, getPaymentByBooking"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/payments/create",
+    "module": "Payments",
+    "middlewares": "requireAuth, anonymous, createPayment"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/admin/fields",
+    "module": "Public Fields",
+    "middlewares": "wrappedHandler"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/admin/fields/:fieldId/approve",
+    "module": "Public Fields",
+    "middlewares": "anonymous, wrappedHandler"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/admin/fields/:fieldId/reject",
+    "module": "Public Fields",
+    "middlewares": "anonymous, anonymous, wrappedHandler"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/fields",
+    "module": "Public Fields",
+    "middlewares": "anonymous, getPublicFields"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/fields/:fieldId",
+    "module": "Public Fields",
+    "middlewares": "anonymous, getPublicFieldDetail"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/fields/:fieldId/availability",
+    "module": "Public Fields",
+    "middlewares": "anonymous, anonymous, getPublicAvailability"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/fields/:fieldId/images",
+    "module": "Public Fields",
+    "middlewares": "anonymous, getPublicFieldImages"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/fields/:fieldId/owner-info",
+    "module": "Public Fields",
+    "middlewares": "anonymous, getPublicFieldOwnerInfo"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/fields/:fieldId/reviews",
+    "module": "Public Fields",
+    "middlewares": "anonymous, anonymous, getPublicFieldReviews"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/owner/fields",
+    "module": "Public Fields",
+    "middlewares": "wrappedHandler"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/owner/fields",
+    "module": "Public Fields",
+    "middlewares": "wrappedHandler"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/owner/fields/:fieldId",
+    "module": "Public Fields",
+    "middlewares": "anonymous, wrappedHandler"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/owner/fields/:fieldId",
+    "module": "Public Fields",
+    "middlewares": "anonymous, wrappedHandler"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/owner/fields/:fieldId/blackout-dates",
+    "module": "Public Fields",
+    "middlewares": "anonymous, anonymous, wrappedHandler"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/owner/fields/:fieldId/images",
+    "module": "Public Fields",
+    "middlewares": "anonymous, multerMiddleware, wrappedHandler"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/owner/fields/:fieldId/images/:imageId",
+    "module": "Public Fields",
+    "middlewares": "anonymous, wrappedHandler"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/owner/fields/:fieldId/images/:imageId/primary",
+    "module": "Public Fields",
+    "middlewares": "anonymous, wrappedHandler"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/owner/fields/:fieldId/operating-hours",
+    "module": "Public Fields",
+    "middlewares": "anonymous, wrappedHandler"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/owner/fields/:fieldId/operating-hours",
+    "module": "Public Fields",
+    "middlewares": "anonymous, wrappedHandler"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/owner/fields/:fieldId/status",
+    "module": "Public Fields",
+    "middlewares": "anonymous, anonymous, wrappedHandler"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/review-reports",
+    "module": "Review Reports",
+    "middlewares": "requireAuth, anonymous, createReviewReport"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/reviews",
+    "module": "Reviews",
+    "middlewares": "requireAuth, anonymous, createReview"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/reviews/:reviewId",
+    "module": "Reviews",
+    "middlewares": "requireAuth, anonymous, anonymous, updateMyReview"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/reviews/:reviewId",
+    "module": "Reviews",
+    "middlewares": "requireAuth, anonymous, anonymous, updateMyReview"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/uploads/avatar",
+    "module": "Uploads",
+    "middlewares": "multerMiddleware, wrappedHandler"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/uploads/documents",
+    "module": "Uploads",
+    "middlewares": "multerMiddleware, wrappedHandler"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/uploads/fields/images",
+    "module": "Uploads",
+    "middlewares": "multerMiddleware, wrappedHandler"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/admin/users",
+    "module": "Users",
+    "middlewares": "wrappedHandler"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/admin/users/:userId",
+    "module": "Users",
+    "middlewares": "anonymous, wrappedHandler"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/admin/users/:userId/status",
+    "module": "Users",
+    "middlewares": "anonymous, anonymous, wrappedHandler"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/users/me",
+    "module": "Users",
+    "middlewares": "getMe"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/users/me",
+    "module": "Users",
+    "middlewares": "getMe"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/vouchers/available",
+    "module": "Vouchers",
+    "middlewares": "requireAuth, anonymous, getAvailableVouchers"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/vouchers/validate",
+    "module": "Vouchers",
+    "middlewares": "requireAuth, anonymous, validateVoucher"
+  }
+]
