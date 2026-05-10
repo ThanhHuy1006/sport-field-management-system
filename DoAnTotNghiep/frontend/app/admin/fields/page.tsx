@@ -342,17 +342,17 @@ export default function AdminFieldsPage() {
   };
 
   return (
-    <div className="p-4 md:p-8">
+    <div data-cy="admin-fields-page" className="p-4 md:p-8">
       {/* Page Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Quản Lý Sân</h1>
+        <h1 data-cy="admin-fields-title" className="text-2xl font-bold text-foreground">Quản Lý Sân</h1>
         <p className="text-muted-foreground">
           Phê duyệt và quản lý các sân thể thao trong hệ thống
         </p>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div data-cy="admin-fields-stats" className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card className="p-4">
           <p className="text-sm text-muted-foreground">Tổng số sân</p>
           <p className="text-2xl font-bold text-foreground">{stats.total}</p>
@@ -372,10 +372,11 @@ export default function AdminFieldsPage() {
       </div>
 
       {/* Search and Filters */}
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
+      <div data-cy="admin-fields-toolbar" className="flex flex-col md:flex-row gap-4 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
+            data-cy="admin-fields-search-input"
             placeholder="Tìm kiếm theo tên sân, chủ sân, địa chỉ..."
             value={searchQuery}
             onChange={(e) => {
@@ -394,6 +395,8 @@ export default function AdminFieldsPage() {
           ].map((status) => (
             <button
               key={status.value}
+              data-cy="admin-fields-status-filter"
+              data-status={status.value}
               onClick={() => {
                 setFilterStatus(status.value);
                 setCurrentPage(1);
@@ -411,16 +414,16 @@ export default function AdminFieldsPage() {
       </div>
 
       {loading && (
-        <Card className="p-6 mb-6 text-center text-muted-foreground">
+        <Card data-cy="admin-fields-loading" className="p-6 mb-6 text-center text-muted-foreground">
           Đang tải dữ liệu...
         </Card>
       )}
 
       {/* Fields List */}
       {!loading && (
-        <div className="space-y-4 mb-8">
+        <div data-cy="admin-fields-list" className="space-y-4 mb-8">
           {paginatedFields.map((field) => (
-            <Card key={field.id} className="p-4 md:p-6">
+            <Card key={field.id} data-cy="admin-field-row" className="p-4 md:p-6">
               <div className="flex flex-col md:flex-row md:items-start gap-4">
                 {/* Field Image */}
                 <div className="w-full md:w-32 h-24 rounded-lg overflow-hidden bg-muted flex-shrink-0">
@@ -438,7 +441,7 @@ export default function AdminFieldsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div>
-                      <h3 className="text-lg font-bold text-foreground">
+                      <h3 data-cy="admin-field-name" className="text-lg font-bold text-foreground">
                         {field.name}
                       </h3>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -448,6 +451,7 @@ export default function AdminFieldsPage() {
                       </div>
                     </div>
                     <Badge
+                      data-cy="admin-field-status"
                       className={`flex-shrink-0 ${getFieldStatusClassName(field.status)}`}
                     >
                       {getFieldStatusLabel(field.status)}
@@ -502,6 +506,7 @@ export default function AdminFieldsPage() {
                   {field.status === "pending" && (
                     <>
                       <Button
+                        data-cy="admin-field-approve-button"
                         size="sm"
                         onClick={() => handleApprove(field.id)}
                         className="bg-green-600 hover:bg-green-700"
@@ -510,6 +515,7 @@ export default function AdminFieldsPage() {
                         Duyệt
                       </Button>
                       <Button
+                        data-cy="admin-field-reject-button"
                         size="sm"
                         variant="outline"
                         className="text-destructive bg-transparent"
@@ -521,6 +527,7 @@ export default function AdminFieldsPage() {
                     </>
                   )}
                   <Button
+                    data-cy="admin-field-detail-button"
                     variant="outline"
                     size="sm"
                     onClick={() => handleViewDetail(field)}
@@ -536,7 +543,7 @@ export default function AdminFieldsPage() {
       )}
 
       {!loading && filteredFields.length === 0 && (
-        <Card className="p-12 text-center">
+        <Card data-cy="admin-fields-empty" className="p-12 text-center">
           <p className="text-muted-foreground text-lg">
             Không tìm thấy sân nào
           </p>
@@ -556,13 +563,13 @@ export default function AdminFieldsPage() {
 
       {/* Field Detail Dialog */}
       <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent data-cy="admin-field-detail-dialog" className="max-w-2xl max-h-[85vh] overflow-y-auto">
           {selectedField && (
             <>
               <DialogHeader>
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <DialogTitle className="text-xl">
+                    <DialogTitle data-cy="admin-field-detail-name" className="text-xl">
                       {selectedField.name}
                     </DialogTitle>
                     <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
@@ -698,6 +705,7 @@ export default function AdminFieldsPage() {
                 {selectedField.status === "pending" && (
                   <div className="flex gap-3 pt-2">
                     <Button
+                      data-cy="admin-field-detail-approve-button"
                       className="flex-1 bg-primary hover:bg-primary/90"
                       onClick={() => handleApprove(selectedField.id)}
                     >
@@ -705,6 +713,7 @@ export default function AdminFieldsPage() {
                       Phê Duyệt
                     </Button>
                     <Button
+                      data-cy="admin-field-detail-reject-button"
                       variant="outline"
                       className="flex-1 border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20 bg-transparent"
                       onClick={() => {
@@ -726,7 +735,7 @@ export default function AdminFieldsPage() {
 
       {/* Reject Dialog */}
       <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent data-cy="admin-field-reject-dialog" className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
               <AlertTriangle className="w-5 h-5" />
@@ -739,6 +748,7 @@ export default function AdminFieldsPage() {
                 Lý do từ chối <span className="text-destructive">*</span>
               </Label>
               <Textarea
+                data-cy="admin-field-reject-reason"
                 id="rejectReason"
                 placeholder="Nhập lý do từ chối sân này (ví dụ: Hình ảnh không rõ ràng, thiếu giấy phép kinh doanh...)"
                 value={rejectReason}
@@ -753,6 +763,7 @@ export default function AdminFieldsPage() {
           </div>
           <DialogFooter className="gap-2">
             <Button
+              data-cy="admin-field-reject-cancel"
               variant="outline"
               onClick={() => {
                 setShowRejectDialog(false);
@@ -763,6 +774,7 @@ export default function AdminFieldsPage() {
               Hủy
             </Button>
             <Button
+              data-cy="admin-field-reject-confirm"
               variant="destructive"
               onClick={handleReject}
               disabled={!rejectReason.trim()}

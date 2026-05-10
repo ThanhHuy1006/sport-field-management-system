@@ -224,7 +224,7 @@ export default function OwnerSchedulePage() {
   }
 
   return (
-    <main className="min-h-screen bg-background">
+    <main data-cy="owner-bookings-page" className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 bg-background border-b border-border">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center gap-2 text-sm mb-3">
@@ -239,24 +239,26 @@ export default function OwnerSchedulePage() {
             <span className="text-foreground font-medium">Quản lý đặt sân</span>
           </div>
           <div className="flex items-center justify-between">
-            <h1 className="text-xl font-bold">Quản Lý Đặt Sân</h1>
+            <h1 data-cy="owner-bookings-title" className="text-xl font-bold">Quản Lý Đặt Sân</h1>
           </div>
         </div>
       </header>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         {isLoading ? (
-          <div className="text-center py-12 text-muted-foreground">
+          <div data-cy="owner-bookings-loading" className="text-center py-12 text-muted-foreground">
             Đang tải danh sách booking...
           </div>
         ) : (
-          <ScheduleManager
-            bookings={bookings}
-            fields={ownerFields}
-            isAdmin={false}
-            onApprove={handleApprove}
-            onReject={handleReject}
-          />
+          <div data-cy="owner-bookings-schedule-manager">
+            <ScheduleManager
+              bookings={bookings}
+              fields={ownerFields}
+              isAdmin={false}
+              onApprove={handleApprove}
+              onReject={handleReject}
+            />
+          </div>
         )}
       </div>
     </main>
