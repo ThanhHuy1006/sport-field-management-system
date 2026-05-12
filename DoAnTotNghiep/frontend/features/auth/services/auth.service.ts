@@ -15,6 +15,13 @@ export type LoginPayload = {
   password: string;
 };
 
+export type RegisterPayload = {
+  name: string;
+  email: string;
+  phone?: string;
+  password: string;
+};
+
 export type LoginResponse = {
   success: boolean;
   message: string;
@@ -22,6 +29,12 @@ export type LoginResponse = {
     token: string;
     user: AuthUser;
   };
+};
+
+export type RegisterResponse = {
+  success: boolean;
+  message: string;
+  data: AuthUser;
 };
 
 export type MeResponse = {
@@ -35,6 +48,14 @@ export type MeResponse = {
 
 export function login(payload: LoginPayload) {
   return apiRequest<LoginResponse>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    requireAuth: false,
+  });
+}
+
+export function register(payload: RegisterPayload) {
+  return apiRequest<RegisterResponse>("/auth/register", {
     method: "POST",
     body: JSON.stringify(payload),
     requireAuth: false,
