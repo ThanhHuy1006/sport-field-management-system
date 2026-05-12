@@ -1,10 +1,10 @@
-"use client"
+"use client";
 
-import { useMemo } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
+import { useMemo } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,7 +12,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   User,
   Settings,
@@ -22,33 +22,33 @@ import {
   Shield,
   Heart,
   Clock,
-} from "lucide-react"
+} from "lucide-react";
 import {
   clearAuthSession,
   getStoredUser,
-} from "@/features/auth/lib/auth-storage"
+} from "@/features/auth/lib/auth-storage";
 
-type UserRole = "USER" | "OWNER" | "ADMIN"
+type UserRole = "USER" | "OWNER" | "ADMIN";
 
 interface UserData {
-  name: string
-  email: string
-  avatar?: string
-  role: UserRole
+  name: string;
+  email: string;
+  avatar?: string;
+  role: UserRole;
 }
 
 function mapBackendRoleToUiRole(role?: string | null): UserRole {
-  const normalizedRole = role?.toUpperCase()
+  const normalizedRole = role?.toUpperCase();
 
-  if (normalizedRole === "OWNER") return "OWNER"
-  if (normalizedRole === "ADMIN") return "ADMIN"
+  if (normalizedRole === "OWNER") return "OWNER";
+  if (normalizedRole === "ADMIN") return "ADMIN";
 
-  return "USER"
+  return "USER";
 }
 
 export function UserNav() {
-  const router = useRouter()
-  const storedUser = getStoredUser()
+  const router = useRouter();
+  const storedUser = getStoredUser();
 
   const user = useMemo<UserData>(() => {
     return {
@@ -56,8 +56,8 @@ export function UserNav() {
       email: storedUser?.email || "",
       avatar: storedUser?.avatar_url || "/placeholder.svg",
       role: mapBackendRoleToUiRole(storedUser?.role),
-    }
-  }, [storedUser])
+    };
+  }, [storedUser]);
 
   const getInitials = (name: string) => {
     return name
@@ -66,19 +66,19 @@ export function UserNav() {
       .map((n) => n[0])
       .join("")
       .toUpperCase()
-      .slice(0, 2)
-  }
+      .slice(0, 2);
+  };
 
   const getRoleLabel = (role: UserRole) => {
     switch (role) {
       case "USER":
-        return "Khách hàng"
+        return "Khách hàng";
       case "OWNER":
-        return "Chủ sân"
+        return "Chủ sân";
       case "ADMIN":
-        return "Quản trị viên"
+        return "Quản trị viên";
     }
-  }
+  };
 
   const getRoleLinks = () => {
     switch (user.role) {
@@ -87,8 +87,18 @@ export function UserNav() {
           { href: "/profile", icon: User, label: "Hồ sơ của tôi" },
           { href: "/bookings", icon: Clock, label: "Lịch đặt sân" },
           { href: "/wishlist", icon: Heart, label: "Yêu thích" },
-          { href: "/settings", icon: Settings, label: "Cài đặt" },
-        ]
+          {
+            href: "/register/owner",
+            icon: Building2,
+            label: "Đăng ký làm chủ sân",
+          },
+          {
+            href: "/register/owner/status",
+            icon: Clock,
+            label: "Trạng thái hồ sơ chủ sân",
+          },
+          // { href: "/settings", icon: Settings, label: "Cài đặt" },
+        ];
 
       case "OWNER":
         return [
@@ -107,12 +117,12 @@ export function UserNav() {
             icon: Building2,
             label: "Quản lý sân",
           },
-          {
-            href: "/owner/settings",
-            icon: Settings,
-            label: "Cài đặt",
-          },
-        ]
+          // {
+          //   href: "/owner/settings",
+          //   icon: Settings,
+          //   label: "Cài đặt",
+          // },
+        ];
 
       case "ADMIN":
         return [
@@ -131,23 +141,23 @@ export function UserNav() {
             icon: Shield,
             label: "Quản lý người dùng",
           },
-          {
-            href: "/admin/settings",
-            icon: Settings,
-            label: "Cài đặt",
-          },
-        ]
+          // {
+          //   href: "/admin/settings",
+          //   icon: Settings,
+          //   label: "Cài đặt",
+          // },
+        ];
     }
-  }
+  };
 
   const handleLogout = () => {
-    clearAuthSession()
+    clearAuthSession();
 
-    window.dispatchEvent(new Event("auth-changed"))
+    window.dispatchEvent(new Event("auth-changed"));
 
-    router.replace("/login")
-    router.refresh()
-  }
+    router.replace("/login");
+    router.refresh();
+  };
 
   return (
     <DropdownMenu>
@@ -181,7 +191,7 @@ export function UserNav() {
         <DropdownMenuSeparator />
 
         {getRoleLinks().map((link) => {
-          const Icon = link.icon
+          const Icon = link.icon;
 
           return (
             <DropdownMenuItem key={link.href} asChild>
@@ -193,7 +203,7 @@ export function UserNav() {
                 <span>{link.label}</span>
               </Link>
             </DropdownMenuItem>
-          )
+          );
         })}
 
         <DropdownMenuSeparator />
@@ -207,5 +217,5 @@ export function UserNav() {
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
-  )
+  );
 }

@@ -90,6 +90,7 @@ export function TopNav() {
           { href: "/browse", label: "Danh sách sân", icon: LayoutList },
           { href: "/about", label: "Về chúng tôi", icon: null },
           { href: "/bookings", label: "Đơn đặt sân", icon: Calendar },
+          { href: "/register/owner", label: "Đăng ký làm chủ sân", icon: Building2 },
           { href: "/help", label: "Trợ giúp", icon: FileText },
         ]
 

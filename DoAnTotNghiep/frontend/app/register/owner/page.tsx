@@ -31,12 +31,10 @@ import {
   Loader2,
 } from "lucide-react"
 
-type FormData = {
+type OwnerRegistrationFormData = {
   fullName: string
   email: string
   phone: string
-  password: string
-  confirmPassword: string
 
   businessType: "individual" | "company"
   businessName: string
@@ -61,6 +59,18 @@ type ApiResponse<T> = {
   data: T
 }
 
+type AuthUser = {
+  id: number
+  name: string
+  email: string
+  phone: string | null
+  avatar_url: string | null
+  role: string
+  status: string
+  created_at?: string
+  updated_at?: string
+}
+
 type UploadedFile = {
   url: string
   storage_path?: string
@@ -69,25 +79,18 @@ type UploadedFile = {
   size_bytes?: number
 }
 
-type UploadDocumentsResponse = {
-  files: UploadedFile[]
-}
-
-type AuthData = {
-  accessToken?: string
-  access_token?: string
-  token?: string
-  user?: unknown
-}
+type UploadDocumentsResponse =
+  | UploadedFile[]
+  | {
+      files?: UploadedFile[]
+    }
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api/v1"
 
-const INITIAL_FORM_DATA: FormData = {
+const INITIAL_FORM_DATA: OwnerRegistrationFormData = {
   fullName: "",
   email: "",
   phone: "",
-  password: "",
-  confirmPassword: "",
   businessType: "individual",
   businessName: "",
   taxId: "",
@@ -97,12 +100,6 @@ const INITIAL_FORM_DATA: FormData = {
   idBack: null,
   licenseFile: null,
   agreeTerms: false,
-}
-
-function getAccessTokenFromAuthResponse(response: ApiResponse<AuthData>) {
-  const payload = response.data
-
-  return payload.accessToken || payload.access_token || payload.token || ""
 }
 
 async function requestJson<T>(
@@ -140,6 +137,13 @@ async function requestJson<T>(
   return result as T
 }
 
+async function getCurrentUser() {
+  return requestJson<ApiResponse<AuthUser>>("/auth/me", {
+    method: "GET",
+    requireAuth: true,
+  })
+}
+
 async function uploadOwnerDocuments(files: File[]) {
   const form = new FormData()
 
@@ -153,7 +157,11 @@ async function uploadOwnerDocuments(files: File[]) {
     requireAuth: true,
   })
 
-  return response.data.files
+  if (Array.isArray(response.data)) {
+    return response.data
+  }
+
+  return response.data.files || []
 }
 
 export default function OwnerRegisterPage() {
@@ -161,7 +169,7 @@ export default function OwnerRegisterPage() {
   const { toast } = useToast()
 
   const [currentStep, setCurrentStep] = useState(1)
-  const [formData, setFormData] = useState<FormData>(INITIAL_FORM_DATA)
+  const [formData, setFormData] = useState<OwnerRegistrationFormData>(INITIAL_FORM_DATA)
   const [uploadPreviews, setUploadPreviews] = useState<UploadPreviews>({
     idFront: "",
     idBack: "",
@@ -170,36 +178,83 @@ export default function OwnerRegisterPage() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
 
   useEffect(() => {
-    const savedData = localStorage.getItem("ownerRegistrationDraft")
+    const token = localStorage.getItem("accessToken")
 
-    if (!savedData) return
+    if (!token) {
+      toast({
+        title: "Vui lòng đăng nhập",
+        description: "Bạn cần đăng nhập trước khi đăng ký làm chủ sân.",
+        variant: "destructive",
+      })
 
-    try {
-      const parsed = JSON.parse(savedData)
-      setFormData((prev) => ({ ...prev, ...parsed }))
-    } catch (error) {
-      console.error("Failed to load saved data", error)
+      router.replace("/login?redirect=/register/owner")
+      return
     }
-  }, [])
+
+    const bootstrap = async () => {
+      try {
+        const savedData = localStorage.getItem("ownerRegistrationDraft")
+        let savedDraft: Partial<OwnerRegistrationFormData> = {}
+
+        if (savedData) {
+          try {
+            savedDraft = JSON.parse(savedData)
+          } catch (error) {
+            console.error("Failed to load saved owner registration draft", error)
+          }
+        }
+
+        const meResponse = await getCurrentUser()
+        const user = meResponse.data
+
+        setFormData((prev) => ({
+          ...prev,
+          ...savedDraft,
+          fullName: user.name || "",
+          email: user.email || "",
+          phone: user.phone || "",
+          idFront: null,
+          idBack: null,
+          licenseFile: null,
+        }))
+      } catch (error) {
+        console.error(error)
+
+        toast({
+          title: "Phiên đăng nhập không hợp lệ",
+          description: "Vui lòng đăng nhập lại để tiếp tục đăng ký chủ sân.",
+          variant: "destructive",
+        })
+
+        localStorage.removeItem("accessToken")
+        router.replace("/login?redirect=/owner/register")
+      } finally {
+        setIsCheckingAuth(false)
+      }
+    }
+
+    bootstrap()
+  }, [router, toast])
 
   useEffect(() => {
+    if (isCheckingAuth) return
+
     const timeout = setTimeout(() => {
       const dataToSave = { ...formData }
 
-      delete (dataToSave as Partial<FormData>).idFront
-      delete (dataToSave as Partial<FormData>).idBack
-      delete (dataToSave as Partial<FormData>).licenseFile
-      delete (dataToSave as Partial<FormData>).password
-      delete (dataToSave as Partial<FormData>).confirmPassword
+      delete (dataToSave as Partial<OwnerRegistrationFormData>).idFront
+      delete (dataToSave as Partial<OwnerRegistrationFormData>).idBack
+      delete (dataToSave as Partial<OwnerRegistrationFormData>).licenseFile
 
       localStorage.setItem("ownerRegistrationDraft", JSON.stringify(dataToSave))
       setLastSaved(new Date())
     }, 1000)
 
     return () => clearTimeout(timeout)
-  }, [formData])
+  }, [formData, isCheckingAuth])
 
   const clearError = (name: string) => {
     if (!errors[name]) return
@@ -273,30 +328,20 @@ export default function OwnerRegisterPage() {
   const validateStep1 = () => {
     const newErrors: Record<string, string> = {}
 
-    if (!formData.fullName.trim()) newErrors.fullName = "Vui lòng nhập họ tên"
+    if (!formData.fullName.trim()) {
+      newErrors.fullName = "Không lấy được họ tên từ tài khoản"
+    }
 
     if (!formData.email.trim()) {
-      newErrors.email = "Vui lòng nhập email"
+      newErrors.email = "Không lấy được email từ tài khoản"
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = "Email không hợp lệ"
     }
 
     if (!formData.phone.trim()) {
-      newErrors.phone = "Vui lòng nhập số điện thoại"
+      newErrors.phone = "Không lấy được số điện thoại từ tài khoản"
     } else if (!/^(0|\+84)[0-9]{8,10}$/.test(formData.phone.replace(/\s/g, ""))) {
       newErrors.phone = "Số điện thoại không hợp lệ"
-    }
-
-    if (!formData.password) {
-      newErrors.password = "Vui lòng nhập mật khẩu"
-    } else if (formData.password.length < 6) {
-      newErrors.password = "Mật khẩu tối thiểu 6 ký tự"
-    }
-
-    if (!formData.confirmPassword) {
-      newErrors.confirmPassword = "Vui lòng xác nhận mật khẩu"
-    } else if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = "Mật khẩu xác nhận không khớp"
     }
 
     setErrors(newErrors)
@@ -349,50 +394,6 @@ export default function OwnerRegisterPage() {
     window.scrollTo({ top: 0, behavior: "smooth" })
   }
 
-  const ensureAccountAndLogin = async () => {
-    const existingToken = localStorage.getItem("accessToken")
-
-    if (existingToken) return
-
-    try {
-      await requestJson<ApiResponse<unknown>>("/auth/register", {
-        method: "POST",
-        body: JSON.stringify({
-          name: formData.fullName.trim(),
-          email: formData.email.trim(),
-          phone: formData.phone.trim(),
-          password: formData.password,
-        }),
-      })
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Không thể tạo tài khoản"
-
-      if (!message.toLowerCase().includes("email") && !message.toLowerCase().includes("tồn tại")) {
-        throw error
-      }
-    }
-
-    const loginResponse = await requestJson<ApiResponse<AuthData>>("/auth/login", {
-      method: "POST",
-      body: JSON.stringify({
-        email: formData.email.trim(),
-        password: formData.password,
-      }),
-    })
-
-    const token = getAccessTokenFromAuthResponse(loginResponse)
-
-    if (!token) {
-      throw new Error("Đăng nhập thành công nhưng không nhận được accessToken")
-    }
-
-    localStorage.setItem("accessToken", token)
-
-    if (loginResponse.data.user) {
-      localStorage.setItem("user", JSON.stringify(loginResponse.data.user))
-    }
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -412,8 +413,6 @@ export default function OwnerRegisterPage() {
 
     try {
       setIsSubmitting(true)
-
-      await ensureAccountAndLogin()
 
       const uploadedFiles = await uploadOwnerDocuments([
         formData.licenseFile as File,
@@ -537,6 +536,19 @@ export default function OwnerRegisterPage() {
     )
   }
 
+  if (isCheckingAuth) {
+    return (
+      <main className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 px-4 py-12 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+        <div className="container mx-auto max-w-4xl">
+          <Card className="p-8 text-center">
+            <Loader2 className="mx-auto mb-4 h-6 w-6 animate-spin text-green-600" />
+            <p className="text-muted-foreground">Đang kiểm tra phiên đăng nhập...</p>
+          </Card>
+        </div>
+      </main>
+    )
+  }
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 px-4 py-12 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       <div className="container mx-auto max-w-4xl">
@@ -617,6 +629,14 @@ export default function OwnerRegisterPage() {
                     Thông tin tài khoản
                   </h2>
 
+                  <Alert className="mb-4 border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/20">
+                    <AlertCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    <AlertDescription className="text-green-800 dark:text-green-300">
+                      Thông tin tài khoản được lấy từ tài khoản đang đăng nhập. Nếu cần thay đổi email hoặc số điện thoại,
+                      vui lòng cập nhật trong hồ sơ cá nhân.
+                    </AlertDescription>
+                  </Alert>
+
                   <div className="space-y-4">
                     <div>
                       <Label htmlFor="fullName">
@@ -625,9 +645,8 @@ export default function OwnerRegisterPage() {
                       <Input
                         id="fullName"
                         name="fullName"
-                        placeholder="Nguyễn Văn A"
                         value={formData.fullName}
-                        onChange={handleChange}
+                        disabled
                         className={errors.fullName ? "border-red-500" : ""}
                       />
                       {errors.fullName && <p className="mt-1 text-xs text-red-500">{errors.fullName}</p>}
@@ -642,9 +661,8 @@ export default function OwnerRegisterPage() {
                           id="email"
                           name="email"
                           type="email"
-                          placeholder="owner@example.com"
                           value={formData.email}
-                          onChange={handleChange}
+                          disabled
                           className={errors.email ? "border-red-500" : ""}
                         />
                         {errors.email && <p className="mt-1 text-xs text-red-500">{errors.email}</p>}
@@ -657,46 +675,11 @@ export default function OwnerRegisterPage() {
                         <Input
                           id="phone"
                           name="phone"
-                          placeholder="0901234567"
                           value={formData.phone}
-                          onChange={handleChange}
+                          disabled
                           className={errors.phone ? "border-red-500" : ""}
                         />
                         {errors.phone && <p className="mt-1 text-xs text-red-500">{errors.phone}</p>}
-                      </div>
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div>
-                        <Label htmlFor="password">
-                          Mật khẩu <span className="text-red-500">*</span>
-                        </Label>
-                        <Input
-                          id="password"
-                          name="password"
-                          type="password"
-                          placeholder="Tối thiểu 6 ký tự"
-                          value={formData.password}
-                          onChange={handleChange}
-                          className={errors.password ? "border-red-500" : ""}
-                        />
-                        {errors.password && <p className="mt-1 text-xs text-red-500">{errors.password}</p>}
-                      </div>
-
-                      <div>
-                        <Label htmlFor="confirmPassword">
-                          Xác nhận mật khẩu <span className="text-red-500">*</span>
-                        </Label>
-                        <Input
-                          id="confirmPassword"
-                          name="confirmPassword"
-                          type="password"
-                          placeholder="Nhập lại mật khẩu"
-                          value={formData.confirmPassword}
-                          onChange={handleChange}
-                          className={errors.confirmPassword ? "border-red-500" : ""}
-                        />
-                        {errors.confirmPassword && <p className="mt-1 text-xs text-red-500">{errors.confirmPassword}</p>}
                       </div>
                     </div>
                   </div>
@@ -850,7 +833,7 @@ export default function OwnerRegisterPage() {
                       <div className="mb-2 flex items-center justify-between">
                         <h3 className="font-medium">Thông tin tài khoản</h3>
                         <Button type="button" variant="ghost" size="sm" onClick={() => setCurrentStep(1)}>
-                          Chỉnh sửa
+                          Xem lại
                         </Button>
                       </div>
                       <div className="space-y-1 text-sm text-muted-foreground">
@@ -973,15 +956,6 @@ export default function OwnerRegisterPage() {
               )}
             </div>
           </form>
-
-          <div className="mt-6 border-t pt-6 text-center">
-            <p className="text-sm text-muted-foreground">
-              Đã có tài khoản?{" "}
-              <Link href="/login" className="font-medium text-green-600 hover:text-green-700 dark:text-green-400">
-                Đăng nhập tại đây
-              </Link>
-            </p>
-          </div>
         </Card>
       </div>
     </main>

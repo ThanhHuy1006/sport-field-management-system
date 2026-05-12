@@ -240,9 +240,12 @@ export default function ProfilePage() {
       setError("")
       setMessage("")
 
+      // const uploadResult = await uploadAvatar(file)
+      // const avatarUrl = uploadResult.data.file.url
+      // const updateResult = await updateMe({ avatar_url: avatarUrl })
       const uploadResult = await uploadAvatar(file)
-      const avatarUrl = uploadResult.data.file.url
-      const updateResult = await updateMe({ avatar_url: avatarUrl })
+const avatarUrl = uploadResult.data.url
+const updateResult = await updateMe({ avatar_url: avatarUrl })
 
       syncStoredUserProfile(updateResult.data)
 
@@ -348,12 +351,12 @@ export default function ProfilePage() {
                     Yêu Thích
                   </button>
                 </Link>
-                <Link href="/settings">
+                {/* <Link href="/settings">
                   <button className="w-full text-left px-4 py-2 rounded-lg hover:bg-muted transition text-foreground">
                     <Settings className="w-4 h-4 inline mr-2" />
                     Cài Đặt
                   </button>
-                </Link>
+                </Link> */}
                 <button
                   type="button"
                   onClick={handleLogout}
@@ -381,7 +384,7 @@ export default function ProfilePage() {
             )}
 
             {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            {/* <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
               {stats.map((stat, idx) => (
                 <Card key={idx} className="p-4 text-center">
                   <div className="text-2xl font-bold text-primary">
@@ -392,7 +395,7 @@ export default function ProfilePage() {
                   </div>
                 </Card>
               ))}
-            </div>
+            </div> */}
 
             {/* Profile Information */}
             <Card className="p-8 mb-8">

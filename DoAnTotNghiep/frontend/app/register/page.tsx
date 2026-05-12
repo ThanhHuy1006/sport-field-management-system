@@ -3,14 +3,18 @@
 import type React from "react"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
 import { User, Mail, Lock, Phone, ArrowLeft } from "lucide-react"
+import { register } from "@/features/auth/services/auth.service"
 
 export default function RegisterPage() {
+  const router = useRouter()
+
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -20,18 +24,66 @@ export default function RegisterPage() {
     agreeTerms: false,
   })
 
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type } = e.target
+
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
     }))
+
+    setError(null)
+    setSuccessMessage(null)
   }
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Customer registration:", formData)
-    window.location.href = "/login"
+
+    if (loading) return
+
+    if (formData.password !== formData.confirmPassword) {
+      setError("Mật khẩu xác nhận không khớp")
+      return
+    }
+
+    if (!formData.agreeTerms) {
+      setError("Vui lòng đồng ý với điều khoản dịch vụ")
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    setSuccessMessage(null)
+
+    try {
+      await register({
+        name: formData.fullName.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        password: formData.password,
+      })
+
+      setSuccessMessage("Đăng ký thành công. Đang chuyển sang trang đăng nhập...")
+
+      setTimeout(() => {
+        router.push("/login")
+      }, 800)
+    } catch (err) {
+      console.error(err)
+
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Đăng ký thất bại. Vui lòng kiểm tra lại thông tin."
+
+      setError(message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -51,9 +103,19 @@ export default function RegisterPage() {
             <p className="text-muted-foreground mt-2">Đăng ký để bắt đầu đặt sân thể thao</p>
           </div>
 
-          <form onSubmit={handleRegister} className="space-y-4">
-            {/* User Type Selection */}
+          {error && (
+            <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+              {error}
+            </div>
+          )}
 
+          {successMessage && (
+            <div className="mb-4 rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+              {successMessage}
+            </div>
+          )}
+
+          <form onSubmit={handleRegister} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">Họ và Tên</label>
               <div className="relative">
@@ -66,6 +128,7 @@ export default function RegisterPage() {
                   onChange={handleChange}
                   className="pl-10"
                   required
+                  disabled={loading}
                 />
               </div>
             </div>
@@ -82,6 +145,7 @@ export default function RegisterPage() {
                   onChange={handleChange}
                   className="pl-10"
                   required
+                  disabled={loading}
                 />
               </div>
             </div>
@@ -98,6 +162,7 @@ export default function RegisterPage() {
                   onChange={handleChange}
                   className="pl-10"
                   required
+                  disabled={loading}
                 />
               </div>
             </div>
@@ -114,6 +179,7 @@ export default function RegisterPage() {
                   onChange={handleChange}
                   className="pl-10"
                   required
+                  disabled={loading}
                 />
               </div>
             </div>
@@ -130,6 +196,7 @@ export default function RegisterPage() {
                   onChange={handleChange}
                   className="pl-10"
                   required
+                  disabled={loading}
                 />
               </div>
             </div>
@@ -142,6 +209,7 @@ export default function RegisterPage() {
                 onChange={handleChange}
                 className="w-4 h-4 rounded border-border mt-1"
                 required
+                disabled={loading}
               />
               <span className="text-sm text-muted-foreground">
                 Tôi đồng ý với{" "}
@@ -155,8 +223,8 @@ export default function RegisterPage() {
               </span>
             </label>
 
-            <Button type="submit" className="w-full">
-              Tạo Tài Khoản
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Đang tạo tài khoản..." : "Tạo Tài Khoản"}
             </Button>
           </form>
 
