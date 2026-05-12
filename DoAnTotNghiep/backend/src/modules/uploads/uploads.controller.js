@@ -1,64 +1,75 @@
 import { ValidationError } from "../../core/errors/index.js";
-import { asyncHandler } from "../../core/utils/asyncHandler.js";
-import { successResponse } from "../../core/utils/response.js";
 import { UPLOAD_FOLDERS } from "./uploads.constants.js";
 import { uploadsService } from "./uploads.service.js";
 
 export const uploadsController = {
-  uploadFieldImages: asyncHandler(async (req, res) => {
-    const files = req.files || [];
+  async uploadFieldImages(req, res, next) {
+    try {
+      const files = req.files || [];
 
-    if (files.length === 0) {
-      throw new ValidationError("Vui lòng chọn ít nhất 1 ảnh sân");
+      if (!files.length) {
+        throw new ValidationError("Vui lòng chọn ít nhất một ảnh sân");
+      }
+
+      const uploadedFiles = await uploadsService.toPublicFiles(
+        files,
+        UPLOAD_FOLDERS.FIELDS
+      );
+
+      return res.status(201).json({
+        success: true,
+        message: "Upload ảnh sân thành công",
+        data: uploadedFiles,
+      });
+    } catch (error) {
+      next(error);
     }
+  },
 
-    const uploadedFiles = uploadsService.toPublicFiles(
-      files,
-      UPLOAD_FOLDERS.FIELDS
-    );
+  async uploadAvatar(req, res, next) {
+    try {
+      const files = req.files || [];
+      const file = files[0];
 
-    return successResponse(
-      res,
-      { files: uploadedFiles },
-      "Upload ảnh sân thành công"
-    );
-  }),
+      if (!file) {
+        throw new ValidationError("Vui lòng chọn ảnh đại diện");
+      }
 
-  uploadAvatar: asyncHandler(async (req, res) => {
-    const files = req.files || [];
+      const uploadedFile = await uploadsService.toPublicFile(
+        file,
+        UPLOAD_FOLDERS.AVATARS
+      );
 
-    if (files.length === 0) {
-      throw new ValidationError("Vui lòng chọn ảnh đại diện");
+      return res.status(201).json({
+        success: true,
+        message: "Upload ảnh đại diện thành công",
+        data: uploadedFile,
+      });
+    } catch (error) {
+      next(error);
     }
+  },
 
-    const uploadedFile = uploadsService.toPublicFile(
-      files[0],
-      UPLOAD_FOLDERS.AVATARS
-    );
+  async uploadDocuments(req, res, next) {
+    try {
+      const files = req.files || [];
 
-    return successResponse(
-      res,
-      { file: uploadedFile },
-      "Upload ảnh đại diện thành công"
-    );
-  }),
+      if (!files.length) {
+        throw new ValidationError("Vui lòng chọn tài liệu");
+      }
 
-  uploadDocuments: asyncHandler(async (req, res) => {
-    const files = req.files || [];
+      const uploadedFiles = await uploadsService.toPublicFiles(
+        files,
+        UPLOAD_FOLDERS.DOCUMENTS
+      );
 
-    if (files.length === 0) {
-      throw new ValidationError("Vui lòng chọn ít nhất 1 tài liệu");
+      return res.status(201).json({
+        success: true,
+        message: "Upload tài liệu thành công",
+        data: uploadedFiles,
+      });
+    } catch (error) {
+      next(error);
     }
-
-    const uploadedFiles = uploadsService.toPublicFiles(
-      files,
-      UPLOAD_FOLDERS.DOCUMENTS
-    );
-
-    return successResponse(
-      res,
-      { files: uploadedFiles },
-      "Upload tài liệu thành công"
-    );
-  }),
+  },
 };

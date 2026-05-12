@@ -1,65 +1,64 @@
-import fs from "fs";
-import path from "path";
-import {
-  UPLOAD_PUBLIC_PATH,
-  UPLOAD_ROOT_DIR,
-} from "./uploads.constants.js";
+import { Readable } from "stream";
+import { cloudinary } from "../../config/cloudinary.config.js";
 
-function normalizePath(filePath) {
-  return filePath.replaceAll("\\", "/");
-}
+function uploadBufferToCloudinary(file, folderName) {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: `sport-field-management/${folderName}`,
+        resource_type: "auto",
+      },
+      (error, result) => {
+        if (error) {
+          return reject(error);
+        }
 
-function getUploadRootPath() {
-  if (path.isAbsolute(UPLOAD_ROOT_DIR)) {
-    return UPLOAD_ROOT_DIR;
-  }
+        return resolve({
+          url: result.secure_url,
+          storage_path: result.public_id,
+          original_name: file.originalname,
+          mime_type: file.mimetype,
+          size_bytes: file.size,
+        });
+      }
+    );
 
-  return path.join(process.cwd(), UPLOAD_ROOT_DIR);
-}
-
-function normalizePublicPath(publicPath) {
-  const normalized = normalizePath(publicPath || "/uploads");
-  return normalized.startsWith("/") ? normalized : `/${normalized}`;
+    Readable.from(file.buffer).pipe(uploadStream);
+  });
 }
 
 export const uploadsService = {
-  toPublicFile(file, folderName) {
-    const publicRoot = normalizePublicPath(UPLOAD_PUBLIC_PATH);
+  async toPublicFile(file, folderName) {
+    if (!file) {
+      throw new Error("Không có file để upload");
+    }
 
-    const publicUrl = normalizePath(
-      path.posix.join(publicRoot, folderName, file.filename)
-    );
+    if (!file.buffer) {
+      throw new Error(
+        "File không tồn tại trong bộ nhớ. Kiểm tra multer.memoryStorage()"
+      );
+    }
 
-    return {
-      url: publicUrl,
-      storage_path: normalizePath(file.path),
-      original_name: file.originalname,
-      mime_type: file.mimetype,
-      size_bytes: file.size,
-    };
+    return uploadBufferToCloudinary(file, folderName);
   },
 
-  toPublicFiles(files = [], folderName) {
-    return files.map((file) => this.toPublicFile(file, folderName));
+  async toPublicFiles(files = [], folderName) {
+    return Promise.all(files.map((file) => this.toPublicFile(file, folderName)));
   },
 
-  deletePhysicalFile(storagePath) {
+  async deletePhysicalFile(storagePath) {
     if (!storagePath) return;
 
-    const normalizedStoragePath = path.isAbsolute(storagePath)
-      ? storagePath
-      : path.join(process.cwd(), storagePath);
-
-    if (fs.existsSync(normalizedStoragePath)) {
-      fs.unlinkSync(normalizedStoragePath);
-    }
+    await cloudinary.uploader.destroy(storagePath, {
+      resource_type: "image",
+    });
   },
 
   getUploadRootDir() {
-    return UPLOAD_ROOT_DIR;
+    return "cloudinary";
   },
 
   getUploadRootPath() {
-    return getUploadRootPath();
+    return "https://res.cloudinary.com";
   },
 };

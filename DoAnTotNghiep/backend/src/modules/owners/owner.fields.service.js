@@ -41,8 +41,12 @@ export const ownerFieldsService = {
     throw new ValidationError("Vui lòng upload ít nhất 1 ảnh sân");
   }
 
-  const uploadedFiles = files.map((file) =>
-    uploadsService.toPublicFile(file, UPLOAD_FOLDERS.FIELDS)
+  // const uploadedFiles = files.map((file) =>
+  //   uploadsService.toPublicFile(file, UPLOAD_FOLDERS.FIELDS)
+  // );
+   const uploadedFiles = await uploadsService.toPublicFiles(
+    files,
+    UPLOAD_FOLDERS.FIELDS
   );
 
   return ownerFieldsRepository.createOwnerFieldImages(fieldId, uploadedFiles);
