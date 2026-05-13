@@ -25,6 +25,7 @@ export function validateRegisterPayload(payload) {
   if (password.length < 6) {
     throw new ValidationError("password phải có ít nhất 6 ký tự");
   }
+  //update thêm rule (pass phải có đủ kí hiệu ...)
 
   return {
     name,

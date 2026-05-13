@@ -8,8 +8,11 @@ import { notFoundMiddleware } from "./core/middlewares/not-found.middleware.js";
 import { errorMiddleware } from "./core/middlewares/error.middleware.js";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./config/swagger.config.js";
+//tạo app express
+
 
 const app = express();
+//flow request middleware
 
 app.use(requestContextMiddleware);
 app.use(requestLoggerMiddleware);
@@ -74,9 +77,9 @@ app.use("/api/v1", routes);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
-console.log("PROCESS CWD:", process.cwd());
-console.log("UPLOAD STATIC DIR:", getUploadStaticDir());
+// console.log("PROCESS CWD:", process.cwd());
+// console.log("UPLOAD STATIC DIR:", getUploadStaticDir());
 
-app.use("/uploads", express.static(getUploadStaticDir()));
+// app.use("/uploads", express.static(getUploadStaticDir()));
 
 export default app;

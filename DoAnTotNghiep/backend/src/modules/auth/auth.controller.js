@@ -6,6 +6,13 @@ import {
 import { asyncHandler } from "../../core/utils/asyncHandler.js";
 
 export const authController = {
+//   Frontend gửi name, email, password, phone
+// → validateBody(validateRegisterPayload) kiểm tra dữ liệu
+// → dữ liệu hợp lệ được đưa vào req.validated.body
+// → controller lấy payload
+// → gọi authService.register(payload)
+// → service tạo user
+// → controller trả createdResponse
   register: asyncHandler(async (req, res) => {
     const payload = req.validated?.body ?? req.body;
     const result = await authService.register(payload);
