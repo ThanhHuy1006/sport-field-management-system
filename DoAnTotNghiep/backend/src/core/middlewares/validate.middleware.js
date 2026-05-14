@@ -24,6 +24,8 @@ export function validateBody(validator) {
   return (req, res, next) => {
     try {
       req.validated ??= {};
+//       Nếu req.validated chưa tồn tại thì tạo object rỗng.
+// Nếu đã tồn tại rồi thì giữ nguyên.
       req.validated.body = runValidator(validator, req.body, "body");
       next();
     } catch (error) {

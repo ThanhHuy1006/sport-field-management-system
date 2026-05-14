@@ -30,11 +30,16 @@ export type LoginResponse = {
     user: AuthUser;
   };
 };
-
 export type RegisterResponse = {
   success: boolean;
   message: string;
-  data: AuthUser;
+  data: {
+    user: AuthUser & {
+      created_at?: string;
+      updated_at?: string;
+    };
+    token: string;
+  };
 };
 
 export type MeResponse = {
