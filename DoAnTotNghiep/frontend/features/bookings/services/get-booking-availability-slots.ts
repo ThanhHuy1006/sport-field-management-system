@@ -1,4 +1,5 @@
 import { apiGet } from "@/lib/api-client";
+///
 
 export type BookingAvailabilitySlotsResponse = {
   success: boolean;
