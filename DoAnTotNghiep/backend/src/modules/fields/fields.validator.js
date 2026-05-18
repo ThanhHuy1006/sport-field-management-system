@@ -1,6 +1,11 @@
 import { ValidationError } from "../../core/errors/index.js";
 
 export function validatePublicFieldQuery(query) {
+//   Nếu client có gửi page → lấy page
+// Nếu không gửi page → mặc định page = 1
+
+// Nếu client có gửi limit → lấy limit
+// Nếu không gửi limit → mặc định limit = 10
   const page = Number(query.page || 1);
   const limit = Number(query.limit || 10);
 

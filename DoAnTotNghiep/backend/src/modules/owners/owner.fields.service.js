@@ -1,8 +1,3 @@
-// import {
-//   ConflictError,
-//   NotFoundError,
-// } from "../../core/errors/index.js";
-// import { ownerFieldsRepository } from "./owner.fields.repository.js";
 import {
   ConflictError,
   NotFoundError,
@@ -13,6 +8,7 @@ import { UPLOAD_FOLDERS } from "../uploads/uploads.constants.js";
 import { ownerFieldsRepository } from "./owner.fields.repository.js";
 
 export const ownerFieldsService = {
+  // Lấy danh sách sân của owner
   async getOwnerFields(ownerId) {
     return ownerFieldsRepository.findOwnerFields(ownerId);
   },

@@ -22,7 +22,8 @@ const router = Router();
 
 router.use(requireAuth, requireRole("OWNER"), requireApprovedOwner());
 
-router.get("/fields", ownerFieldsController.getOwnerFields);
+router.get("/fields", ownerFieldsController.getOwnerFields)
+
 
 router.post(
   "/fields",
