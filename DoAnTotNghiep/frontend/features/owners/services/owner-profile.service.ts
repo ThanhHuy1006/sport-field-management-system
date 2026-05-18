@@ -50,9 +50,15 @@ export function getMyOwnerProfile() {
   return apiGet<ApiResponse<OwnerProfileData>>("/owner/profile/me")
 }
 
+// export function updateMyOwnerProfile(payload: UpdateOwnerProfilePayload) {
+//   return apiRequest<ApiResponse<OwnerProfileData>>("/owner/profile/me", {
+//     method: "PUT",
+//     body: JSON.stringify(payload),
+//   })
+// }
 export function updateMyOwnerProfile(payload: UpdateOwnerProfilePayload) {
   return apiRequest<ApiResponse<OwnerProfileData>>("/owner/profile/me", {
-    method: "PUT",
+    method: "PATCH",
     body: JSON.stringify(payload),
   })
 }
