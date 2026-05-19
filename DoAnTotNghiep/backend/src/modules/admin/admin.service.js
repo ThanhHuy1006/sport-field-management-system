@@ -17,32 +17,28 @@ export const adminService = {
     return user;
   },
   async updateUserStatus(adminId, userId, payload) {
-  const user = await adminRepository.findUserById(userId);
+    const user = await adminRepository.findUserById(userId);
 
-  if (!user) {
-    throw new NotFoundError("Không tìm thấy user");
-  }
+    if (!user) {
+      throw new NotFoundError("Không tìm thấy user");
+    }
 
-  if (Number(adminId) === Number(userId)) {
-    throw new ConflictError(
-      "Admin không thể tự thay đổi trạng thái tài khoản của mình"
-    );
-  }
+    if (Number(adminId) === Number(userId)) {
+      throw new ConflictError(
+        "Admin không thể tự thay đổi trạng thái tài khoản của mình",
+      );
+    }
 
-  if (user.role === "ADMIN") {
-    throw new ConflictError(
-      "Không thể thay đổi trạng thái tài khoản ADMIN"
-    );
-  }
+    if (user.role === "ADMIN") {
+      throw new ConflictError("Không thể thay đổi trạng thái tài khoản ADMIN");
+    }
 
-  if (user.status === payload.status) {
-    throw new ConflictError("User đã ở trạng thái này");
-  }
+    if (user.status === payload.status) {
+      throw new ConflictError("User đã ở trạng thái này");
+    }
 
-  return adminRepository.updateUserStatus(userId, payload.status);
-},
-
-
+    return adminRepository.updateUserStatus(userId, payload.status);
+  },
 
   async getOwnerRegistrations() {
     return adminRepository.findOwnerRegistrations();
@@ -131,18 +127,18 @@ export const adminService = {
   },
 
   async rejectField(fieldId, payload) {
-  const field = await adminRepository.findFieldById(fieldId);
+    const field = await adminRepository.findFieldById(fieldId);
 
-  if (!field) {
-    throw new NotFoundError("Không tìm thấy sân");
-  }
+    if (!field) {
+      throw new NotFoundError("Không tìm thấy sân");
+    }
 
-  if (field.status !== FIELD_STATUS.PENDING) {
-    throw new ConflictError("Chỉ sân pending mới được từ chối");
-  }
+    if (field.status !== FIELD_STATUS.PENDING) {
+      throw new ConflictError("Chỉ sân pending mới được từ chối");
+    }
 
-  return adminRepository.rejectField(fieldId, payload.reject_reason);
-},
+    return adminRepository.rejectField(fieldId, payload.reject_reason);
+  },
 
   async getAdminBookings() {
     return adminRepository.findAdminBookings();
