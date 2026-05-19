@@ -176,6 +176,7 @@ function isToday(value: string) {
   );
 }
 
+
 function extractQrToken(value: string) {
   const raw = String(value || "").trim();
 
@@ -189,9 +190,9 @@ function extractQrToken(value: string) {
       url.searchParams.get("token") ||
       url.searchParams.get("checkin_token") ||
       raw
-    );
+    ).trim();
   } catch {
-    // Không phải URL thì kiểm tra tiếp JSON/raw text.
+    // Không phải URL thì tiếp tục kiểm tra JSON/raw text.
   }
 
   try {
@@ -219,6 +220,7 @@ export default function OwnerCheckinPage() {
     null
   );
   const [showResultDialog, setShowResultDialog] = useState(false);
+  const [showQrConfirmDialog, setShowQrConfirmDialog] = useState(false);
   const [checkinResult, setCheckinResult] = useState<CheckinResult>(null);
   const [checkinHistory, setCheckinHistory] = useState<CheckinHistoryItem[]>(
     []
@@ -431,6 +433,7 @@ export default function OwnerCheckinPage() {
 
       const res = await scanOwnerBookingQr(qrTokenValue);
 
+      setShowQrConfirmDialog(false);
       setFoundBooking(res.data);
       setCheckinResult("success");
       setShowResultDialog(true);
@@ -456,8 +459,6 @@ export default function OwnerCheckinPage() {
         description: `${getCustomerName(res.data)} đã được check-in.`,
       });
     } catch (error) {
-      setCheckinResult("error");
-
       toast({
         title: "Quét QR thất bại",
         description:
@@ -472,6 +473,22 @@ export default function OwnerCheckinPage() {
   };
 
   const handleScanQr = async () => {
+    const qrTokenValue = extractQrToken(qrToken);
+
+    if (!qrTokenValue) {
+      toast({
+        title: "QR token trống",
+        description: "Vui lòng quét QR hoặc dán qr_token trước khi xác nhận.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setQrToken(qrTokenValue);
+    setShowQrConfirmDialog(true);
+  };
+
+  const handleConfirmQrCheckin = async () => {
     await handleScanQrToken(qrToken);
   };
 
@@ -482,7 +499,7 @@ export default function OwnerCheckinPage() {
       hasScannedRef.current = false;
 
       await new Promise<void>((resolve) => {
-        setTimeout(resolve, 200);
+        setTimeout(resolve, 150);
       });
 
       const readerElement = document.getElementById(QR_READER_ID);
@@ -506,6 +523,36 @@ export default function OwnerCheckinPage() {
 
       let failCount = 0;
 
+      const onScanSuccess = async (decodedText: string) => {
+        console.log("[QR SUCCESS]", decodedText);
+
+        if (hasScannedRef.current) return;
+
+        hasScannedRef.current = true;
+
+        const token = extractQrToken(decodedText);
+
+        if (!token) {
+          setScanDebug("Đã đọc QR nhưng dữ liệu rỗng.");
+          hasScannedRef.current = false;
+          return;
+        }
+
+        setQrToken(token);
+        setScanDebug("Đã đọc được mã QR. Vui lòng xác nhận check-in.");
+
+        await stopCameraScanning();
+        setShowQrConfirmDialog(true);
+      };
+
+      const onScanFailure = () => {
+        failCount += 1;
+
+        if (failCount % 20 === 0) {
+          setScanDebug("Đang tìm mã QR... Hãy đưa QR vào giữa khung.");
+        }
+      };
+
       const scanConfig = {
         fps: 20,
         qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
@@ -522,30 +569,6 @@ export default function OwnerCheckinPage() {
         experimentalFeatures: {
           useBarCodeDetectorIfSupported: true,
         },
-      };
-
-      const onScanSuccess = async (decodedText: string) => {
-        console.log("[QR SUCCESS]", decodedText);
-
-        if (hasScannedRef.current) return;
-
-        hasScannedRef.current = true;
-
-        const token = extractQrToken(decodedText);
-
-        setScanDebug("Đã đọc được mã QR");
-        setQrToken(token);
-
-        await stopCameraScanning();
-        await handleScanQrToken(token);
-      };
-
-      const onScanFailure = () => {
-        failCount += 1;
-
-        if (failCount % 20 === 0) {
-          setScanDebug("Đang tìm mã QR... Hãy đưa QR vào giữa khung.");
-        }
       };
 
       try {
@@ -665,7 +688,10 @@ export default function OwnerCheckinPage() {
           <div className="flex gap-2 mb-6">
             <Button
               variant={inputMethod === "camera" ? "default" : "outline"}
-              onClick={() => setInputMethod("camera")}
+              onClick={() => {
+                setInputMethod("camera");
+                setScanDebug("");
+              }}
               className="flex-1"
             >
               <Camera className="w-4 h-4 mr-2" />
@@ -695,11 +721,11 @@ export default function OwnerCheckinPage() {
 
                     <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                       <div className="w-[90%] h-[90%] max-w-[360px] max-h-[360px] border-2 border-primary rounded-lg relative">
-                        <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-white" />
-                        <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-white" />
-                        <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-white" />
-                        <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-white" />
-                        <div className="absolute inset-x-0 top-0 h-0.5 bg-primary animate-pulse" />
+                        <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-white" />
+                        <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-white" />
+                        <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-white" />
+                        <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-white" />
+                        <div className="absolute inset-x-4 top-1/2 h-0.5 bg-primary animate-pulse" />
                       </div>
                     </div>
 
@@ -711,9 +737,20 @@ export default function OwnerCheckinPage() {
                   <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground bg-muted">
                     <QrCode className="w-16 h-16 mb-4" />
                     <p>Nhấn nút bên dưới để bật camera</p>
+                    {qrToken && (
+                      <p className="mt-2 text-xs font-mono break-all max-w-xs text-center px-4">
+                        Đã đọc QR: {qrToken}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
+
+              {scanDebug && !scanning && (
+                <p className="text-sm text-muted-foreground text-center">
+                  {scanDebug}
+                </p>
+              )}
 
               <Button
                 className="w-full"
@@ -752,6 +789,10 @@ export default function OwnerCheckinPage() {
                     Xác nhận QR
                   </Button>
                 </div>
+
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Lưu ý: quét QR chỉ đọc mã. Hệ thống chỉ check-in sau khi chủ sân bấm xác nhận.
+                </p>
               </div>
             </div>
           )}
@@ -871,6 +912,52 @@ export default function OwnerCheckinPage() {
           </div>
         </Card>
       </div>
+
+      <Dialog open={showQrConfirmDialog} onOpenChange={setShowQrConfirmDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Xác nhận check-in bằng QR</DialogTitle>
+            <DialogDescription>
+              Hệ thống đã đọc được QR token. Chủ sân cần bấm xác nhận để thực hiện check-in.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="flex items-center gap-3 p-4 rounded-lg border bg-primary/10 border-primary/30">
+              <QrCode className="w-8 h-8 text-primary" />
+              <div className="min-w-0">
+                <p className="font-medium text-foreground">QR token đã đọc</p>
+                <p className="text-xs font-mono break-all text-muted-foreground">
+                  {qrToken || "Chưa có QR token"}
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-muted-foreground">
+              Vui lòng kiểm tra đúng khách và đúng khung giờ trước khi xác nhận. Sau khi xác nhận, backend sẽ cập nhật trạng thái booking sang check-in.
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowQrConfirmDialog(false)}
+              disabled={isSubmitting}
+            >
+              Hủy
+            </Button>
+
+            <Button
+              onClick={handleConfirmQrCheckin}
+              disabled={isSubmitting || !qrToken.trim()}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <CheckCircle2 className="w-4 h-4 mr-2" />
+              {isSubmitting ? "Đang check-in..." : "Xác nhận Check-in"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showResultDialog} onOpenChange={setShowResultDialog}>
         <DialogContent className="sm:max-w-md">
