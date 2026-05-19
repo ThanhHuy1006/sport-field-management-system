@@ -13,6 +13,7 @@ import { notificationsService } from "../notifications/notifications.service.js"
 const CHECKIN_EARLY_MINUTES = 30;
 const CHECKIN_LATE_MINUTES = 60;
 const PAYMENT_EXPIRE_MINUTES = 30;
+
 // Nếu tạo booking thành công nhưng tạo notification lỗi
 // → Không nên làm booking fail
 // → Chỉ log lỗi notification
@@ -246,6 +247,7 @@ export const bookingsService = {
     );
 
     const slots = [];
+    const now = new Date();
 
     for (
       let cursor = new Date(open);
@@ -277,7 +279,10 @@ export const bookingsService = {
       let reason = null;
       let booking_status = null;
 
-      if (blackout) {
+      if (slotStart <= now) {
+        available = false;
+        reason = "Khung giờ đã qua";
+      } else if (blackout) {
         available = false;
         reason = blackout.reason || "Khung giờ đang bị khóa";
       } else if (conflict) {
@@ -438,7 +443,9 @@ export const bookingsService = {
       await safeCreateNotification({
         user_id: ownerId,
         title: "Có yêu cầu đặt sân mới",
-        body: `Sân ${field.field_name || "của bạn"} vừa có một yêu cầu đặt sân mới.`,
+        body: `Sân ${
+          field.field_name || "của bạn"
+        } vừa có một yêu cầu đặt sân mới.`,
         type: "BOOKING",
       });
     }
@@ -670,6 +677,7 @@ export const bookingsService = {
 
     return updatedBooking;
   },
+
   async checkInOwnerBooking(ownerId, bookingId, payload) {
     const booking = await bookingsRepository.findOwnerBookingById(
       ownerId,

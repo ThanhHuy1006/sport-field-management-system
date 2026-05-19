@@ -62,6 +62,7 @@ import {
   getStoredAccessToken,
   getStoredUser,
 } from "@/features/auth/lib/auth-storage";
+import { getImageUrl } from "@/lib/image-url";
 
 type BookingPaymentMethod = "ONSITE" | "BANK_TRANSFER";
 
@@ -220,6 +221,25 @@ export default function BookingsPage() {
   //     checkedInAt: item.checked_in_at ?? undefined,
   //   }
   // }
+  function getBookingFieldImage(item: MyBookingListItem) {
+    const source = item as MyBookingListItem & {
+      field?:
+        | (MyBookingListItem["field"] & {
+            image_url?: string | null;
+            images?: Array<{ url?: string | null }>;
+            field_images?: Array<{ url?: string | null }>;
+          })
+        | null;
+    };
+
+    const rawUrl =
+      source.field?.image_url ??
+      source.field?.images?.[0]?.url ??
+      source.field?.field_images?.[0]?.url ??
+      null;
+
+    return getImageUrl(rawUrl) || "/placeholder.svg";
+  }
   const mapApiBookingToUi = (item: MyBookingListItem): Booking => {
     const source = item as MyBookingListItem & {
       requested_payment_method?: BookingPaymentMethod | null;
@@ -242,7 +262,7 @@ export default function BookingsPage() {
       duration,
       price: Number(item.total_price ?? 0),
       status: item.status,
-      image: "/placeholder.svg",
+      image: getBookingFieldImage(item),
       bookingRef: `BK-${item.id}`,
       checkedInAt: item.checked_in_at ?? undefined,
       requestedPaymentMethod: source.requested_payment_method ?? null,
@@ -862,6 +882,9 @@ export default function BookingsPage() {
                       <img
                         src={booking.image || "/placeholder.svg"}
                         alt={booking.fieldName}
+                        onError={(event) => {
+                          event.currentTarget.src = "/placeholder.svg";
+                        }}
                         className="w-full md:w-48 h-48 object-cover"
                       />
                       {booking.isRecurring && (

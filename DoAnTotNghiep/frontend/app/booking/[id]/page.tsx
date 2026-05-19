@@ -49,6 +49,27 @@ type SlotUi = {
   available: boolean;
   reason: string | null;
 };
+
+type CreatedBookingUi = {
+  id: number;
+  field_id: number;
+  user_id: number;
+  start_datetime: string;
+  end_datetime: string;
+  status: string;
+  original_price: string | number | null;
+  discount_amount: string | number | null;
+  total_price: string | number;
+  voucher_id?: number | null;
+  voucher?: {
+    id: number;
+    code: string;
+    type: string;
+    discount_value: string | number | null;
+    max_discount_amount?: string | number | null;
+  } | null;
+  requested_payment_method?: "ONSITE" | "BANK_TRANSFER" | null;
+};
 function mapFieldDetailToUi(data: FieldDetailResponse["data"]): FieldUi {
   const source = data as FieldDetailResponse["data"] & {
     owner_id?: number | null;
@@ -108,6 +129,80 @@ function buildDateTime(date: string, time: string) {
   return `${date}T${time}:00`;
 }
 
+function getTodayLocalDate() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function formatDateDisplay(value?: string | null) {
+  if (!value) return "--/--/----";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "--/--/----";
+  }
+
+  return date.toLocaleDateString("vi-VN");
+}
+
+function formatTimeDisplay(value?: string | null) {
+  if (!value) return "--:--";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "--:--";
+  }
+
+  return date.toLocaleTimeString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+function formatDurationDisplay(start?: string | null, end?: string | null) {
+  if (!start || !end) return "0 giờ";
+
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return "0 giờ";
+  }
+
+  const minutes = Math.max(
+    0,
+    Math.round((endDate.getTime() - startDate.getTime()) / 60000),
+  );
+
+  const hours = Math.floor(minutes / 60);
+  const remainMinutes = minutes % 60;
+
+  if (remainMinutes === 0) {
+    return `${hours} giờ`;
+  }
+
+  if (hours === 0) {
+    return `${remainMinutes} phút`;
+  }
+
+  return `${hours} giờ ${remainMinutes} phút`;
+}
+
+function formatPaymentMethodLabel(
+  method?: "ONSITE" | "BANK_TRANSFER" | null,
+) {
+  return method === "BANK_TRANSFER"
+    ? "Chuyển khoản ngân hàng"
+    : "Thanh toán tại sân";
+}
+
 export default function BookingPage() {
   
   // /booking/5 thì FieldId=5
@@ -134,12 +229,9 @@ export default function BookingPage() {
   });
 
   const [slots, setSlots] = useState<SlotUi[]>([]);
-  const [createdBooking, setCreatedBooking] = useState<null | {
-    id: number;
-    status: string;
-    total_price: string | number;
-    requested_payment_method?: "ONSITE" | "BANK_TRANSFER" | null;
-  }>(null);
+  const [createdBooking, setCreatedBooking] = useState<CreatedBookingUi | null>(
+    null,
+  );
   const [voucherCode, setVoucherCode] = useState("");
   const [isApplyingVoucher, setIsApplyingVoucher] = useState(false);
   const [voucherError, setVoucherError] = useState("");
@@ -450,8 +542,16 @@ export default function BookingPage() {
 
       setCreatedBooking({
         id: result.data.id,
+        field_id: result.data.field_id,
+        user_id: result.data.user_id,
+        start_datetime: result.data.start_datetime,
+        end_datetime: result.data.end_datetime,
         status: result.data.status,
+        original_price: result.data.original_price ?? result.data.total_price,
+        discount_amount: result.data.discount_amount ?? 0,
         total_price: result.data.total_price,
+        voucher_id: result.data.voucher_id ?? null,
+        voucher: result.data.voucher ?? null,
         requested_payment_method:
           result.data.requested_payment_method ?? bookingData.paymentMethod,
       });
@@ -574,7 +674,7 @@ export default function BookingPage() {
                     className="w-full border border-border rounded-md px-3 py-2 bg-background"
                     value={bookingData.date}
                     onChange={(e) => handleDateChange(e.target.value)}
-                    min={new Date().toISOString().slice(0, 10)}
+                    min={getTodayLocalDate()}
                   />
                 </div>
 
@@ -989,16 +1089,32 @@ export default function BookingPage() {
 
                 <div className="bg-muted rounded-lg p-4 text-left max-w-md mx-auto mb-6">
                   <div className="flex justify-between mb-2">
+                    <span className="text-muted-foreground">Mã booking</span>
+                    <span className="font-medium">#{createdBooking.id}</span>
+                  </div>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-muted-foreground">Ngày đặt</span>
+                    <span className="font-medium">
+                      {formatDateDisplay(createdBooking.start_datetime)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-muted-foreground">Giờ đặt</span>
+                    <span className="font-medium">
+                      {formatTimeDisplay(createdBooking.start_datetime)} - {" "}
+                      {formatTimeDisplay(createdBooking.end_datetime)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between mb-2">
                     <span className="text-muted-foreground">Trạng thái</span>
                     <span className="font-medium">{createdBooking.status}</span>
                   </div>
                   <div className="flex justify-between mb-2">
                     <span className="text-muted-foreground">Thanh toán</span>
-                    <span className="font-medium">
-                      {createdBooking.requested_payment_method ===
-                      "BANK_TRANSFER"
-                        ? "Chuyển khoản ngân hàng"
-                        : "Thanh toán tại sân"}
+                    <span className="font-medium text-right">
+                      {formatPaymentMethodLabel(
+                        createdBooking.requested_payment_method,
+                      )}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -1032,53 +1148,177 @@ export default function BookingPage() {
                 className="w-full h-48 object-cover rounded-lg mb-4"
               />
 
-              <h3 data-cy="booking-summary-field-name" className="text-lg font-bold mb-2">{field.name}</h3>
+              <h3
+                data-cy="booking-summary-field-name"
+                className="text-lg font-bold mb-2"
+              >
+                {field.name}
+              </h3>
               <p className="text-sm text-muted-foreground mb-4">
                 {field.location}
               </p>
 
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Giờ hoạt động</span>
-                  <span className="font-medium">
-                    {field.openTime ?? "--:--"} - {field.closeTime ?? "--:--"}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Giá / giờ</span>
-                  <span className="font-medium">
-                    {formatCurrency(field.pricePerHour)} VND
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Tạm tính</span>
-                  <span className="font-medium">
-                    {formatCurrency(subtotal)} VND
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Phí dịch vụ</span>
-                  <span className="font-medium">
-                    {formatCurrency(serviceFee)} VND
-                  </span>
-                </div>
+              {createdBooking ? (
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Mã booking</span>
+                    <span className="font-medium">#{createdBooking.id}</span>
+                  </div>
 
-                {appliedVoucher && (
-                  <div className="flex justify-between text-green-600">
-                    <span>Giảm giá ({appliedVoucher.voucher.code})</span>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Ngày đặt</span>
                     <span className="font-medium">
-                      -{formatCurrency(voucherDiscount)} VND
+                      {formatDateDisplay(createdBooking.start_datetime)}
                     </span>
                   </div>
-                )}
 
-                <div className="flex justify-between border-t border-border pt-3 text-base">
-                  <span className="font-semibold">Tổng cộng</span>
-                  <span className="font-bold text-primary">
-                    {formatCurrency(finalAmount)} VND
-                  </span>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Giờ đặt</span>
+                    <span className="font-medium">
+                      {formatTimeDisplay(createdBooking.start_datetime)} - {" "}
+                      {formatTimeDisplay(createdBooking.end_datetime)}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Thời lượng</span>
+                    <span className="font-medium">
+                      {formatDurationDisplay(
+                        createdBooking.start_datetime,
+                        createdBooking.end_datetime,
+                      )}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Trạng thái</span>
+                    <span className="font-medium text-right">
+                      {createdBooking.status}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Thanh toán</span>
+                    <span className="font-medium text-right">
+                      {formatPaymentMethodLabel(
+                        createdBooking.requested_payment_method,
+                      )}
+                    </span>
+                  </div>
+
+                  <div className="border-t border-border pt-3 space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Tạm tính</span>
+                      <span className="font-medium">
+                        {formatCurrency(
+                          Number(createdBooking.original_price ?? 0),
+                        )} {" "}
+                        VND
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Phí dịch vụ</span>
+                      <span className="font-medium">0 VND</span>
+                    </div>
+
+                    {Number(createdBooking.discount_amount ?? 0) > 0 && (
+                      <div className="flex justify-between text-green-600">
+                        <span>
+                          Giảm giá
+                          {createdBooking.voucher?.code
+                            ? ` (${createdBooking.voucher.code})`
+                            : ""}
+                        </span>
+                        <span className="font-medium">
+                          -
+                          {formatCurrency(
+                            Number(createdBooking.discount_amount ?? 0),
+                          )} {" "}
+                          VND
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between border-t border-border pt-3 text-base">
+                      <span className="font-semibold">Tổng cộng</span>
+                      <span className="font-bold text-primary">
+                        {formatCurrency(Number(createdBooking.total_price ?? 0))} {" "}
+                        VND
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Giờ hoạt động</span>
+                    <span className="font-medium">
+                      {field.openTime ?? "--:--"} - {field.closeTime ?? "--:--"}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Ngày đặt</span>
+                    <span className="font-medium">
+                      {bookingData.date || "Chưa chọn"}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Giờ đặt</span>
+                    <span className="font-medium text-right">
+                      {bookingData.selectedSlot
+                        ? `${bookingData.selectedSlot.start_time} - ${bookingData.selectedSlot.end_time}`
+                        : "Chưa chọn"}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Thời lượng</span>
+                    <span className="font-medium">
+                      {bookingData.durationHours} giờ
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Giá / giờ</span>
+                    <span className="font-medium">
+                      {formatCurrency(field.pricePerHour)} VND
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Tạm tính</span>
+                    <span className="font-medium">
+                      {formatCurrency(subtotal)} VND
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Phí dịch vụ</span>
+                    <span className="font-medium">
+                      {formatCurrency(serviceFee)} VND
+                    </span>
+                  </div>
+
+                  {appliedVoucher && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Giảm giá ({appliedVoucher.voucher.code})</span>
+                      <span className="font-medium">
+                        -{formatCurrency(voucherDiscount)} VND
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between border-t border-border pt-3 text-base">
+                    <span className="font-semibold">Tổng cộng</span>
+                    <span className="font-bold text-primary">
+                      {formatCurrency(finalAmount)} VND
+                    </span>
+                  </div>
+                </div>
+              )}
             </Card>
           </div>
         </div>

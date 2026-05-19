@@ -28,14 +28,15 @@ export type MyBookingListItem = {
   checked_in_by: number | null;
   checkin_method: string | null;
   created_at: string;
-  field: {
-    id: number;
-    field_name: string;
-    address: string | null;
-    sport_type: string | null;
-    base_price_per_hour: string | number | null;
-    currency: string | null;
-  } | null;
+ field: {
+  id: number;
+  field_name: string | null;
+  address: string | null;
+  sport_type: string | null;
+  base_price_per_hour: string | number | null;
+  currency: string | null;
+  image_url?: string | null;
+} | null;
   payment_expires_at?: string | null;
   review?: {
   id: number

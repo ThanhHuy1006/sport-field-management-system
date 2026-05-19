@@ -27,6 +27,7 @@ export function toBookingListItem(item) {
           sport_type: item.fields.sport_type,
           base_price_per_hour: item.fields.base_price_per_hour,
           currency: item.fields.currency,
+          image_url: item.fields.field_images?.[0]?.url ?? null,
         }
       : null,
     payment_expires_at: item.payment_expires_at || null,

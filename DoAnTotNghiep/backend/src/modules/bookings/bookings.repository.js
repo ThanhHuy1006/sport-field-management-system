@@ -9,6 +9,16 @@ const ACTIVE_BOOKING_STATUSES = [
   "CHECKED_IN",
 ];
 
+// const memberFieldSelect = {
+//   id: true,
+//   field_name: true,
+//   address: true,
+//   sport_type: true,
+//   base_price_per_hour: true,
+//   currency: true,
+//   owner_id: true,
+
+// };
 const memberFieldSelect = {
   id: true,
   field_name: true,
@@ -17,6 +27,20 @@ const memberFieldSelect = {
   base_price_per_hour: true,
   currency: true,
   owner_id: true,
+  field_images: {
+    orderBy: [
+      { is_primary: "desc" },
+      { order_no: "asc" },
+      { id: "asc" },
+    ],
+    take: 1,
+    select: {
+      id: true,
+      url: true,
+      is_primary: true,
+      order_no: true,
+    },
+  },
 };
 
 const ownerFieldSelect = {
