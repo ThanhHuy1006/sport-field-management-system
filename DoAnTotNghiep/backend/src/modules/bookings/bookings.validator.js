@@ -167,6 +167,7 @@ export function validateBookingListQuery(query) {
     "PAY_FAILED",
     "CHECKED_IN",
     "PAYMENT_EXPIRED",
+    "NO_SHOW",
   ];
 
   const status = query.status ? String(query.status).trim() : "";

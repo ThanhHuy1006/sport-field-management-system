@@ -530,7 +530,7 @@ export const bookingsRepository = {
           booking_id: bookingId,
           from_status: booking.status,
           to_status: "CHECKED_IN",
-          reason: note || "Completed by owner",
+          reason: note || "Checked in by owner",
         },
       });
 
@@ -601,4 +601,108 @@ export const bookingsRepository = {
       return hydrateMemberBooking(tx, bookingId);
     });
   },
+  async syncBookingLifecycle(now = new Date()) {
+  const GRACE_MINUTES = 5;
+  const threshold = new Date(now.getTime() - GRACE_MINUTES * 60 * 1000);
+
+  return prisma.$transaction(async (tx) => {
+    const expiredCheckedInBookings = await tx.bookings.findMany({
+      where: {
+        status: "CHECKED_IN",
+        end_datetime: {
+          lte: threshold,
+        },
+      },
+      select: {
+        id: true,
+        status: true,
+      },
+    });
+
+    const noShowBookings = await tx.bookings.findMany({
+      where: {
+        status: {
+          in: ["APPROVED", "PAID"],
+        },
+        checked_in_at: null,
+        end_datetime: {
+          lte: threshold,
+        },
+      },
+      select: {
+        id: true,
+        status: true,
+      },
+    });
+
+    const completedIds = expiredCheckedInBookings.map((booking) => booking.id);
+    const noShowIds = noShowBookings.map((booking) => booking.id);
+
+    let completedResult = { count: 0 };
+    let noShowResult = { count: 0 };
+
+    if (completedIds.length > 0) {
+      completedResult = await tx.bookings.updateMany({
+        where: {
+          id: {
+            in: completedIds,
+          },
+          status: "CHECKED_IN",
+          end_datetime: {
+            lte: threshold,
+          },
+        },
+        data: {
+          status: "COMPLETED",
+          updated_at: now,
+        },
+      });
+
+      await tx.booking_status_history.createMany({
+        data: expiredCheckedInBookings.map((booking) => ({
+          booking_id: booking.id,
+          from_status: "CHECKED_IN",
+          to_status: "COMPLETED",
+          reason: "AUTO_COMPLETED_AFTER_END_TIME",
+        })),
+      });
+    }
+
+    if (noShowIds.length > 0) {
+      noShowResult = await tx.bookings.updateMany({
+        where: {
+          id: {
+            in: noShowIds,
+          },
+          status: {
+            in: ["APPROVED", "PAID"],
+          },
+          checked_in_at: null,
+          end_datetime: {
+            lte: threshold,
+          },
+        },
+        data: {
+          status: "NO_SHOW",
+          updated_at: now,
+        },
+      });
+
+      await tx.booking_status_history.createMany({
+        data: noShowBookings.map((booking) => ({
+          booking_id: booking.id,
+          from_status: booking.status,
+          to_status: "NO_SHOW",
+          reason: "AUTO_NO_SHOW_AFTER_END_TIME_WITHOUT_CHECKIN",
+        })),
+      });
+    }
+
+    return {
+      completed: completedResult.count,
+      no_show: noShowResult.count,
+    };
+  });
+}
+
 };

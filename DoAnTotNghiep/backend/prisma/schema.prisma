@@ -493,6 +493,7 @@ enum bookings_status {
   PAY_FAILED
   CHECKED_IN
   PAYMENT_EXPIRED
+  NO_SHOW
 }
 
 enum users_role {

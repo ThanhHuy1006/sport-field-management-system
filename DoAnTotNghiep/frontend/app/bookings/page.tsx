@@ -65,6 +65,7 @@ import {
 import { getImageUrl } from "@/lib/image-url";
 
 type BookingPaymentMethod = "ONSITE" | "BANK_TRANSFER";
+type BookingTab = "upcoming" | "using" | "completed" | "cancelled";
 
 type Booking = {
   id: number;
@@ -74,9 +75,11 @@ type Booking = {
   sportType?: string | null;
   date: string;
   time: string;
+  startDateTime: string;
+  endDateTime: string;
   duration: number;
   price: number;
-  status: BookingStatus | "pending_reschedule";
+  status: BookingStatus | "pending_reschedule" | "NO_SHOW";
   image: string;
   bookingRef: string;
   rating?: number;
@@ -108,7 +111,7 @@ export default function BookingsPage() {
 
   const [authChecked, setAuthChecked] = useState(false);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [activeTab, setActiveTab] = useState("upcoming");
+  const [activeTab, setActiveTab] = useState<BookingTab>("upcoming");
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [showRatingDialog, setShowRatingDialog] = useState(false);
   const [showRescheduleDialog, setShowRescheduleDialog] = useState(false);
@@ -133,19 +136,6 @@ export default function BookingsPage() {
   const [qrExpiresAt, setQrExpiresAt] = useState<string | null>(null);
   const itemsPerPage = 5;
   const { toast } = useToast();
-
-  const [apiPagination, setApiPagination] = useState({
-    page: 1,
-    limit: itemsPerPage,
-    total: 0,
-    totalPages: 1,
-  });
-
-  const [tabTotals, setTabTotals] = useState({
-    upcoming: 0,
-    completed: 0,
-    cancelled: 0,
-  });
 
   useEffect(() => {
     const token = getStoredAccessToken();
@@ -259,6 +249,8 @@ export default function BookingsPage() {
       sportType: item.field?.sport_type ?? null,
       date: formatLocalDate(item.start_datetime),
       time: `${formatLocalTime(item.start_datetime)} - ${formatLocalTime(item.end_datetime)}`,
+      startDateTime: item.start_datetime,
+      endDateTime: item.end_datetime,
       duration,
       price: Number(item.total_price ?? 0),
       status: item.status,
@@ -270,49 +262,29 @@ export default function BookingsPage() {
     };
   };
 
-  const getStatusParamFromTab = (tab: string): BookingStatus | undefined => {
-    switch (tab) {
-      case "completed":
-        return "COMPLETED";
-      case "cancelled":
-        return "CANCELLED";
-      default:
-        return undefined;
-    }
-  };
-
-  const loadBookings = async (page = 1, tab = activeTab) => {
+  const loadBookings = async () => {
     try {
       setIsLoading(true);
 
-      const status = getStatusParamFromTab(tab);
-      const res = await getMyBookings({
-        page,
-        limit: itemsPerPage,
-        status,
+      const firstPage = await getMyBookings({
+        page: 1,
+        limit: 100,
       });
 
-      let items = res.data.items.map(mapApiBookingToUi);
+      let allItems = [...firstPage.data.items];
+      const totalPagesFromApi = firstPage.data.pagination.totalPages || 1;
 
-      if (tab === "upcoming") {
-        items = items.filter(
-          (b) =>
-            (b.status === "PENDING_CONFIRM" ||
-              b.status === "APPROVED" ||
-              b.status === "AWAITING_PAYMENT" ||
-              b.status === "PAID" ||
-              b.status === "CHECKED_IN") &&
-            !b.isRecurring,
-        );
+      for (let page = 2; page <= totalPagesFromApi; page += 1) {
+        const res = await getMyBookings({
+          page,
+          limit: 100,
+        });
+
+        allItems = allItems.concat(res.data.items);
       }
 
-      setBookings(items);
-      setApiPagination({
-        page: res.data.pagination.page,
-        limit: res.data.pagination.limit,
-        total: res.data.pagination.total,
-        totalPages: Math.max(1, res.data.pagination.totalPages),
-      });
+      setBookings(allItems.map(mapApiBookingToUi));
+      setCurrentPage(1);
     } catch (error) {
       toast({
         title: "Không tải được danh sách booking",
@@ -321,53 +293,9 @@ export default function BookingsPage() {
         variant: "destructive",
       });
       setBookings([]);
-      setApiPagination({
-        page: 1,
-        limit: itemsPerPage,
-        total: 0,
-        totalPages: 1,
-      });
+      setCurrentPage(1);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const loadTabTotals = async () => {
-    try {
-      const [
-        pending,
-        approved,
-        awaitingPayment,
-        paid,
-        checkedIn,
-        completed,
-        cancelled,
-      ] = await Promise.all([
-        getMyBookings({ page: 1, limit: 1, status: "PENDING_CONFIRM" }),
-        getMyBookings({ page: 1, limit: 1, status: "APPROVED" }),
-        getMyBookings({ page: 1, limit: 1, status: "AWAITING_PAYMENT" }),
-        getMyBookings({ page: 1, limit: 1, status: "PAID" }),
-        getMyBookings({ page: 1, limit: 1, status: "CHECKED_IN" }),
-        getMyBookings({ page: 1, limit: 1, status: "COMPLETED" }),
-        getMyBookings({ page: 1, limit: 1, status: "CANCELLED" }),
-      ]);
-
-      setTabTotals({
-        upcoming:
-          pending.data.pagination.total +
-          approved.data.pagination.total +
-          awaitingPayment.data.pagination.total +
-          paid.data.pagination.total +
-          checkedIn.data.pagination.total,
-        completed: completed.data.pagination.total,
-        cancelled: cancelled.data.pagination.total,
-      });
-    } catch {
-      setTabTotals({
-        upcoming: 0,
-        completed: 0,
-        cancelled: 0,
-      });
     }
   };
 
@@ -378,14 +306,7 @@ export default function BookingsPage() {
   useEffect(() => {
     if (!authChecked) return;
 
-    loadBookings(currentPage, activeTab);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authChecked, currentPage, activeTab]);
-
-  useEffect(() => {
-    if (!authChecked) return;
-
-    loadTabTotals();
+    void loadBookings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authChecked]);
 
@@ -510,10 +431,7 @@ export default function BookingsPage() {
       setCancelBookingId(null);
       setRefundAmount(0);
 
-      await Promise.all([
-        loadBookings(currentPage, activeTab),
-        loadTabTotals(),
-      ]);
+      await loadBookings();
     } catch (error) {
       toast({
         title: "Hủy booking thất bại",
@@ -632,74 +550,87 @@ export default function BookingsPage() {
   };
 
   const handleShowQR = async (booking: Booking) => {
-  try {
-    setSelectedBooking(booking);
-    setQrToken(null);
-    setQrExpiresAt(null);
+    try {
+      setSelectedBooking(booking);
+      setQrToken(null);
+      setQrExpiresAt(null);
 
-    const res = await getMyBookingCheckInQr(booking.id);
-    const token = String(res.data.qr_token || "").trim();
+      const res = await getMyBookingCheckInQr(booking.id);
+      const token = String(res.data.qr_token || "").trim();
 
-    if (!token) {
-      throw new Error("Booking này chưa có mã check-in.");
+      if (!token) {
+        throw new Error("Booking này chưa có mã check-in.");
+      }
+
+      setQrToken(token);
+      setQrExpiresAt(res.data.expires_at);
+      setShowQRDialog(true);
+    } catch (error) {
+      toast({
+        title: "Không lấy được mã check-in",
+        description:
+          error instanceof Error ? error.message : "Đã có lỗi xảy ra",
+        variant: "destructive",
+      });
     }
+  };
 
-    setQrToken(token);
-    setQrExpiresAt(res.data.expires_at);
-    setShowQRDialog(true);
-  } catch (error) {
-    toast({
-      title: "Không lấy được mã check-in",
-      description:
-        error instanceof Error ? error.message : "Đã có lỗi xảy ra",
-      variant: "destructive",
-    });
-  }
-};
+  const isFutureBooking = (booking: Booking) => {
+    return new Date(booking.endDateTime).getTime() > Date.now();
+  };
 
-  const filteredBookings = useMemo(() => {
-    if (activeTab === "upcoming") {
-      return bookings.filter(
+  const tabBookings = useMemo(() => {
+    const upcomingStatuses = [
+      "PENDING_CONFIRM",
+      "APPROVED",
+      "AWAITING_PAYMENT",
+      "PAID",
+    ];
+
+    const cancelledStatuses = [
+      "CANCELLED",
+      "REJECTED",
+      "PAYMENT_EXPIRED",
+      "PAY_FAILED",
+      "NO_SHOW",
+    ];
+
+    return {
+      upcoming: bookings.filter(
         (booking) =>
-          (booking.status === "PENDING_CONFIRM" ||
-            booking.status === "APPROVED" ||
-            booking.status === "AWAITING_PAYMENT" ||
-            booking.status === "PAID" ||
-            booking.status === "CHECKED_IN" ||
+          (upcomingStatuses.includes(booking.status) ||
             booking.status === "pending_reschedule") &&
-          !booking.isRecurring,
-      );
-    }
-    if (activeTab === "recurring") {
-      return bookings.filter(
-        (booking) => booking.isRecurring && booking.status !== "CANCELLED",
-      );
-    }
-    if (activeTab === "completed") {
-      return bookings.filter((booking) => booking.status === "COMPLETED");
-    }
-    if (activeTab === "cancelled") {
-      return bookings.filter((booking) => booking.status === "CANCELLED");
-    }
-    return [];
-  }, [bookings, activeTab]);
+          isFutureBooking(booking),
+      ),
+      using: bookings.filter((booking) => booking.status === "CHECKED_IN"),
+      completed: bookings.filter((booking) => booking.status === "COMPLETED"),
+      cancelled: bookings.filter(
+        (booking) =>
+          cancelledStatuses.includes(booking.status) ||
+          (upcomingStatuses.includes(booking.status) &&
+            !isFutureBooking(booking)),
+      ),
+    };
+  }, [bookings]);
 
-  const recurringCount = bookings.filter(
-    (b) => b.isRecurring && b.status !== "CANCELLED",
-  ).length;
+  const tabTotals = {
+    upcoming: tabBookings.upcoming.length,
+    using: tabBookings.using.length,
+    completed: tabBookings.completed.length,
+    cancelled: tabBookings.cancelled.length,
+  };
 
-  const totalPages =
-    activeTab === "recurring"
-      ? Math.max(1, Math.ceil(filteredBookings.length / itemsPerPage))
-      : apiPagination.totalPages || 1;
+  const filteredBookings = tabBookings[activeTab] ?? [];
 
-  const paginatedBookings =
-    activeTab === "recurring"
-      ? filteredBookings.slice(
-          (currentPage - 1) * itemsPerPage,
-          currentPage * itemsPerPage,
-        )
-      : filteredBookings;
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredBookings.length / itemsPerPage),
+  );
+
+  const paginatedBookings = filteredBookings.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage,
+  );
 
   const getStatusDisplay = (status: Booking["status"]) => {
     switch (status) {
@@ -763,6 +694,18 @@ export default function BookingsPage() {
           className:
             "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
         };
+      case "PAYMENT_EXPIRED":
+        return {
+          text: "Hết hạn thanh toán",
+          className:
+            "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+        };
+      case "NO_SHOW":
+        return {
+          text: "Không đến sân",
+          className:
+            "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+        };
       default:
         return { text: status, className: "bg-gray-100 text-gray-700" };
     }
@@ -805,17 +748,16 @@ export default function BookingsPage() {
           </button>
           <button
             onClick={() => {
-              setActiveTab("recurring");
+              setActiveTab("using");
               setCurrentPage(1);
             }}
-            className={`px-4 py-2 font-medium transition whitespace-nowrap flex items-center gap-2 ${
-              activeTab === "recurring"
+            className={`px-4 py-2 font-medium transition whitespace-nowrap ${
+              activeTab === "using"
                 ? "text-primary border-b-2 border-primary"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <Repeat className="w-4 h-4" />
-            Định kỳ ({recurringCount})
+            Đang sử dụng ({tabTotals.using})
           </button>
           <button
             onClick={() => {
@@ -841,7 +783,7 @@ export default function BookingsPage() {
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            Đã hủy ({tabTotals.cancelled})
+            Đã hủy / Không đến ({tabTotals.cancelled})
           </button>
         </div>
 
@@ -865,9 +807,13 @@ export default function BookingsPage() {
               </div>
               <h3 className="text-lg font-medium mb-2">Chưa có đơn đặt sân</h3>
               <p className="text-muted-foreground mb-4">
-                {activeTab === "recurring"
-                  ? "Bạn chưa có lịch đặt sân định kỳ nào"
-                  : "Bạn chưa có đơn đặt sân nào trong mục này"}
+                {activeTab === "upcoming"
+                  ? "Bạn chưa có đơn đặt sân sắp tới."
+                  : activeTab === "using"
+                    ? "Bạn chưa có đơn nào đang sử dụng."
+                    : activeTab === "completed"
+                      ? "Bạn chưa có đơn hoàn thành."
+                      : "Không có đơn bị hủy hoặc không đến."}
               </p>
               <Link href="/browse">
                 <Button>Tìm sân ngay</Button>
@@ -895,12 +841,6 @@ export default function BookingsPage() {
                         }}
                         className="w-full md:w-48 h-48 object-cover"
                       />
-                      {booking.isRecurring && (
-                        <Badge className="absolute top-2 left-2 bg-primary">
-                          <Repeat className="w-3 h-3 mr-1" />
-                          Định kỳ
-                        </Badge>
-                      )}
                     </div>
 
                     <div className="flex-1 p-6 flex flex-col justify-between">
@@ -948,30 +888,6 @@ export default function BookingsPage() {
                                 Đơn đã được duyệt, đang chờ thanh toán
                               </p>
                               <p>Vui lòng thanh toán để hoàn tất đặt sân.</p>
-                            </div>
-                          </div>
-                        )}
-
-                        {booking.isRecurring && booking.recurringSettings && (
-                          <div className="flex items-start gap-2 mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
-                            <Repeat className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
-                            <div className="text-sm">
-                              <p className="font-medium text-primary mb-1">
-                                Lịch định kỳ
-                              </p>
-                              <p className="text-muted-foreground">
-                                {booking.recurringSettings.frequency ===
-                                "weekly"
-                                  ? "Hàng tuần"
-                                  : booking.recurringSettings.frequency ===
-                                      "biweekly"
-                                    ? "2 tuần/lần"
-                                    : "Hàng tháng"}
-                                {" • "}
-                                {booking.recurringSettings.completedSessions}/
-                                {booking.recurringSettings.totalSessions} buổi
-                                đã hoàn thành
-                              </p>
                             </div>
                           </div>
                         )}
@@ -1047,8 +963,7 @@ export default function BookingsPage() {
 
                       <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border">
                         {(booking.status === "APPROVED" ||
-                          booking.status === "PAID" ||
-                          booking.status === "CHECKED_IN") && (
+                          booking.status === "PAID") && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -1056,9 +971,7 @@ export default function BookingsPage() {
                             className="gap-2"
                           >
                             <QrCode className="w-4 h-4" />
-                            {booking.status === "CHECKED_IN"
-                              ? "Xem QR"
-                              : "Mã Check-in"}
+                            Mã Check-in
                           </Button>
                         )}
 
@@ -1071,102 +984,84 @@ export default function BookingsPage() {
                           </Link>
                         )}
 
-                        {booking.isRecurring && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedBooking(booking);
-                              setShowRecurringDetailDialog(true);
-                            }}
-                          >
-                            <CalendarDays className="w-4 h-4 mr-2" />
-                            Xem lịch
-                          </Button>
-                        )}
-
                         {(booking.status === "APPROVED" ||
-                          booking.status === "AWAITING_PAYMENT") &&
-                          !booking.isRecurring && (
-                            <>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedBooking(booking);
-                                  setShowRescheduleDialog(true);
-                                }}
-                              >
-                                Đổi lịch
-                              </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="text-red-600 hover:text-red-700 bg-transparent"
-                                    onClick={() =>
-                                      handleCancelBooking(booking.id)
-                                    }
-                                  >
-                                    Hủy đặt sân
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>
-                                      Xác nhận hủy đặt sân?
-                                    </AlertDialogTitle>
-                                    <AlertDialogDescription asChild>
-                                      <div className="space-y-2">
-                                        <p>
-                                          Bạn có chắc chắn muốn hủy đặt sân này
-                                          không?
+                          booking.status === "AWAITING_PAYMENT") && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedBooking(booking);
+                                setShowRescheduleDialog(true);
+                              }}
+                            >
+                              Đổi lịch
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-red-600 hover:text-red-700 bg-transparent"
+                                  onClick={() =>
+                                    handleCancelBooking(booking.id)
+                                  }
+                                >
+                                  Hủy đặt sân
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>
+                                    Xác nhận hủy đặt sân?
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription asChild>
+                                    <div className="space-y-2">
+                                      <p>
+                                        Bạn có chắc chắn muốn hủy đặt sân này
+                                        không?
+                                      </p>
+                                      <div className="p-3 bg-muted rounded-lg text-sm">
+                                        <p className="font-medium mb-1">
+                                          Chính sách hoàn tiền:
                                         </p>
-                                        <div className="p-3 bg-muted rounded-lg text-sm">
-                                          <p className="font-medium mb-1">
-                                            Chính sách hoàn tiền:
+                                        <ul className="list-disc list-inside space-y-1">
+                                          <li>Hủy trước 24h: Hoàn 100%</li>
+                                          <li>Hủy trước 12h: Hoàn 50%</li>
+                                          <li>Hủy dưới 12h: Không hoàn tiền</li>
+                                        </ul>
+                                        {refundAmount > 0 ? (
+                                          <p className="mt-2 text-green-600 dark:text-green-400 font-medium">
+                                            Số tiền hoàn:{" "}
+                                            {refundAmount.toLocaleString()} VND
                                           </p>
-                                          <ul className="list-disc list-inside space-y-1">
-                                            <li>Hủy trước 24h: Hoàn 100%</li>
-                                            <li>Hủy trước 12h: Hoàn 50%</li>
-                                            <li>
-                                              Hủy dưới 12h: Không hoàn tiền
-                                            </li>
-                                          </ul>
-                                          {refundAmount > 0 ? (
-                                            <p className="mt-2 text-green-600 dark:text-green-400 font-medium">
-                                              Số tiền hoàn:{" "}
-                                              {refundAmount.toLocaleString()}{" "}
-                                              VND
-                                            </p>
-                                          ) : (
-                                            <p className="mt-2 text-red-600 dark:text-red-400 font-medium">
-                                              Bạn sẽ không được hoàn tiền
-                                            </p>
-                                          )}
-                                        </div>
+                                        ) : (
+                                          <p className="mt-2 text-red-600 dark:text-red-400 font-medium">
+                                            Bạn sẽ không được hoàn tiền
+                                          </p>
+                                        )}
                                       </div>
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>
-                                      Quay lại
-                                    </AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={confirmCancelBooking}
-                                      className="bg-red-600 hover:bg-red-700"
-                                      disabled={isCancelling}
-                                    >
-                                      {isCancelling
-                                        ? "Đang hủy..."
-                                        : "Xác nhận hủy"}
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </>
-                          )}
+                                    </div>
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>
+                                    Quay lại
+                                  </AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={confirmCancelBooking}
+                                    className="bg-red-600 hover:bg-red-700"
+                                    disabled={isCancelling}
+                                  >
+                                    {isCancelling
+                                      ? "Đang hủy..."
+                                      : "Xác nhận hủy"}
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </>
+                        )}
 
                         {booking.status === "COMPLETED" && !booking.rating && (
                           <Button
@@ -1208,13 +1103,13 @@ export default function BookingsPage() {
           )}
         </div>
 
-        {totalPages > 1 && (
+        {filteredBookings.length > itemsPerPage && (
           <Pagination
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={setCurrentPage}
-            itemsPerPage={apiPagination.limit}
-            totalItems={apiPagination.total}
+            itemsPerPage={itemsPerPage}
+            totalItems={filteredBookings.length}
           />
         )}
       </div>

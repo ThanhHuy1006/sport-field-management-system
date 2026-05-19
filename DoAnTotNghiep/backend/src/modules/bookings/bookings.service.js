@@ -97,7 +97,9 @@ function assertCheckInWindow(startDatetime) {
     throw new ForbiddenError("Đã quá thời gian cho phép check-in");
   }
 }
-
+async function syncBookingLifecycle() {
+  await bookingsRepository.syncBookingLifecycle();
+}
 function assertCanCheckInBooking(booking) {
   if (!booking) {
     throw new NotFoundError("Không tìm thấy booking");
@@ -128,9 +130,10 @@ function assertCanCheckInBooking(booking) {
       "Booking thanh toán tại sân phải được xác nhận trước khi check-in",
     );
   }
+  async function syncBookingLifecycle() {
+    await bookingsRepository.syncExpiredCheckedInBookings();
+  }
 
-  // Bản demo hiện tại tạm không siết thời gian để dễ kiểm thử.
-  // Khi triển khai production, bật lại dòng dưới:
   // assertCheckInWindow(booking.start_datetime);
 }
 
@@ -454,6 +457,7 @@ export const bookingsService = {
   },
 
   async getMyBookings(userId, query) {
+    await syncBookingLifecycle();
     const { items, total } = await bookingsRepository.findMyBookings(
       userId,
       query,
@@ -471,6 +475,7 @@ export const bookingsService = {
   },
 
   async getMyBookingDetail(userId, bookingId) {
+    await syncBookingLifecycle();
     const booking = await bookingsRepository.findMyBookingById(
       userId,
       bookingId,
@@ -577,6 +582,7 @@ export const bookingsService = {
   },
 
   async getOwnerBookings(ownerId, query) {
+    await syncBookingLifecycle();
     const { items, total } = await bookingsRepository.findOwnerBookings(
       ownerId,
       query,
@@ -594,6 +600,7 @@ export const bookingsService = {
   },
 
   async getOwnerBookingDetail(ownerId, bookingId) {
+    await syncBookingLifecycle();
     const booking = await bookingsRepository.findOwnerBookingById(
       ownerId,
       bookingId,
@@ -743,25 +750,41 @@ export const bookingsService = {
   },
 
   async completeOwnerBooking(ownerId, bookingId, payload) {
-    const booking = await bookingsRepository.findOwnerBookingById(
-      ownerId,
-      bookingId,
+  await syncBookingLifecycle();
+
+  const booking = await bookingsRepository.findOwnerBookingById(
+    ownerId,
+    bookingId,
+  );
+
+  if (!booking) {
+    throw new NotFoundError("Không tìm thấy booking");
+  }
+
+  if (booking.status === "COMPLETED") {
+    return booking;
+  }
+
+  if (booking.status !== "CHECKED_IN") {
+    throw new ForbiddenError(
+      "Chỉ booking đã CHECKED_IN mới được chuyển COMPLETED",
     );
+  }
 
-    if (!booking) {
-      throw new NotFoundError("Không tìm thấy booking");
-    }
+  const now = new Date();
+  const GRACE_MINUTES = 5;
+  const threshold = new Date(now.getTime() - GRACE_MINUTES * 60 * 1000);
 
-    if (booking.status !== "CHECKED_IN") {
-      throw new ForbiddenError(
-        "Chỉ booking đã CHECKED_IN mới được chuyển COMPLETED",
-      );
-    }
-
-    return bookingsRepository.completeOwnerBooking(
-      ownerId,
-      bookingId,
-      payload.note,
+  if (new Date(booking.end_datetime).getTime() > threshold.getTime()) {
+    throw new ForbiddenError(
+      "Booking chưa đến giờ kết thúc. Hệ thống sẽ tự động hoàn thành sau khi hết giờ đặt sân.",
     );
-  },
+  }
+
+  return bookingsRepository.completeOwnerBooking(
+    ownerId,
+    bookingId,
+    payload.note || "Completed after end time",
+  );
+}
 };

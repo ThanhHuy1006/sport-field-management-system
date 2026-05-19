@@ -81,5 +81,8 @@ app.use(errorMiddleware);
 // console.log("UPLOAD STATIC DIR:", getUploadStaticDir());
 
 // app.use("/uploads", express.static(getUploadStaticDir()));
+// console.log("SERVER TIMEZONE:", Intl.DateTimeFormat().resolvedOptions().timeZone);
+// console.log("SERVER NOW:", new Date().toString());
+// console.log("SERVER ISO:", new Date().toISOString());
 
 export default app;
