@@ -176,6 +176,7 @@ function isToday(value: string) {
   );
 }
 
+
 function extractQrToken(value: string) {
   const raw = String(value || "").trim();
 
@@ -191,7 +192,7 @@ function extractQrToken(value: string) {
       raw
     ).trim();
   } catch {
-    // Không phải URL thì kiểm tra tiếp JSON/raw text.
+    // Không phải URL thì tiếp tục kiểm tra JSON/raw text.
   }
 
   try {
@@ -205,63 +206,21 @@ function extractQrToken(value: string) {
   }
 }
 
-function decodeBase64Url(value: string) {
-  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
-
-  return atob(padded);
-}
-
-function getBookingIdFromQrToken(value: string) {
-  const token = extractQrToken(value);
-
-  if (!token) return NaN;
-
-  const bookingRefMatch = token.match(/(?:BOOKING|BK)[:\-]?(\d+)/i);
-  if (bookingRefMatch) {
-    return Number(bookingRefMatch[1]);
-  }
-
-  try {
-    const json = JSON.parse(token);
-    const id = json.booking_id || json.bookingId || json.id;
-
-    return Number(id);
-  } catch {
-    // Không phải JSON.
-  }
-
-  const parts = token.split(".");
-
-  if (parts.length >= 2) {
-    try {
-      const payload = JSON.parse(decodeBase64Url(parts[1]));
-      const id = payload.booking_id || payload.bookingId || payload.id;
-
-      return Number(id);
-    } catch {
-      return NaN;
-    }
-  }
-
-  return NaN;
-}
-
 export default function OwnerCheckinPage() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
   const [inputMethod, setInputMethod] = useState<"camera" | "manual">("camera");
   const [manualCode, setManualCode] = useState("");
-  const [pendingQrToken, setPendingQrToken] = useState("");
+  const [qrToken, setQrToken] = useState("");
   const [scanning, setScanning] = useState(false);
-  const [scanDebug, setScanDebug] = useState("");
 
   const [todayBookings, setTodayBookings] = useState<OwnerBookingDetail[]>([]);
   const [foundBooking, setFoundBooking] = useState<OwnerBookingDetail | null>(
     null
   );
   const [showResultDialog, setShowResultDialog] = useState(false);
+  const [showQrConfirmDialog, setShowQrConfirmDialog] = useState(false);
   const [checkinResult, setCheckinResult] = useState<CheckinResult>(null);
   const [checkinHistory, setCheckinHistory] = useState<CheckinHistoryItem[]>(
     []
@@ -272,6 +231,7 @@ export default function OwnerCheckinPage() {
 
   const scannerRef = useRef<any>(null);
   const hasScannedRef = useRef(false);
+  const [scanDebug, setScanDebug] = useState("");
 
   const todayStats = {
     total: todayBookings.length,
@@ -340,8 +300,6 @@ export default function OwnerCheckinPage() {
   }
 
   const handleManualSearch = async () => {
-    setPendingQrToken("");
-
     const bookingId = parseBookingId(manualCode);
     await loadBookingById(bookingId);
   };
@@ -458,81 +416,13 @@ export default function OwnerCheckinPage() {
     }
   };
 
-  const previewBookingFromQrToken = async (token: string) => {
+  const handleScanQrToken = async (token: string) => {
     const qrTokenValue = extractQrToken(token);
 
     if (!qrTokenValue) {
-      setScanDebug("Không đọc được dữ liệu từ mã QR.");
-
       toast({
-        title: "QR không hợp lệ",
-        description: "Không đọc được dữ liệu từ mã QR.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const bookingId = getBookingIdFromQrToken(qrTokenValue);
-
-    if (!bookingId || Number.isNaN(bookingId)) {
-      setScanDebug("QR không đúng định dạng booking.");
-
-      toast({
-        title: "QR không hợp lệ",
-        description:
-          "Không lấy được mã booking từ QR. Vui lòng kiểm tra lại mã QR của khách.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setPendingQrToken(qrTokenValue);
-        setScanDebug("Đã đọc QR. Đang tải thông tin booking...");
-
-      const res = await getOwnerBookingDetail(bookingId);
-
-      setFoundBooking(res.data);
-
-      if (res.data.status === "CHECKED_IN") {
-        setCheckinResult("already");
-      } else if (res.data.status === "COMPLETED") {
-        setCheckinResult("completed");
-      } else {
-        setCheckinResult(null);
-      }
-
-      setShowResultDialog(true);
-      setScanDebug("Đã đọc QR. Vui lòng kiểm tra thông tin trước khi xác nhận.");
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Không thể tải thông tin booking từ QR.";
-
-      setPendingQrToken("");
-      setFoundBooking(null);
-      setCheckinResult("error");
-      setScanDebug(message);
-
-      toast({
-        title: "Không thể hiển thị thông tin booking",
-        description: message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleConfirmQrCheckin = async () => {
-    const qrTokenValue = extractQrToken(pendingQrToken);
-
-    if (!qrTokenValue) {
-      toast({
-        title: "QR không hợp lệ",
-        description: "Vui lòng quét lại QR trước khi xác nhận check-in.",
+        title: "Mã QR trống",
+        description: "Không đọc được dữ liệu từ QR.",
         variant: "destructive",
       });
       return;
@@ -543,10 +433,13 @@ export default function OwnerCheckinPage() {
 
       const res = await scanOwnerBookingQr(qrTokenValue);
 
+      setShowQrConfirmDialog(false);
       setFoundBooking(res.data);
       setCheckinResult("success");
-      setPendingQrToken("");
-  
+      setShowResultDialog(true);
+      setQrToken("");
+      setScanDebug("");
+
       setCheckinHistory((prev) => [
         {
           bookingRef: getBookingRef(res.data),
@@ -563,20 +456,16 @@ export default function OwnerCheckinPage() {
       await loadTodayBookings();
 
       toast({
-        title: "Check-in thành công",
-        description: `${getCustomerName(res.data)} đã check-in tại ${getFieldName(
-          res.data
-        )}.`,
+        title: "Quét QR thành công",
+        description: `${getCustomerName(res.data)} đã được check-in.`,
       });
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Check-in bằng QR thất bại";
-
-      setCheckinResult("error");
-
       toast({
-        title: "Check-in thất bại",
-        description: message,
+        title: "Quét QR thất bại",
+        description:
+          error instanceof Error
+            ? error.message
+            : "QR không hợp lệ hoặc đã hết hạn",
         variant: "destructive",
       });
     } finally {
@@ -584,12 +473,31 @@ export default function OwnerCheckinPage() {
     }
   };
 
+  const handleScanQr = async () => {
+    const qrTokenValue = extractQrToken(qrToken);
+
+    if (!qrTokenValue) {
+      toast({
+        title: "Mã QR trống",
+        description: "Vui lòng quét mã QR trước khi xác nhận.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setQrToken(qrTokenValue);
+    setShowQrConfirmDialog(true);
+  };
+
+  const handleConfirmQrCheckin = async () => {
+    await handleScanQrToken(qrToken);
+  };
+
   const startCameraScanning = async () => {
     try {
       setScanning(true);
       setScanDebug("Đang khởi động camera...");
-      setPendingQrToken("");
-        hasScannedRef.current = false;
+      hasScannedRef.current = false;
 
       await new Promise<void>((resolve) => {
         setTimeout(resolve, 150);
@@ -617,6 +525,8 @@ export default function OwnerCheckinPage() {
       let failCount = 0;
 
       const onScanSuccess = async (decodedText: string) => {
+        console.log("[QR SUCCESS]", "QR code decoded successfully");
+
         if (hasScannedRef.current) return;
 
         hasScannedRef.current = true;
@@ -624,15 +534,16 @@ export default function OwnerCheckinPage() {
         const token = extractQrToken(decodedText);
 
         if (!token) {
-          setScanDebug("Đã đọc QR nhưng dữ liệu rỗng. Vui lòng quét lại.");
+          setScanDebug("Đã đọc QR nhưng dữ liệu rỗng.");
           hasScannedRef.current = false;
           return;
         }
 
-        setScanDebug("Đã đọc QR. Đang tải thông tin booking...");
+        setQrToken(token);
+        setScanDebug("Đã đọc được mã QR. Vui lòng xác nhận check-in.");
 
         await stopCameraScanning();
-        await previewBookingFromQrToken(token);
+        setShowQrConfirmDialog(true);
       };
 
       const onScanFailure = () => {
@@ -792,8 +703,8 @@ export default function OwnerCheckinPage() {
               variant={inputMethod === "manual" ? "default" : "outline"}
               onClick={() => {
                 setInputMethod("manual");
-                setPendingQrToken("");
-                            setScanDebug("");
+                setQrToken("");
+                setScanDebug("");
                 void stopCameraScanning();
               }}
               className="flex-1"
@@ -825,21 +736,21 @@ export default function OwnerCheckinPage() {
                     </p>
                   </>
                 ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground bg-muted">
-                    {pendingQrToken && foundBooking ? (
-                      <div className="text-center px-6">
-                        <CheckCircle2 className="w-16 h-16 mx-auto mb-4 text-green-600 dark:text-green-400" />
-                        <p className="font-medium text-foreground">
-                          Đã đọc QR
+                  <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground bg-muted px-6">
+                    {qrToken ? (
+                      <div className="rounded-xl border border-green-500/30 bg-green-500/10 px-5 py-5 text-center">
+                        <CheckCircle2 className="mx-auto mb-3 h-10 w-10 text-green-500" />
+                        <p className="font-medium text-green-500">
+                          Đã đọc được mã QR
                         </p>
                         <p className="mt-2 text-sm text-muted-foreground">
-                          Thông tin booking đang hiển thị trong hộp thoại xác nhận.
+                          Hệ thống chưa check-in. Vui lòng bấm xác nhận bên dưới.
                         </p>
                       </div>
                     ) : (
                       <>
                         <QrCode className="w-16 h-16 mb-4" />
-                        <p>Nhấn nút bên dưới để bật camera</p>
+                        <p className="text-center">Nhấn nút bên dưới để bật camera</p>
                       </>
                     )}
                   </div>
@@ -869,14 +780,55 @@ export default function OwnerCheckinPage() {
                 ) : (
                   <>
                     <Camera className="w-5 h-5 mr-2" />
-                    {pendingQrToken ? "Quét lại" : "Bắt đầu quét"}
+                    {qrToken ? "Quét lại" : "Bắt đầu quét"}
                   </>
                 )}
               </Button>
 
-              <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
-                Flow QR: quét mã → hiển thị thông tin booking → chủ sân xác nhận check-in.
-                Hệ thống không hiển thị QR token trên giao diện.
+              <div className="rounded-lg border bg-muted/40 p-4">
+                {qrToken ? (
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-500" />
+                      <div>
+                        <p className="font-medium text-foreground">
+                          Đã nhận mã QR
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          QR đã được đọc thành công. Hệ thống chỉ check-in sau khi chủ sân bấm xác nhận.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setQrToken("");
+                          setScanDebug("");
+                          void startCameraScanning();
+                        }}
+                        disabled={isSubmitting || scanning}
+                      >
+                        <Camera className="w-4 h-4 mr-2" />
+                        Quét lại
+                      </Button>
+
+                      <Button
+                        onClick={handleScanQr}
+                        disabled={isSubmitting}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        Xác nhận Check-in
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center">
+                    Chưa đọc được mã QR. Hãy bấm “Bắt đầu quét” và đưa mã QR vào giữa khung camera.
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -922,8 +874,7 @@ export default function OwnerCheckinPage() {
                           key={booking.id}
                           className="flex items-center justify-between p-3 bg-muted rounded-lg cursor-pointer hover:bg-muted/80 transition"
                           onClick={() => {
-                            setPendingQrToken("");
-                                                    setFoundBooking(booking);
+                            setFoundBooking(booking);
                             setCheckinResult(null);
                             setShowResultDialog(true);
                           }}
@@ -999,20 +950,66 @@ export default function OwnerCheckinPage() {
       </div>
 
       <Dialog
-        open={showResultDialog}
+        open={showQrConfirmDialog}
         onOpenChange={(open) => {
-          setShowResultDialog(open);
-          if (!open && pendingQrToken) {
-            setPendingQrToken("");
-                  }
+          setShowQrConfirmDialog(open);
+          if (!open && !isSubmitting) {
+            setScanDebug(qrToken ? "Đã đọc được mã QR. Vui lòng xác nhận check-in." : "");
+          }
         }}
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
+            <DialogTitle>Xác nhận check-in bằng QR</DialogTitle>
+            <DialogDescription>
+              Hệ thống đã đọc được mã QR. Chủ sân cần bấm xác nhận để thực hiện check-in.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="flex items-start gap-3 p-4 rounded-lg border bg-green-500/10 border-green-500/30">
+              <CheckCircle2 className="mt-0.5 w-8 h-8 shrink-0 text-green-500" />
+              <div>
+                <p className="font-medium text-foreground">
+                  Mã QR đã được đọc thành công
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Token được giữ nội bộ để gửi lên hệ thống, không hiển thị trực tiếp trên giao diện.
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-muted-foreground">
+              Lưu ý: với backend hiện tại, hệ thống chỉ lấy được thông tin booking sau khi xác nhận check-in. Nếu cần xem thông tin booking trước khi check-in, nên bổ sung API verify QR riêng.
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowQrConfirmDialog(false)}
+              disabled={isSubmitting}
+            >
+              Hủy
+            </Button>
+
+            <Button
+              onClick={handleConfirmQrCheckin}
+              disabled={isSubmitting || !qrToken.trim()}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <CheckCircle2 className="w-4 h-4 mr-2" />
+              {isSubmitting ? "Đang check-in..." : "Xác nhận Check-in"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showResultDialog} onOpenChange={setShowResultDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
             <DialogTitle>
-              {pendingQrToken && !checkinResult
-                ? "Xác nhận thông tin QR"
-                : checkinResult === "success"
+              {checkinResult === "success"
                 ? "Check-in thành công"
                 : checkinResult === "already"
                 ? "Đã check-in trước đó"
@@ -1024,9 +1021,7 @@ export default function OwnerCheckinPage() {
             </DialogTitle>
 
             <DialogDescription>
-              {pendingQrToken && !checkinResult
-                ? "Kiểm tra thông tin booking trước khi xác nhận check-in"
-                : checkinResult === "success"
+              {checkinResult === "success"
                 ? "Khách hàng đã được check-in thành công"
                 : checkinResult === "already"
                 ? "Đơn đặt sân này đã được check-in trước đó"
@@ -1040,20 +1035,6 @@ export default function OwnerCheckinPage() {
 
           {foundBooking && (
             <div className="space-y-4 py-4">
-              {pendingQrToken && !checkinResult && (
-                <div className="flex items-center gap-3 p-4 rounded-lg border bg-blue-500/10 border-blue-500/30">
-                  <QrCode className="w-8 h-8 text-blue-600 dark:text-blue-400" />
-                  <div>
-                    <p className="font-medium text-foreground">
-                      QR đã được đọc thành công
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Vui lòng kiểm tra đúng khách, đúng sân và đúng khung giờ trước khi xác nhận.
-                    </p>
-                  </div>
-                </div>
-              )}
-
               {checkinResult && (
                 <div
                   className={`flex items-center gap-3 p-4 rounded-lg border ${
@@ -1210,7 +1191,7 @@ export default function OwnerCheckinPage() {
 
             {foundBooking && canCheckIn(foundBooking) && (
               <Button
-                onClick={pendingQrToken ? handleConfirmQrCheckin : handleCheckin}
+                onClick={handleCheckin}
                 disabled={isSubmitting}
                 className="bg-green-600 hover:bg-green-700"
               >
