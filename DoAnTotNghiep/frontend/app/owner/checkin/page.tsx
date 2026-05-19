@@ -210,7 +210,7 @@ export default function OwnerCheckinPage() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
-  const [inputMethod, setInputMethod] = useState<"camera" | "manual">("manual");
+  const [inputMethod, setInputMethod] = useState<"camera" | "manual">("camera");
   const [manualCode, setManualCode] = useState("");
   const [qrToken, setQrToken] = useState("");
   const [scanning, setScanning] = useState(false);
@@ -421,7 +421,7 @@ export default function OwnerCheckinPage() {
 
     if (!qrTokenValue) {
       toast({
-        title: "QR token trống",
+        title: "Mã QR trống",
         description: "Không đọc được dữ liệu từ QR.",
         variant: "destructive",
       });
@@ -437,7 +437,8 @@ export default function OwnerCheckinPage() {
       setFoundBooking(res.data);
       setCheckinResult("success");
       setShowResultDialog(true);
-      setQrToken(qrTokenValue);
+      setQrToken("");
+      setScanDebug("");
 
       setCheckinHistory((prev) => [
         {
@@ -477,8 +478,8 @@ export default function OwnerCheckinPage() {
 
     if (!qrTokenValue) {
       toast({
-        title: "QR token trống",
-        description: "Vui lòng quét QR hoặc dán qr_token trước khi xác nhận.",
+        title: "Mã QR trống",
+        description: "Vui lòng quét mã QR trước khi xác nhận.",
         variant: "destructive",
       });
       return;
@@ -524,7 +525,7 @@ export default function OwnerCheckinPage() {
       let failCount = 0;
 
       const onScanSuccess = async (decodedText: string) => {
-        console.log("[QR SUCCESS]", decodedText);
+        console.log("[QR SUCCESS]", "QR code decoded successfully");
 
         if (hasScannedRef.current) return;
 
@@ -643,7 +644,7 @@ export default function OwnerCheckinPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
@@ -702,6 +703,7 @@ export default function OwnerCheckinPage() {
               variant={inputMethod === "manual" ? "default" : "outline"}
               onClick={() => {
                 setInputMethod("manual");
+                setQrToken("");
                 setScanDebug("");
                 void stopCameraScanning();
               }}
@@ -734,13 +736,22 @@ export default function OwnerCheckinPage() {
                     </p>
                   </>
                 ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground bg-muted">
-                    <QrCode className="w-16 h-16 mb-4" />
-                    <p>Nhấn nút bên dưới để bật camera</p>
-                    {qrToken && (
-                      <p className="mt-2 text-xs font-mono break-all max-w-xs text-center px-4">
-                        Đã đọc QR: {qrToken}
-                      </p>
+                  <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground bg-muted px-6">
+                    {qrToken ? (
+                      <div className="rounded-xl border border-green-500/30 bg-green-500/10 px-5 py-5 text-center">
+                        <CheckCircle2 className="mx-auto mb-3 h-10 w-10 text-green-500" />
+                        <p className="font-medium text-green-500">
+                          Đã đọc được mã QR
+                        </p>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          Hệ thống chưa check-in. Vui lòng bấm xác nhận bên dưới.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <QrCode className="w-16 h-16 mb-4" />
+                        <p className="text-center">Nhấn nút bên dưới để bật camera</p>
+                      </>
                     )}
                   </div>
                 )}
@@ -769,30 +780,55 @@ export default function OwnerCheckinPage() {
                 ) : (
                   <>
                     <Camera className="w-5 h-5 mr-2" />
-                    Bắt đầu quét
+                    {qrToken ? "Quét lại" : "Bắt đầu quét"}
                   </>
                 )}
               </Button>
 
-              <div>
-                <Label htmlFor="qrToken">QR token</Label>
-                <div className="flex gap-2 mt-1">
-                  <Input
-                    id="qrToken"
-                    placeholder="Dán qr_token từ mã QR của khách"
-                    value={qrToken}
-                    onChange={(event) => setQrToken(event.target.value)}
-                    className="flex-1"
-                  />
+              <div className="rounded-lg border bg-muted/40 p-4">
+                {qrToken ? (
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-500" />
+                      <div>
+                        <p className="font-medium text-foreground">
+                          Đã nhận mã QR
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          QR đã được đọc thành công. Hệ thống chỉ check-in sau khi chủ sân bấm xác nhận.
+                        </p>
+                      </div>
+                    </div>
 
-                  <Button onClick={handleScanQr} disabled={isSubmitting}>
-                    Xác nhận QR
-                  </Button>
-                </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setQrToken("");
+                          setScanDebug("");
+                          void startCameraScanning();
+                        }}
+                        disabled={isSubmitting || scanning}
+                      >
+                        <Camera className="w-4 h-4 mr-2" />
+                        Quét lại
+                      </Button>
 
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Lưu ý: quét QR chỉ đọc mã. Hệ thống chỉ check-in sau khi chủ sân bấm xác nhận.
-                </p>
+                      <Button
+                        onClick={handleScanQr}
+                        disabled={isSubmitting}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        Xác nhận Check-in
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center">
+                    Chưa đọc được mã QR. Hãy bấm “Bắt đầu quét” và đưa mã QR vào giữa khung camera.
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -913,28 +949,38 @@ export default function OwnerCheckinPage() {
         </Card>
       </div>
 
-      <Dialog open={showQrConfirmDialog} onOpenChange={setShowQrConfirmDialog}>
+      <Dialog
+        open={showQrConfirmDialog}
+        onOpenChange={(open) => {
+          setShowQrConfirmDialog(open);
+          if (!open && !isSubmitting) {
+            setScanDebug(qrToken ? "Đã đọc được mã QR. Vui lòng xác nhận check-in." : "");
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Xác nhận check-in bằng QR</DialogTitle>
             <DialogDescription>
-              Hệ thống đã đọc được QR token. Chủ sân cần bấm xác nhận để thực hiện check-in.
+              Hệ thống đã đọc được mã QR. Chủ sân cần bấm xác nhận để thực hiện check-in.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <div className="flex items-center gap-3 p-4 rounded-lg border bg-primary/10 border-primary/30">
-              <QrCode className="w-8 h-8 text-primary" />
-              <div className="min-w-0">
-                <p className="font-medium text-foreground">QR token đã đọc</p>
-                <p className="text-xs font-mono break-all text-muted-foreground">
-                  {qrToken || "Chưa có QR token"}
+            <div className="flex items-start gap-3 p-4 rounded-lg border bg-green-500/10 border-green-500/30">
+              <CheckCircle2 className="mt-0.5 w-8 h-8 shrink-0 text-green-500" />
+              <div>
+                <p className="font-medium text-foreground">
+                  Mã QR đã được đọc thành công
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Token được giữ nội bộ để gửi lên hệ thống, không hiển thị trực tiếp trên giao diện.
                 </p>
               </div>
             </div>
 
             <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-muted-foreground">
-              Vui lòng kiểm tra đúng khách và đúng khung giờ trước khi xác nhận. Sau khi xác nhận, backend sẽ cập nhật trạng thái booking sang check-in.
+              Lưu ý: với backend hiện tại, hệ thống chỉ lấy được thông tin booking sau khi xác nhận check-in. Nếu cần xem thông tin booking trước khi check-in, nên bổ sung API verify QR riêng.
             </div>
           </div>
 
