@@ -632,22 +632,30 @@ export default function BookingsPage() {
   };
 
   const handleShowQR = async (booking: Booking) => {
-    try {
-      setSelectedBooking(booking);
+  try {
+    setSelectedBooking(booking);
+    setQrToken(null);
+    setQrExpiresAt(null);
 
-      const res = await getMyBookingCheckInQr(booking.id);
-      setQrToken(res.data.qr_token);
-      setQrExpiresAt(res.data.expires_at);
-      setShowQRDialog(true);
-    } catch (error) {
-      toast({
-        title: "Không lấy được mã check-in",
-        description:
-          error instanceof Error ? error.message : "Đã có lỗi xảy ra",
-        variant: "destructive",
-      });
+    const res = await getMyBookingCheckInQr(booking.id);
+    const token = String(res.data.qr_token || "").trim();
+
+    if (!token) {
+      throw new Error("Booking này chưa có mã check-in.");
     }
-  };
+
+    setQrToken(token);
+    setQrExpiresAt(res.data.expires_at);
+    setShowQRDialog(true);
+  } catch (error) {
+    toast({
+      title: "Không lấy được mã check-in",
+      description:
+        error instanceof Error ? error.message : "Đã có lỗi xảy ra",
+      variant: "destructive",
+    });
+  }
+};
 
   const filteredBookings = useMemo(() => {
     if (activeTab === "upcoming") {
@@ -1234,12 +1242,20 @@ export default function BookingsPage() {
           </DialogHeader>
           {selectedBooking && (
             <div className="flex flex-col items-center gap-6 py-4">
-              <div className="p-4 bg-white rounded-xl shadow-lg">
-                <QRCode
-                  value={qrToken || `BOOKING:${selectedBooking.bookingRef}`}
-                  size={200}
-                />
+              <div className="p-5 bg-white rounded-2xl shadow-lg">
+                {qrToken ? (
+                  <QRCode value={qrToken} size={300} />
+                ) : (
+                  <div className="w-[300px] h-[300px] flex items-center justify-center text-sm text-red-600 text-center">
+                    Không có mã QR check-in
+                  </div>
+                )}
               </div>
+              {qrToken && (
+                <p className="max-w-[320px] text-xs font-mono break-all text-center text-muted-foreground">
+                  {qrToken}
+                </p>
+              )}
 
               <div className="w-full space-y-3 text-sm">
                 <div className="flex justify-between items-center py-2 border-b">

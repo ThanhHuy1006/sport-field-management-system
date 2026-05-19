@@ -200,6 +200,7 @@ export default function OwnerCheckinPage() {
 
   const scannerRef = useRef<any>(null);
   const hasScannedRef = useRef(false);
+  const [scanDebug, setScanDebug] = useState("");
 
   const todayStats = {
     total: todayBookings.length,
@@ -441,67 +442,88 @@ export default function OwnerCheckinPage() {
     await handleScanQrToken(qrToken);
   };
 
-  const startCameraScanning = async () => {
-    try {
-      setScanning(true);
-      hasScannedRef.current = false;
+ const startCameraScanning = async () => {
+  try {
+    setScanning(true);
+    setScanDebug("Đang khởi động camera...");
+    hasScannedRef.current = false;
 
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() => resolve());
-      });
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 150);
+    });
 
-      if (scannerRef.current) {
-        await scannerRef.current.stop().catch(() => {});
-        await scannerRef.current.clear().catch(() => {});
-        scannerRef.current = null;
-      }
+    const readerElement = document.getElementById(QR_READER_ID);
 
-      const { Html5Qrcode } = await import("html5-qrcode");
-
-      const scanner = new Html5Qrcode(QR_READER_ID);
-      scannerRef.current = scanner;
-
-      await scanner.start(
-        { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: {
-            width: 250,
-            height: 250,
-          },
-        },
-        async (decodedText: string) => {
-          if (hasScannedRef.current) return;
-
-          hasScannedRef.current = true;
-          setQrToken(decodedText);
-
-          await stopCameraScanning();
-          await handleScanQrToken(decodedText);
-        },
-        () => {
-          // Bỏ qua lỗi từng frame khi camera chưa thấy QR.
-        }
-      );
-    } catch (error) {
-      setScanning(false);
-
-      if (scannerRef.current) {
-        await scannerRef.current.stop().catch(() => {});
-        await scannerRef.current.clear().catch(() => {});
-        scannerRef.current = null;
-      }
-
-      toast({
-        title: "Không thể mở camera",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Vui lòng kiểm tra quyền camera của trình duyệt.",
-        variant: "destructive",
-      });
+    if (!readerElement) {
+      throw new Error(`Không tìm thấy vùng quét #${QR_READER_ID}`);
     }
-  };
+
+    if (scannerRef.current) {
+      await scannerRef.current.stop().catch(() => {});
+      await scannerRef.current.clear().catch(() => {});
+      scannerRef.current = null;
+    }
+
+    const { Html5Qrcode } = await import("html5-qrcode");
+
+    const scanner = new Html5Qrcode(QR_READER_ID);
+    scannerRef.current = scanner;
+
+    await scanner.start(
+      { facingMode: "environment" },
+      {
+        fps: 15,
+        qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+          const qrboxSize = Math.floor(minEdge * 0.8);
+
+          return {
+            width: qrboxSize,
+            height: qrboxSize,
+          };
+        },
+        aspectRatio: 1.0,
+      },
+      async (decodedText: string) => {
+        console.log("[QR SUCCESS]", decodedText);
+        setScanDebug(`Đã đọc QR: ${decodedText}`);
+
+        if (hasScannedRef.current) return;
+
+        hasScannedRef.current = true;
+
+        const token = decodedText.trim();
+
+        setQrToken(token);
+
+        await stopCameraScanning();
+        await handleScanQrToken(token);
+      },
+      (errorMessage: string) => {
+        setScanDebug("Đang tìm mã QR...");
+        console.log("[QR SCANNING]", errorMessage);
+      }
+    );
+  } catch (error) {
+    setScanning(false);
+    setScanDebug("");
+
+    if (scannerRef.current) {
+      await scannerRef.current.stop().catch(() => {});
+      await scannerRef.current.clear().catch(() => {});
+      scannerRef.current = null;
+    }
+
+    toast({
+      title: "Không thể mở camera",
+      description:
+        error instanceof Error
+          ? error.message
+          : "Vui lòng kiểm tra quyền camera của trình duyệt.",
+      variant: "destructive",
+    });
+  }
+};
 
   useEffect(() => {
     void loadTodayBookings();
@@ -604,7 +626,7 @@ export default function OwnerCheckinPage() {
                     <div id={QR_READER_ID} className="w-full h-full" />
 
                     <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                      <div className="w-48 h-48 border-2 border-primary rounded-lg relative">
+                      <div className="w-[75%] h-[75%] max-w-[320px] max-h-[320px] border-2 border-primary rounded-lg relative">
                         <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-primary" />
                         <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-primary" />
                         <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-primary" />
@@ -634,6 +656,12 @@ export default function OwnerCheckinPage() {
                     : startCameraScanning
                 }
               >
+                 {scanDebug && (
+      <p className="text-sm text-yellow-400 text-center">
+        {scanDebug}
+      </p>
+    )}
+
                 {scanning ? (
                   <>
                     <XCircle className="w-5 h-5 mr-2" />
