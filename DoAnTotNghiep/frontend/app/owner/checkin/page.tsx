@@ -176,6 +176,35 @@ function isToday(value: string) {
   );
 }
 
+function extractQrToken(value: string) {
+  const raw = String(value || "").trim();
+
+  if (!raw) return "";
+
+  try {
+    const url = new URL(raw);
+
+    return (
+      url.searchParams.get("qr_token") ||
+      url.searchParams.get("token") ||
+      url.searchParams.get("checkin_token") ||
+      raw
+    );
+  } catch {
+    // Không phải URL thì kiểm tra tiếp JSON/raw text.
+  }
+
+  try {
+    const json = JSON.parse(raw);
+
+    return String(
+      json.qr_token || json.token || json.checkin_token || raw
+    ).trim();
+  } catch {
+    return raw;
+  }
+}
+
 export default function OwnerCheckinPage() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -371,7 +400,7 @@ export default function OwnerCheckinPage() {
     }
   };
 
-  const stopCameraScanning = async () => {
+  const stopCameraScanning = async (updateState = true) => {
     try {
       if (scannerRef.current) {
         await scannerRef.current.stop().catch(() => {});
@@ -379,12 +408,14 @@ export default function OwnerCheckinPage() {
         scannerRef.current = null;
       }
     } finally {
-      setScanning(false);
+      if (updateState) {
+        setScanning(false);
+      }
     }
   };
 
   const handleScanQrToken = async (token: string) => {
-    const qrTokenValue = token.trim();
+    const qrTokenValue = extractQrToken(token);
 
     if (!qrTokenValue) {
       toast({
@@ -425,6 +456,8 @@ export default function OwnerCheckinPage() {
         description: `${getCustomerName(res.data)} đã được check-in.`,
       });
     } catch (error) {
+      setCheckinResult("error");
+
       toast({
         title: "Quét QR thất bại",
         description:
@@ -442,40 +475,42 @@ export default function OwnerCheckinPage() {
     await handleScanQrToken(qrToken);
   };
 
- const startCameraScanning = async () => {
-  try {
-    setScanning(true);
-    setScanDebug("Đang khởi động camera...");
-    hasScannedRef.current = false;
+  const startCameraScanning = async () => {
+    try {
+      setScanning(true);
+      setScanDebug("Đang khởi động camera...");
+      hasScannedRef.current = false;
 
-    await new Promise<void>((resolve) => {
-      setTimeout(resolve, 150);
-    });
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 200);
+      });
 
-    const readerElement = document.getElementById(QR_READER_ID);
+      const readerElement = document.getElementById(QR_READER_ID);
 
-    if (!readerElement) {
-      throw new Error(`Không tìm thấy vùng quét #${QR_READER_ID}`);
-    }
+      if (!readerElement) {
+        throw new Error(`Không tìm thấy vùng quét #${QR_READER_ID}`);
+      }
 
-    if (scannerRef.current) {
-      await scannerRef.current.stop().catch(() => {});
-      await scannerRef.current.clear().catch(() => {});
-      scannerRef.current = null;
-    }
+      await stopCameraScanning(false);
 
-    const { Html5Qrcode } = await import("html5-qrcode");
+      const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import(
+        "html5-qrcode"
+      );
 
-    const scanner = new Html5Qrcode(QR_READER_ID);
-    scannerRef.current = scanner;
+      const scanner = new Html5Qrcode(QR_READER_ID, {
+        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+        verbose: false,
+      });
 
-    await scanner.start(
-      { facingMode: "environment" },
-      {
-        fps: 15,
+      scannerRef.current = scanner;
+
+      let failCount = 0;
+
+      const scanConfig = {
+        fps: 20,
         qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
           const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-          const qrboxSize = Math.floor(minEdge * 0.8);
+          const qrboxSize = Math.floor(minEdge * 0.9);
 
           return {
             width: qrboxSize,
@@ -483,47 +518,79 @@ export default function OwnerCheckinPage() {
           };
         },
         aspectRatio: 1.0,
-      },
-      async (decodedText: string) => {
+        disableFlip: true,
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true,
+        },
+      };
+
+      const onScanSuccess = async (decodedText: string) => {
         console.log("[QR SUCCESS]", decodedText);
-        setScanDebug(`Đã đọc QR: ${decodedText}`);
 
         if (hasScannedRef.current) return;
 
         hasScannedRef.current = true;
 
-        const token = decodedText.trim();
+        const token = extractQrToken(decodedText);
 
+        setScanDebug("Đã đọc được mã QR");
         setQrToken(token);
 
         await stopCameraScanning();
         await handleScanQrToken(token);
-      },
-      (errorMessage: string) => {
-        setScanDebug("Đang tìm mã QR...");
-        console.log("[QR SCANNING]", errorMessage);
+      };
+
+      const onScanFailure = () => {
+        failCount += 1;
+
+        if (failCount % 20 === 0) {
+          setScanDebug("Đang tìm mã QR... Hãy đưa QR vào giữa khung.");
+        }
+      };
+
+      try {
+        await scanner.start(
+          { facingMode: "environment" },
+          scanConfig as any,
+          onScanSuccess,
+          onScanFailure
+        );
+      } catch {
+        const cameras = await Html5Qrcode.getCameras();
+
+        if (!cameras.length) {
+          throw new Error("Không tìm thấy camera trên thiết bị.");
+        }
+
+        await scanner.start(
+          cameras[0].id,
+          scanConfig as any,
+          onScanSuccess,
+          onScanFailure
+        );
       }
-    );
-  } catch (error) {
-    setScanning(false);
-    setScanDebug("");
 
-    if (scannerRef.current) {
-      await scannerRef.current.stop().catch(() => {});
-      await scannerRef.current.clear().catch(() => {});
-      scannerRef.current = null;
+      setScanDebug("Camera đã bật. Hãy đưa QR vào giữa khung.");
+    } catch (error) {
+      setScanning(false);
+      setScanDebug("");
+
+      if (scannerRef.current) {
+        await scannerRef.current.stop().catch(() => {});
+        await scannerRef.current.clear().catch(() => {});
+        scannerRef.current = null;
+      }
+
+      toast({
+        title: "Không thể mở camera",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Vui lòng kiểm tra quyền camera của trình duyệt.",
+        variant: "destructive",
+      });
     }
-
-    toast({
-      title: "Không thể mở camera",
-      description:
-        error instanceof Error
-          ? error.message
-          : "Vui lòng kiểm tra quyền camera của trình duyệt.",
-      variant: "destructive",
-    });
-  }
-};
+  };
 
   useEffect(() => {
     void loadTodayBookings();
@@ -536,7 +603,7 @@ export default function OwnerCheckinPage() {
     }
 
     return () => {
-      void stopCameraScanning();
+      void stopCameraScanning(false);
     };
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -609,6 +676,7 @@ export default function OwnerCheckinPage() {
               variant={inputMethod === "manual" ? "default" : "outline"}
               onClick={() => {
                 setInputMethod("manual");
+                setScanDebug("");
                 void stopCameraScanning();
               }}
               className="flex-1"
@@ -620,27 +688,27 @@ export default function OwnerCheckinPage() {
 
           {inputMethod === "camera" && (
             <div className="space-y-4">
-              <div className="relative aspect-square bg-muted rounded-lg overflow-hidden">
+              <div className="relative h-[420px] bg-black rounded-lg overflow-hidden">
                 {scanning ? (
                   <>
                     <div id={QR_READER_ID} className="w-full h-full" />
 
                     <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                      <div className="w-[75%] h-[75%] max-w-[320px] max-h-[320px] border-2 border-primary rounded-lg relative">
-                        <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-primary" />
-                        <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-primary" />
-                        <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-primary" />
-                        <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-primary" />
+                      <div className="w-[90%] h-[90%] max-w-[360px] max-h-[360px] border-2 border-primary rounded-lg relative">
+                        <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-white" />
+                        <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-white" />
+                        <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-white" />
+                        <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-white" />
                         <div className="absolute inset-x-0 top-0 h-0.5 bg-primary animate-pulse" />
                       </div>
                     </div>
 
-                    <p className="absolute bottom-4 left-0 right-0 text-center text-white text-sm pointer-events-none">
-                      Đang quét... Hướng camera vào mã QR của khách.
+                    <p className="absolute bottom-4 left-4 right-4 text-center text-white text-sm pointer-events-none bg-black/60 rounded-lg px-3 py-2">
+                      {scanDebug || "Đang quét... Hướng camera vào mã QR của khách."}
                     </p>
                   </>
                 ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
+                  <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground bg-muted">
                     <QrCode className="w-16 h-16 mb-4" />
                     <p>Nhấn nút bên dưới để bật camera</p>
                   </div>
@@ -656,12 +724,6 @@ export default function OwnerCheckinPage() {
                     : startCameraScanning
                 }
               >
-                 {scanDebug && (
-      <p className="text-sm text-yellow-400 text-center">
-        {scanDebug}
-      </p>
-    )}
-
                 {scanning ? (
                   <>
                     <XCircle className="w-5 h-5 mr-2" />
