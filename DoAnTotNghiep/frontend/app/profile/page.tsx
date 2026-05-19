@@ -584,23 +584,23 @@ const updateResult = await updateMe({ avatar_url: avatarUrl })
             </Card>
 
             {/* Payment Methods */}
-            <Card className="p-8">
+            {/* <Card className="p-8">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold">
                   Phương Thức Thanh Toán
                 </h2>
                 <Button>Thêm Phương Thức</Button>
-              </div>
+              </div> */}
 
-              <div className="space-y-4">
+              {/* <div className="space-y-4">
                 <div className="flex items-center justify-between p-4 border border-border rounded-lg">
                   <div>
                     <p className="font-medium text-foreground">Thẻ Visa</p>
                     <p className="text-sm text-muted-foreground">
                       **** **** **** 4242
                     </p>
-                  </div>
-                  <div className="flex gap-2">
+                  </div> */}
+                  {/* <div className="flex gap-2">
                     <Button variant="outline" size="sm">
                       Sửa
                     </Button>
@@ -612,9 +612,9 @@ const updateResult = await updateMe({ avatar_url: avatarUrl })
                       Xóa
                     </Button>
                   </div>
-                </div>
+                </div> */}
 
-                <div className="flex items-center justify-between p-4 border border-border rounded-lg">
+                {/* <div className="flex items-center justify-between p-4 border border-border rounded-lg">
                   <div>
                     <p className="font-medium text-foreground">
                       Chuyển Khoản Ngân Hàng
@@ -622,8 +622,8 @@ const updateResult = await updateMe({ avatar_url: avatarUrl })
                     <p className="text-sm text-muted-foreground">
                       Vietcombank - Tài khoản kết thúc 5678
                     </p>
-                  </div>
-                  <div className="flex gap-2">
+                  </div> */}
+                  {/* <div className="flex gap-2">
                     <Button variant="outline" size="sm">
                       Sửa
                     </Button>
@@ -634,10 +634,10 @@ const updateResult = await updateMe({ avatar_url: avatarUrl })
                     >
                       Xóa
                     </Button>
-                  </div>
-                </div>
+                  </div> */}
+                {/* </div>
               </div>
-            </Card>
+            </Card> */}
           </div>
         </div>
       </div>

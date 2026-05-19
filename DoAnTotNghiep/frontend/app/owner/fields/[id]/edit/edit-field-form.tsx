@@ -221,7 +221,7 @@ function getSafeFieldData(existingData?: FieldData): FieldData {
 function getStatusLabel(status: string) {
   if (status === "active") return "Đang hiển thị";
   if (status === "pending") return "Chờ duyệt";
-  if (status === "inactive") return "Đã ẩn";
+  if (status === "hidden") return "Đã ẩn";
   if (status === "maintenance") return "Bảo trì";
   return status || "Chưa xác định";
 }
@@ -239,7 +239,7 @@ function getStatusBadgeClass(status: string) {
     return "border-blue-500 text-blue-600 bg-blue-50 dark:bg-blue-950/20 dark:text-blue-400";
   }
 
-  if (status === "inactive") {
+  if (status === "hidden") {
     return "border-muted-foreground text-muted-foreground";
   }
 
@@ -814,11 +814,11 @@ export default function EditFieldForm({
     try {
       setIsHiding(true);
 
-      await updateOwnerFieldStatus(fieldId, "inactive");
+      await updateOwnerFieldStatus(fieldId, "hidden");
 
       setFormData((prev) => ({
         ...prev,
-        status: "inactive",
+        status: "hidden",
       }));
 
       toast({
