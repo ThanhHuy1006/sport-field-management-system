@@ -1,159 +1,382 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
+import { apiGet } from "@/lib/api-client"
 import {
+  AlertTriangle,
   ArrowLeft,
-  TrendingUp,
-  DollarSign,
-  Users,
-  MapPin,
-  Calendar,
-  Star,
-  ArrowUpRight,
-  FileText,
   BarChart3,
-  PieChart,
-  Activity,
+  Building2,
+  Calendar,
+  ClipboardCheck,
+  Download,
+  DollarSign,
+  FileWarning,
+  MapPin,
+  Printer,
+  Star,
+  TrendingUp,
+  Users,
 } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 import {
-  LineChart,
-  Line,
-  BarChart,
+  Area,
+  AreaChart,
   Bar,
-  PieChart as RechartsPieChart,
-  Pie,
-  Cell,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  AreaChart,
-  Area,
 } from "recharts"
 
-// Mock data for charts
-const revenueData = [
-  { month: "T1", revenue: 45000000, bookings: 120 },
-  { month: "T2", revenue: 52000000, bookings: 145 },
-  { month: "T3", revenue: 48000000, bookings: 132 },
-  { month: "T4", revenue: 61000000, bookings: 168 },
-  { month: "T5", revenue: 55000000, bookings: 155 },
-  { month: "T6", revenue: 67000000, bookings: 189 },
-  { month: "T7", revenue: 72000000, bookings: 205 },
-  { month: "T8", revenue: 69000000, bookings: 198 },
-  { month: "T9", revenue: 78000000, bookings: 220 },
-  { month: "T10", revenue: 82000000, bookings: 235 },
-  { month: "T11", revenue: 88000000, bookings: 248 },
-  { month: "T12", revenue: 95000000, bookings: 268 },
-]
+type AdminReportRange = "7days" | "30days" | "3months" | "year"
 
-const userGrowthData = [
-  { month: "T1", newUsers: 45, totalUsers: 450 },
-  { month: "T2", newUsers: 62, totalUsers: 512 },
-  { month: "T3", newUsers: 58, totalUsers: 570 },
-  { month: "T4", newUsers: 71, totalUsers: 641 },
-  { month: "T5", newUsers: 68, totalUsers: 709 },
-  { month: "T6", newUsers: 85, totalUsers: 794 },
-  { month: "T7", newUsers: 92, totalUsers: 886 },
-  { month: "T8", newUsers: 78, totalUsers: 964 },
-  { month: "T9", newUsers: 95, totalUsers: 1059 },
-  { month: "T10", newUsers: 88, totalUsers: 1147 },
-  { month: "T11", newUsers: 102, totalUsers: 1249 },
-  { month: "T12", newUsers: 115, totalUsers: 1364 },
-]
+type RevenuePoint = {
+  label: string
+  booking_value?: number
+  bookingValue?: number
+  revenue?: number
+  bookings: number
+}
 
-const bookingsByFieldType = [
-  { name: "Bóng đá", value: 45, color: "#16a34a" },
-  { name: "Bóng rổ", value: 20, color: "#ea580c" },
-  { name: "Tennis", value: 15, color: "#2563eb" },
-  { name: "Cầu lông", value: 12, color: "#9333ea" },
-  { name: "Khác", value: 8, color: "#6b7280" },
-]
+type UserGrowthPoint = {
+  label: string
+  new_users?: number
+  newUsers?: number
+  total_users?: number
+  totalUsers?: number
+}
 
-const bookingsByTime = [
-  { time: "6-8h", bookings: 45 },
-  { time: "8-10h", bookings: 78 },
-  { time: "10-12h", bookings: 65 },
-  { time: "12-14h", bookings: 42 },
-  { time: "14-16h", bookings: 58 },
-  { time: "16-18h", bookings: 125 },
-  { time: "18-20h", bookings: 168 },
-  { time: "20-22h", bookings: 142 },
-]
+type TopField = {
+  field_id?: number
+  field_name?: string
+  name?: string
+  owner_name?: string
+  owner?: string
+  bookings: number
+  booking_value?: number
+  bookingValue?: number
+  revenue?: number
+  avg_rating?: number
+  rating?: number
+}
 
-const topFields = [
-  { name: "Sân Bóng Đá Thảo Điền", owner: "Nguyễn Văn A", bookings: 156, revenue: 78000000, rating: 4.8 },
-  { name: "Sân Tennis Phú Nhuận", owner: "Trần Thị B", bookings: 142, revenue: 71000000, rating: 4.7 },
-  { name: "Sân Bóng Rổ Quận 7", owner: "Lê Văn C", bookings: 128, revenue: 51200000, rating: 4.6 },
-  { name: "Sân Cầu Lông Bình Thạnh", owner: "Phạm Thị D", bookings: 115, revenue: 46000000, rating: 4.5 },
-  { name: "Sân Bóng Đá Mini Quận 1", owner: "Hoàng Văn E", bookings: 108, revenue: 54000000, rating: 4.4 },
-]
+type TopOwner = {
+  owner_id?: number
+  owner_name?: string
+  name?: string
+  fields: number
+  bookings: number
+  booking_value?: number
+  bookingValue?: number
+  revenue?: number
+}
 
-const topOwners = [
-  { name: "Nguyễn Văn A", fields: 5, bookings: 320, revenue: 160000000 },
-  { name: "Trần Thị B", fields: 3, bookings: 245, revenue: 122500000 },
-  { name: "Lê Văn C", fields: 4, bookings: 198, revenue: 99000000 },
-  { name: "Phạm Thị D", fields: 2, bookings: 156, revenue: 78000000 },
-  { name: "Hoàng Văn E", fields: 3, bookings: 142, revenue: 71000000 },
-]
+type BookingStatusItem = {
+  label: string
+  count: number
+  description?: string
+}
 
-const weeklyBookings = [
-  { day: "T2", bookings: 45, completed: 42, cancelled: 3 },
-  { day: "T3", bookings: 52, completed: 48, cancelled: 4 },
-  { day: "T4", bookings: 48, completed: 45, cancelled: 3 },
-  { day: "T5", bookings: 55, completed: 52, cancelled: 3 },
-  { day: "T6", bookings: 68, completed: 64, cancelled: 4 },
-  { day: "T7", bookings: 95, completed: 89, cancelled: 6 },
-  { day: "CN", bookings: 88, completed: 82, cancelled: 6 },
-]
+type FieldStatusItem = {
+  label: string
+  count: number
+}
 
-const formatCurrency = (value: number) => {
-  if (value >= 1000000000) return `${(value / 1000000000).toFixed(1)}B`
-  if (value >= 1000000) return `${(value / 1000000).toFixed(0)}M`
-  if (value >= 1000) return `${(value / 1000).toFixed(0)}K`
+type AdminReportsData = {
+  summary: {
+    total_booking_value?: number
+    totalBookingValue?: number
+    total_revenue?: number
+    totalRevenue?: number
+    total_bookings?: number
+    totalBookings?: number
+    total_users?: number
+    totalUsers?: number
+    total_owners?: number
+    totalOwners?: number
+    total_fields?: number
+    totalFields?: number
+    pending_fields?: number
+    pendingFields?: number
+    pending_reports?: number
+    pendingReports?: number
+    avg_rating?: number
+    avgRating?: number
+  }
+  revenue_series: RevenuePoint[]
+  user_growth: UserGrowthPoint[]
+  top_fields: TopField[]
+  top_owners: TopOwner[]
+  booking_status: BookingStatusItem[]
+  field_status: FieldStatusItem[]
+}
+
+type AdminReportsResponse = {
+  success: boolean
+  message: string
+  data: AdminReportsData
+}
+
+function createEmptyReports(): AdminReportsData {
+  return {
+    summary: {
+      total_booking_value: 0,
+      total_bookings: 0,
+      total_users: 0,
+      total_owners: 0,
+      total_fields: 0,
+      pending_fields: 0,
+      pending_reports: 0,
+      avg_rating: 0,
+    },
+    revenue_series: [],
+    user_growth: [],
+    top_fields: [],
+    top_owners: [],
+    booking_status: [],
+    field_status: [],
+  }
+}
+
+async function getAdminReports(range: AdminReportRange) {
+  const params = new URLSearchParams({ range })
+
+  const result = await apiGet<AdminReportsResponse>(`/admin/reports?${params.toString()}`)
+
+  if (!result?.data) {
+    throw new Error("API không trả về dữ liệu thống kê admin")
+  }
+
+  return result.data
+}
+
+function toNumber(value: unknown) {
+  const numberValue = Number(value ?? 0)
+  return Number.isFinite(numberValue) ? numberValue : 0
+}
+
+function formatCompactCurrency(value: number) {
+  if (!Number.isFinite(value)) return "0"
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B`
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(0)}M`
+  if (value >= 1_000) return `${(value / 1_000).toFixed(0)}K`
   return value.toString()
 }
 
-export default function AdminReportsPage() {
-  const [dateRange, setDateRange] = useState("year")
-  const [activeTab, setActiveTab] = useState("overview")
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("vi-VN").format(value)
+}
 
-  // Calculate totals
-  const totalRevenue = revenueData.reduce((sum, item) => sum + item.revenue, 0)
-  const totalBookings = revenueData.reduce((sum, item) => sum + item.bookings, 0)
-  const totalUsers = userGrowthData[userGrowthData.length - 1].totalUsers
-  const avgRating = 4.6
+function getRangeLabel(range: AdminReportRange) {
+  switch (range) {
+    case "7days":
+      return "7 ngày qua"
+    case "30days":
+      return "30 ngày qua"
+    case "3months":
+      return "3 tháng qua"
+    case "year":
+      return "Năm nay"
+    default:
+      return "Năm nay"
+  }
+}
+
+function KpiCard({
+  title,
+  value,
+  description,
+  icon: Icon,
+}: {
+  title: string
+  value: string
+  description: string
+  icon: LucideIcon
+}) {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+          <Icon className="h-5 w-5 text-primary" />
+        </div>
+        <p className="text-2xl font-bold">{value}</p>
+        <p className="text-sm font-medium">{title}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+      </CardContent>
+    </Card>
+  )
+}
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="flex h-[260px] items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
+      {message}
+    </div>
+  )
+}
+
+export default function AdminReportsPage() {
+  const [dateRange, setDateRange] = useState<AdminReportRange>("year")
+  const [reports, setReports] = useState<AdminReportsData>(() => createEmptyReports())
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function fetchReports() {
+      try {
+        setIsLoading(true)
+        setError("")
+
+        const data = await getAdminReports(dateRange)
+
+        if (cancelled) return
+        setReports(data)
+      } catch (err) {
+        if (cancelled) return
+
+        setReports(createEmptyReports())
+        setError(err instanceof Error ? err.message : "Không thể tải dữ liệu thống kê admin")
+      } finally {
+        if (!cancelled) setIsLoading(false)
+      }
+    }
+
+    fetchReports()
+
+    return () => {
+      cancelled = true
+    }
+  }, [dateRange])
+
+  const summary = reports.summary
+
+  const totalBookingValue = toNumber(
+    summary.total_booking_value ?? summary.totalBookingValue ?? summary.total_revenue ?? summary.totalRevenue,
+  )
+  const totalBookings = toNumber(summary.total_bookings ?? summary.totalBookings)
+  const totalUsers = toNumber(summary.total_users ?? summary.totalUsers)
+  const totalOwners = toNumber(summary.total_owners ?? summary.totalOwners)
+  const totalFields = toNumber(summary.total_fields ?? summary.totalFields)
+  const pendingFields = toNumber(summary.pending_fields ?? summary.pendingFields)
+  const pendingReports = toNumber(summary.pending_reports ?? summary.pendingReports)
+  const avgRating = toNumber(summary.avg_rating ?? summary.avgRating)
+
+  const revenueData = useMemo(
+    () =>
+      reports.revenue_series.map((item) => ({
+        label: item.label,
+        bookingValue: toNumber(item.booking_value ?? item.bookingValue ?? item.revenue),
+        bookings: toNumber(item.bookings),
+      })),
+    [reports.revenue_series],
+  )
+
+  const userGrowthData = useMemo(
+    () =>
+      reports.user_growth.map((item) => ({
+        label: item.label,
+        newUsers: toNumber(item.new_users ?? item.newUsers),
+        totalUsers: toNumber(item.total_users ?? item.totalUsers),
+      })),
+    [reports.user_growth],
+  )
+
+  const topFields = useMemo(
+    () =>
+      reports.top_fields.map((field) => ({
+        id: field.field_id ?? field.field_name ?? field.name,
+        name: field.field_name ?? field.name ?? "Không rõ tên sân",
+        owner: field.owner_name ?? field.owner ?? "Không rõ chủ sân",
+        bookings: toNumber(field.bookings),
+        bookingValue: toNumber(field.booking_value ?? field.bookingValue ?? field.revenue),
+        rating: toNumber(field.avg_rating ?? field.rating),
+      })),
+    [reports.top_fields],
+  )
+
+  const topOwners = useMemo(
+    () =>
+      reports.top_owners.map((owner) => ({
+        id: owner.owner_id ?? owner.owner_name ?? owner.name,
+        name: owner.owner_name ?? owner.name ?? "Không rõ chủ sân",
+        fields: toNumber(owner.fields),
+        bookings: toNumber(owner.bookings),
+        bookingValue: toNumber(owner.booking_value ?? owner.bookingValue ?? owner.revenue),
+      })),
+    [reports.top_owners],
+  )
+
+  const handlePrint = () => {
+    window.print()
+  }
+
+  const handleExportCsv = () => {
+    const rows = [
+      ["Báo cáo", "Thống kê hệ thống"],
+      ["Khoảng thời gian", getRangeLabel(dateRange)],
+      [],
+      ["Chỉ số", "Giá trị"],
+      ["Tổng giá trị đặt sân", totalBookingValue],
+      ["Tổng lượt đặt", totalBookings],
+      ["Tổng người dùng", totalUsers],
+      ["Tổng chủ sân", totalOwners],
+      ["Tổng sân", totalFields],
+      ["Sân chờ duyệt", pendingFields],
+      ["Báo cáo chờ xử lý", pendingReports],
+      ["Đánh giá trung bình", avgRating],
+      [],
+      ["Mốc thời gian", "Giá trị đặt sân", "Lượt đặt"],
+      ...revenueData.map((item) => [item.label, item.bookingValue, item.bookings]),
+      [],
+      ["Top sân", "Chủ sân", "Lượt đặt", "Giá trị đặt sân", "Đánh giá"],
+      ...topFields.map((field) => [field.name, field.owner, field.bookings, field.bookingValue, field.rating]),
+    ]
+
+    const csv = rows.map((row) => row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(",")).join("\n")
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+
+    link.href = url
+    link.download = `admin-reports-${dateRange}.csv`
+    link.click()
+
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <main className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-background border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/admin/dashboard" className="flex items-center gap-2 text-primary hover:text-primary/80">
-            <ArrowLeft className="w-5 h-5" />
-            <span className="hidden sm:inline">Quay lại</span>
+      <header className="sticky top-0 z-50 border-b border-border bg-background">
+        <div className="mx-auto max-w-7xl px-4 py-4">
+          <Link href="/admin/dashboard" className="inline-flex items-center gap-2 text-primary hover:text-primary/80">
+            <ArrowLeft className="h-5 w-5" />
+            <span>Quay lại</span>
           </Link>
-          <h1 className="text-xl font-bold">Báo Cáo & Phân Tích</h1>
-          <div className="w-10" /> {/* Placeholder để giữ layout cân đối */}
+
+          <div className="mt-3">
+            <h1 className="text-xl font-bold sm:text-2xl">Thống kê hệ thống</h1>
+            <p className="text-sm text-muted-foreground">
+              Dữ liệu được lấy từ API admin report, không dùng số mẫu hard-code trên giao diện.
+            </p>
+          </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
-        {/* Date Range & Quick Stats */}
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+      <div className="mx-auto max-w-7xl space-y-6 px-4 py-6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-muted-foreground" />
-            <Select value={dateRange} onValueChange={setDateRange}>
-              <SelectTrigger className="w-[180px]">
+            <Calendar className="h-5 w-5 text-muted-foreground" />
+            <Select value={dateRange} onValueChange={(value) => setDateRange(value as AdminReportRange)}>
+              <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue placeholder="Chọn thời gian" />
               </SelectTrigger>
               <SelectContent>
@@ -164,540 +387,261 @@ export default function AdminReportsPage() {
               </SelectContent>
             </Select>
           </div>
+
           <div className="flex gap-2">
-            <Button variant="outline" size="sm">
-              <FileText className="w-4 h-4 mr-2" />
-              PDF
+            <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={isLoading}>
+              <Download className="mr-2 h-4 w-4" />
+              Xuất CSV
             </Button>
-            <Button variant="outline" size="sm">
-              <BarChart3 className="w-4 h-4 mr-2" />
-              Excel
+            <Button variant="outline" size="sm" onClick={handlePrint}>
+              <Printer className="mr-2 h-4 w-4" />
+              In / PDF
             </Button>
           </div>
         </div>
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                  <DollarSign className="w-5 h-5 text-green-600" />
-                </div>
-                <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50 dark:bg-green-900/20">
-                  <ArrowUpRight className="w-3 h-3 mr-1" />
-                  +18%
-                </Badge>
-              </div>
-              <p className="text-2xl font-bold mt-3">{formatCurrency(totalRevenue)} VND</p>
-              <p className="text-sm text-muted-foreground">Tổng doanh thu</p>
+        {error && (
+          <Card className="border-destructive/30 bg-destructive/10">
+            <CardContent className="p-4 text-sm text-destructive">
+              {error}. Nếu backend chưa có endpoint này, trang sẽ không hiển thị số ảo.
             </CardContent>
           </Card>
+        )}
 
+        {isLoading ? (
           <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                  <Calendar className="w-5 h-5 text-blue-600" />
-                </div>
-                <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50 dark:bg-blue-900/20">
-                  <ArrowUpRight className="w-3 h-3 mr-1" />
-                  +12%
-                </Badge>
-              </div>
-              <p className="text-2xl font-bold mt-3">{totalBookings.toLocaleString()}</p>
-              <p className="text-sm text-muted-foreground">Tổng đặt sân</p>
-            </CardContent>
+            <CardContent className="p-6 text-center text-muted-foreground">Đang tải dữ liệu thống kê...</CardContent>
           </Card>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <KpiCard
+                title="Giá trị đặt sân"
+                value={`${formatCompactCurrency(totalBookingValue)} VND`}
+                description="Tổng giá trị booking toàn hệ thống"
+                icon={DollarSign}
+              />
+              <KpiCard
+                title="Lượt đặt sân"
+                value={totalBookings.toLocaleString("vi-VN")}
+                description="Tổng số đơn đặt sân"
+                icon={ClipboardCheck}
+              />
+              <KpiCard
+                title="Người dùng"
+                value={totalUsers.toLocaleString("vi-VN")}
+                description="Tổng tài khoản khách hàng"
+                icon={Users}
+              />
+              <KpiCard
+                title="Chủ sân"
+                value={totalOwners.toLocaleString("vi-VN")}
+                description="Tổng tài khoản owner"
+                icon={Building2}
+              />
+              <KpiCard
+                title="Tổng số sân"
+                value={totalFields.toLocaleString("vi-VN")}
+                description="Sân đã đăng ký trên hệ thống"
+                icon={MapPin}
+              />
+              <KpiCard
+                title="Sân chờ duyệt"
+                value={pendingFields.toLocaleString("vi-VN")}
+                description="Cần admin xem xét"
+                icon={AlertTriangle}
+              />
+              <KpiCard
+                title="Báo cáo chờ xử lý"
+                value={pendingReports.toLocaleString("vi-VN")}
+                description="Báo cáo sân/đánh giá cần xử lý"
+                icon={FileWarning}
+              />
+              <KpiCard
+                title="Đánh giá TB"
+                value={avgRating.toFixed(1)}
+                description="Điểm đánh giá trung bình toàn hệ thống"
+                icon={Star}
+              />
+            </div>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                  <Users className="w-5 h-5 text-purple-600" />
-                </div>
-                <Badge
-                  variant="outline"
-                  className="text-purple-600 border-purple-200 bg-purple-50 dark:bg-purple-900/20"
-                >
-                  <ArrowUpRight className="w-3 h-3 mr-1" />
-                  +25%
-                </Badge>
-              </div>
-              <p className="text-2xl font-bold mt-3">{totalUsers.toLocaleString()}</p>
-              <p className="text-sm text-muted-foreground">Người dùng</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="w-10 h-10 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
-                  <Star className="w-5 h-5 text-yellow-600" />
-                </div>
-                <Badge
-                  variant="outline"
-                  className="text-yellow-600 border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20"
-                >
-                  <ArrowUpRight className="w-3 h-3 mr-1" />
-                  +0.2
-                </Badge>
-              </div>
-              <p className="text-2xl font-bold mt-3">{avgRating}</p>
-              <p className="text-sm text-muted-foreground">Đánh giá TB</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
-            <TabsTrigger value="overview" className="text-xs sm:text-sm">
-              <Activity className="w-4 h-4 mr-1 hidden sm:inline" />
-              Tổng quan
-            </TabsTrigger>
-            <TabsTrigger value="revenue" className="text-xs sm:text-sm">
-              <DollarSign className="w-4 h-4 mr-1 hidden sm:inline" />
-              Doanh thu
-            </TabsTrigger>
-            <TabsTrigger value="users" className="text-xs sm:text-sm">
-              <Users className="w-4 h-4 mr-1 hidden sm:inline" />
-              Người dùng
-            </TabsTrigger>
-            <TabsTrigger value="fields" className="text-xs sm:text-sm">
-              <MapPin className="w-4 h-4 mr-1 hidden sm:inline" />
-              Sân bãi
-            </TabsTrigger>
-            <TabsTrigger value="bookings" className="text-xs sm:text-sm">
-              <Calendar className="w-4 h-4 mr-1 hidden sm:inline" />
-              Đặt sân
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid lg:grid-cols-2 gap-6">
-              {/* Revenue Chart */}
+            <div className="grid gap-6 lg:grid-cols-2">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-green-600" />
-                    Doanh thu theo tháng
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <TrendingUp className="h-5 w-5 text-primary" />
+                    Giá trị đặt sân theo thời gian
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <AreaChart data={revenueData}>
-                      <defs>
-                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#16a34a" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#16a34a" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis dataKey="month" className="text-xs" />
-                      <YAxis tickFormatter={(value) => formatCurrency(value)} className="text-xs" />
-                      <Tooltip
-                        formatter={(value: number) => [`${value.toLocaleString()} VND`, "Doanh thu"]}
-                        contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="revenue"
-                        stroke="#16a34a"
-                        fillOpacity={1}
-                        fill="url(#colorRevenue)"
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                  {revenueData.length === 0 ? (
+                    <EmptyState message="Chưa có dữ liệu giá trị đặt sân" />
+                  ) : (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <AreaChart data={revenueData}>
+                        <defs>
+                          <linearGradient id="bookingValueGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="currentColor" stopOpacity={0.25} />
+                            <stop offset="95%" stopColor="currentColor" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                        <XAxis dataKey="label" className="text-xs" />
+                        <YAxis tickFormatter={(value) => formatCompactCurrency(Number(value))} className="text-xs" />
+                        <Tooltip
+                          formatter={(value: number) => [`${formatCurrency(value)} VND`, "Giá trị đặt sân"]}
+                          contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="bookingValue"
+                          stroke="currentColor"
+                          fillOpacity={1}
+                          fill="url(#bookingValueGradient)"
+                          className="text-primary"
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  )}
                 </CardContent>
               </Card>
 
-              {/* Bookings by Field Type */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <PieChart className="w-5 h-5 text-blue-600" />
-                    Đặt sân theo loại
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Users className="h-5 w-5 text-primary" />
+                    Tăng trưởng người dùng
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <RechartsPieChart>
-                      <Pie
-                        data={bookingsByFieldType}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={100}
-                        paddingAngle={5}
-                        dataKey="value"
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      >
-                        {bookingsByFieldType.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </RechartsPieChart>
-                  </ResponsiveContainer>
+                  {userGrowthData.length === 0 ? (
+                    <EmptyState message="Chưa có dữ liệu tăng trưởng người dùng" />
+                  ) : (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={userGrowthData}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                        <XAxis dataKey="label" className="text-xs" />
+                        <YAxis className="text-xs" />
+                        <Tooltip
+                          formatter={(value: number) => [value.toLocaleString("vi-VN"), "Người dùng mới"]}
+                          contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
+                        />
+                        <Bar dataKey="newUsers" fill="currentColor" radius={[4, 4, 0, 0]} className="text-primary" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
                 </CardContent>
               </Card>
             </div>
 
-            {/* Top Fields & Owners */}
-            <div className="grid lg:grid-cols-2 gap-6">
+            <div className="grid gap-6 lg:grid-cols-2">
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Top 5 sân được đặt nhiều nhất</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {topFields.map((field, idx) => (
-                    <div key={idx} className="flex items-center gap-4">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
-                        {idx + 1}
+                  {topFields.length === 0 ? (
+                    <EmptyState message="Chưa có dữ liệu top sân" />
+                  ) : (
+                    topFields.map((field, index) => (
+                      <div key={String(field.id)} className="flex items-center gap-4">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                          {index + 1}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium">{field.name}</p>
+                          <p className="text-sm text-muted-foreground">{field.owner}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold">{field.bookings} đặt</p>
+                          <p className="text-sm text-muted-foreground">{formatCompactCurrency(field.bookingValue)} VND</p>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{field.name}</p>
-                        <p className="text-sm text-muted-foreground">{field.owner}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold">{field.bookings} đặt</p>
-                        <p className="text-sm text-muted-foreground flex items-center justify-end gap-1">
-                          <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
-                          {field.rating}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Top 5 chủ sân doanh thu cao</CardTitle>
+                  <CardTitle className="text-base">Top 5 chủ sân hoạt động tốt</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {topOwners.map((owner, idx) => (
-                    <div key={idx} className="flex items-center gap-4">
-                      <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-sm font-bold text-green-600">
-                        {idx + 1}
+                  {topOwners.length === 0 ? (
+                    <EmptyState message="Chưa có dữ liệu top chủ sân" />
+                  ) : (
+                    topOwners.map((owner, index) => (
+                      <div key={String(owner.id)} className="flex items-center gap-4">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                          {index + 1}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium">{owner.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {owner.fields} sân • {owner.bookings} lượt đặt
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold">{formatCompactCurrency(owner.bookingValue)}</p>
+                          <p className="text-sm text-muted-foreground">VND</p>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{owner.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {owner.fields} sân • {owner.bookings} đặt
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold text-green-600">{formatCurrency(owner.revenue)}</p>
-                        <p className="text-sm text-muted-foreground">VND</p>
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* Revenue Tab */}
-          <TabsContent value="revenue" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Biểu đồ doanh thu & số lượng đặt sân</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={400}>
-                  <LineChart data={revenueData}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="month" />
-                    <YAxis yAxisId="left" tickFormatter={(value) => formatCurrency(value)} />
-                    <YAxis yAxisId="right" orientation="right" />
-                    <Tooltip
-                      formatter={(value: number, name: string) => [
-                        name === "revenue" ? `${value.toLocaleString()} VND` : value,
-                        name === "revenue" ? "Doanh thu" : "Số đặt sân",
-                      ]}
-                      contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
-                    />
-                    <Legend formatter={(value) => (value === "revenue" ? "Doanh thu" : "Số đặt sân")} />
-                    <Line
-                      yAxisId="left"
-                      type="monotone"
-                      dataKey="revenue"
-                      stroke="#16a34a"
-                      strokeWidth={2}
-                      dot={{ fill: "#16a34a" }}
-                    />
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="bookings"
-                      stroke="#2563eb"
-                      strokeWidth={2}
-                      dot={{ fill: "#2563eb" }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <div className="grid md:grid-cols-3 gap-4">
-              <Card>
-                <CardContent className="p-4">
-                  <p className="text-sm text-muted-foreground">Doanh thu cao nhất</p>
-                  <p className="text-2xl font-bold text-green-600">95M VND</p>
-                  <p className="text-sm text-muted-foreground">Tháng 12</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <p className="text-sm text-muted-foreground">Doanh thu thấp nhất</p>
-                  <p className="text-2xl font-bold text-red-600">45M VND</p>
-                  <p className="text-sm text-muted-foreground">Tháng 1</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <p className="text-sm text-muted-foreground">Doanh thu trung bình</p>
-                  <p className="text-2xl font-bold text-blue-600">68M VND</p>
-                  <p className="text-sm text-muted-foreground">Mỗi tháng</p>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* Users Tab */}
-          <TabsContent value="users" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Tăng trưởng người dùng</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={400}>
-                  <AreaChart data={userGrowthData}>
-                    <defs>
-                      <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#9333ea" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#9333ea" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
-                    />
-                    <Legend formatter={(value) => (value === "totalUsers" ? "Tổng người dùng" : "Người dùng mới")} />
-                    <Area
-                      type="monotone"
-                      dataKey="totalUsers"
-                      stroke="#9333ea"
-                      fillOpacity={1}
-                      fill="url(#colorUsers)"
-                    />
-                    <Bar dataKey="newUsers" fill="#16a34a" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <div className="grid md:grid-cols-4 gap-4">
-              <Card>
-                <CardContent className="p-4">
-                  <p className="text-sm text-muted-foreground">Tổng người dùng</p>
-                  <p className="text-2xl font-bold">1,364</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <p className="text-sm text-muted-foreground">Khách hàng</p>
-                  <p className="text-2xl font-bold">1,289</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <p className="text-sm text-muted-foreground">Chủ sân</p>
-                  <p className="text-2xl font-bold">75</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <p className="text-sm text-muted-foreground">Đăng ký mới tháng này</p>
-                  <p className="text-2xl font-bold text-green-600">+115</p>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* Fields Tab */}
-          <TabsContent value="fields" className="space-y-6">
-            <div className="grid md:grid-cols-4 gap-4">
-              <Card>
-                <CardContent className="p-4">
-                  <p className="text-sm text-muted-foreground">Tổng số sân</p>
-                  <p className="text-2xl font-bold">48</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <p className="text-sm text-muted-foreground">Đang hoạt động</p>
-                  <p className="text-2xl font-bold text-green-600">42</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <p className="text-sm text-muted-foreground">Chờ duyệt</p>
-                  <p className="text-2xl font-bold text-yellow-600">4</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <p className="text-sm text-muted-foreground">Bị từ chối</p>
-                  <p className="text-2xl font-bold text-red-600">2</p>
+                    ))
+                  )}
                 </CardContent>
               </Card>
             </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Phân bố sân theo loại</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={bookingsByFieldType} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis type="number" />
-                    <YAxis dataKey="name" type="category" width={100} />
-                    <Tooltip />
-                    <Bar dataKey="value" fill="#16a34a" radius={[0, 4, 4, 0]}>
-                      {bookingsByFieldType.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <BarChart3 className="h-5 w-5 text-primary" />
+                    Trạng thái đơn đặt sân
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {reports.booking_status.length === 0 ? (
+                    <EmptyState message="Chưa có dữ liệu trạng thái đơn" />
+                  ) : (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {reports.booking_status.map((item) => (
+                        <div key={item.label} className="rounded-lg border border-border p-4">
+                          <p className="text-2xl font-bold">{toNumber(item.count).toLocaleString("vi-VN")}</p>
+                          <p className="font-medium">{item.label}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{item.description ?? ""}</p>
+                        </div>
                       ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Hiệu suất sân bãi</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {topFields.map((field, idx) => (
-                  <div key={idx} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">{field.name}</span>
-                      <span className="text-sm text-muted-foreground">
-                        {Math.round((field.bookings / 200) * 100)}% công suất
-                      </span>
                     </div>
-                    <Progress value={(field.bookings / 200) * 100} className="h-2" />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Bookings Tab */}
-          <TabsContent value="bookings" className="space-y-6">
-            <div className="grid lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Đặt sân theo ngày trong tuần</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={weeklyBookings}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis dataKey="day" />
-                      <YAxis />
-                      <Tooltip
-                        contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
-                      />
-                      <Legend
-                        formatter={(value) => {
-                          if (value === "completed") return "Hoàn thành"
-                          if (value === "cancelled") return "Đã hủy"
-                          return "Tổng"
-                        }}
-                      />
-                      <Bar dataKey="completed" stackId="a" fill="#16a34a" />
-                      <Bar dataKey="cancelled" stackId="a" fill="#dc2626" />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  )}
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Đặt sân theo khung giờ</CardTitle>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <MapPin className="h-5 w-5 text-primary" />
+                    Trạng thái sân
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={bookingsByTime}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis dataKey="time" />
-                      <YAxis />
-                      <Tooltip
-                        contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
-                      />
-                      <Bar dataKey="bookings" fill="#2563eb" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  {reports.field_status.length === 0 ? (
+                    <EmptyState message="Chưa có dữ liệu trạng thái sân" />
+                  ) : (
+                    <div className="space-y-4">
+                      {reports.field_status.map((item) => (
+                        <div key={item.label} className="flex items-center justify-between rounded-lg border border-border p-4">
+                          <span className="font-medium">{item.label}</span>
+                          <span className="text-2xl font-bold">{toNumber(item.count)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Thống kê đặt sân</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid md:grid-cols-5 gap-4">
-                  <div className="text-center p-4 bg-muted/50 rounded-lg">
-                    <p className="text-2xl font-bold">2,083</p>
-                    <p className="text-sm text-muted-foreground">Tổng đặt sân</p>
-                  </div>
-                  <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                    <p className="text-2xl font-bold text-green-600">1,892</p>
-                    <p className="text-sm text-muted-foreground">Hoàn thành</p>
-                  </div>
-                  <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-                    <p className="text-2xl font-bold text-yellow-600">45</p>
-                    <p className="text-sm text-muted-foreground">Chờ duyệt</p>
-                  </div>
-                  <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                    <p className="text-2xl font-bold text-blue-600">68</p>
-                    <p className="text-sm text-muted-foreground">Đã xác nhận</p>
-                  </div>
-                  <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                    <p className="text-2xl font-bold text-red-600">78</p>
-                    <p className="text-sm text-muted-foreground">Đã hủy</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Tỷ lệ hoàn thành</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span>Tỷ lệ hoàn thành</span>
-                  <span className="font-bold text-green-600">90.8%</span>
-                </div>
-                <Progress value={90.8} className="h-3" />
-                <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>Hoàn thành: 1,892</span>
-                  <span>Đã hủy: 78</span>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+          </>
+        )}
       </div>
     </main>
   )

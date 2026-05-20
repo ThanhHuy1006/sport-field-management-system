@@ -70,13 +70,14 @@ model bookings {
   created_at               DateTime?            @default(now()) @db.DateTime(0)
   updated_at               DateTime?            @default(now()) @db.DateTime(0)
 
-  booking_status_history booking_status_history[]
-  field_reports          field_reports[]
-  fields                 fields                   @relation(fields: [field_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_booking_field")
-  users                  users                    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_booking_user")
-  voucher                vouchers?                @relation(fields: [voucher_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_booking_voucher")
-  payments               payments?
-  reviews                reviews[]
+  booking_status_history      booking_status_history[]
+  field_reports               field_reports[]
+  fields                      fields                        @relation(fields: [field_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_booking_field")
+  users                       users                         @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_booking_user")
+  voucher                     vouchers?                     @relation(fields: [voucher_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_booking_voucher")
+  payments                    payments?
+  reviews                     reviews[]
+  booking_reschedule_requests booking_reschedule_requests[]
 
   checked_in_at  DateTime? @db.DateTime(0)
   checked_in_by  Int?
@@ -87,6 +88,33 @@ model bookings {
   @@index([voucher_id], map: "fk_booking_voucher")
   @@index([field_id, start_datetime])
   @@index([user_id, start_datetime])
+}
+
+model booking_reschedule_requests {
+  id           Int @id @default(autoincrement())
+  booking_id   Int
+  requested_by Int
+
+  old_start_datetime DateTime @db.DateTime(0)
+  old_end_datetime   DateTime @db.DateTime(0)
+  new_start_datetime DateTime @db.DateTime(0)
+  new_end_datetime   DateTime @db.DateTime(0)
+
+  status     String  @default("PENDING") @db.VarChar(20)
+  reason     String? @db.VarChar(255)
+  owner_note String? @db.VarChar(255)
+
+  decided_by Int?
+  decided_at DateTime? @db.DateTime(0)
+
+  created_at DateTime? @default(now()) @db.DateTime(0)
+  updated_at DateTime? @default(now()) @db.DateTime(0)
+
+  bookings bookings @relation(fields: [booking_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_reschedule_booking")
+
+  @@index([booking_id], map: "fk_reschedule_booking")
+  @@index([requested_by])
+  @@index([status])
 }
 
 model facilities {
