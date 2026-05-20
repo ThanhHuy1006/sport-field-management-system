@@ -197,13 +197,22 @@ function getBookingStatus(bookings) {
 
   return Array.from(map.entries()).map(([status, count]) => ({ status, count }));
 }
+function getBookingPayment(booking) {
+  if (Array.isArray(booking.payments)) {
+    return booking.payments[0] || null;
+  }
+
+  return booking.payments || null;
+}
 
 function getPaymentMethods(bookings) {
   const map = new Map();
 
   bookings.filter(isRevenueBooking).forEach((booking) => {
+    const payment = getBookingPayment(booking);
+
     const method = String(
-      booking.payments?.provider || booking.requested_payment_method || "UNKNOWN"
+      payment?.provider || booking.requested_payment_method || "UNKNOWN"
     );
 
     const item = map.get(method) || { method, count: 0, amount: 0 };
@@ -615,4 +624,7 @@ export const reportsService = {
       voucher_impact: getVoucherImpact(bookings),
     };
   },
+  
+  
+  
 };

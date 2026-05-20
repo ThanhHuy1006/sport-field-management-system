@@ -216,4 +216,32 @@ export const reportsRepository = {
       where: { status },
     });
   },
+  getUsersCreatedBetween({ from, to }) {
+  return prisma.users.findMany({
+    where: {
+      created_at: {
+        gte: from,
+        lte: to,
+      },
+    },
+    select: {
+      id: true,
+      role: true,
+      status: true,
+      created_at: true,
+    },
+    orderBy: { created_at: "asc" },
+  });
+},
+countPendingFieldReports() {
+  return prisma.field_reports.count({
+    where: { status: "PENDING" },
+  });
+},
+
+countPendingReviewReports() {
+  return prisma.review_reports.count({
+    where: { status: "PENDING" },
+  });
+},
 };
