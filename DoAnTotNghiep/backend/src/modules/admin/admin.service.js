@@ -111,6 +111,15 @@ export const adminService = {
   async getAdminFields() {
     return adminRepository.findAdminFields();
   },
+  async getAdminFieldDetail(fieldId) {
+  const field = await adminRepository.findFieldById(fieldId);
+
+  if (!field) {
+    throw new NotFoundError("Không tìm thấy sân");
+  }
+
+  return field;
+  },
 
   async approveField(fieldId) {
     const field = await adminRepository.findFieldById(fieldId);

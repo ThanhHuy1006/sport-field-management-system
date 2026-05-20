@@ -58,6 +58,12 @@ router.patch(
 );
 
 router.get("/fields", adminController.getAdminFields);
+// thêm lấy chi tiết sân cho admin 
+router.get(
+  "/fields/:fieldId",
+  validateParams(validateAdminFieldIdParams),
+  adminController.getAdminFieldDetail
+);
 
 router.patch(
   "/fields/:fieldId/approve",

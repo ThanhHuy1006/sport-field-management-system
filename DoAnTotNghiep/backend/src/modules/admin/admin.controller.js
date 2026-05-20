@@ -117,6 +117,17 @@ export const adminController = {
       "Lấy danh sách sân thành công"
     );
   }),
+  getAdminFieldDetail: asyncHandler(async (req, res) => {
+  const { fieldId } = req.validated?.params ?? req.params;
+
+  const item = await adminService.getAdminFieldDetail(fieldId);
+
+  return successResponse(
+    res,
+    toAdminFieldResponse(item),
+    "Lấy chi tiết sân thành công"
+  );
+}),
 
   approveField: asyncHandler(async (req, res) => {
     const { fieldId } = req.validated?.params ?? req.params;
