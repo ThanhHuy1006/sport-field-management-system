@@ -27,7 +27,7 @@ export const FIELD_IMAGES: Record<string, string> = {
   "Bóng đá": "/soccer-field-green-grass.jpg",
   "Cầu lông": "/indoor-badminton-court.png",
   "Bóng rổ": "/indoor-basketball-court.png",
-  Tennis: "/professional-tennis-court.jpg",
+  "Tennis": "/professional-tennis-court.jpg",
   "Bóng chuyền": "/beach-volleyball-court.png",
 }
 

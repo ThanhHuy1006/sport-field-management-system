@@ -75,9 +75,40 @@ export function toAdminOwnerRegistrationResponse(item) {
 export function toAdminFieldResponse(item) {
   if (!item) return null;
 
-  const primaryImage = Array.isArray(item.field_images)
-    ? item.field_images[0] || null
-    : null;
+  const images = Array.isArray(item.field_images) ? item.field_images : [];
+
+  const primaryImage =
+    images.find((image) => image.is_primary) || images[0] || null;
+
+  const operatingHours = Array.isArray(item.operating_hours)
+    ? item.operating_hours
+    : [];
+
+  const reviews = Array.isArray(item.reviews) ? item.reviews : [];
+  const bookings = Array.isArray(item.bookings) ? item.bookings : [];
+  const pricingRules = Array.isArray(item.field_pricing_rules)
+  ? item.field_pricing_rules
+  : [];
+
+  const totalReviews = reviews.length;
+  const totalBookings = bookings.length;
+
+  const rating =
+    totalReviews > 0
+      ? reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) /
+        totalReviews
+      : 0;
+
+  const amenities = Array.isArray(item.field_facilities)
+    ? item.field_facilities
+        .map((fieldFacility) => fieldFacility.facilities)
+        .filter(Boolean)
+        .map((facility) => ({
+          id: facility.id,
+          name: facility.name,
+          icon: facility.icon ?? null,
+        }))
+    : [];
 
   return {
     id: item.id,
@@ -97,14 +128,16 @@ export function toAdminFieldResponse(item) {
     min_duration_minutes: item.min_duration_minutes,
     max_players: item.max_players,
     created_at: item.created_at,
-    
+
     owner: item.users
       ? {
           id: item.users.id,
           name: item.users.name,
           email: item.users.email,
+          phone: item.users.phone ?? null,
         }
       : null,
+
     primary_image: primaryImage
       ? {
           id: primaryImage.id,
@@ -113,11 +146,41 @@ export function toAdminFieldResponse(item) {
           order_no: primaryImage.order_no,
         }
       : null,
+
+    images: images.map((image) => ({
+      id: image.id,
+      url: image.url,
+      is_primary: image.is_primary,
+      order_no: image.order_no,
+    })),
+
+    operating_hours: operatingHours.map((hour) => ({
+      id: hour.id,
+      day_of_week: hour.day_of_week,
+      open_time: hour.open_time,
+      close_time: hour.close_time,
+    })),
+
+    amenities,
+    total_bookings: totalBookings,
+    total_reviews: totalReviews,
+    rating: Number(rating.toFixed(1)),
+    pricing_rules: pricingRules.map((rule) => ({
+  id: rule.id,
+  day_type: rule.day_type,
+  start_time: rule.start_time,
+  end_time: rule.end_time,
+  price: rule.price ? Number(rule.price) : 0,
+  currency: rule.currency,
+  priority: rule.priority ?? 0,
+  active: Boolean(rule.active),
+})),
   };
 }
 
 export function toAdminBookingResponse(item) {
   if (!item) return null;
+  
 
   return {
     id: item.id,

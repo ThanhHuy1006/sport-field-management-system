@@ -60,19 +60,55 @@ type AdminField = {
   min_duration_minutes: number | null;
   max_players: number | null;
   created_at: string | null;
+
   owner: {
     id: number;
     name: string | null;
     email: string | null;
+    phone?: string | null;
   } | null;
+
   primary_image: {
     id: number;
     url: string;
     is_primary: boolean;
     order_no: number | null;
   } | null;
-};
 
+  images?: {
+    id: number;
+    url: string;
+    is_primary: boolean;
+    order_no: number | null;
+  }[];
+
+  operating_hours?: {
+    id: number;
+    day_of_week: number;
+    open_time: string | null;
+    close_time: string | null;
+  }[];
+
+  amenities?: {
+    id: number;
+    name: string;
+    icon: string | null;
+  }[];
+  pricing_rules?: {
+    id: number;
+    day_type: "WEEKDAY" | "WEEKEND" | "HOLIDAY" | "CUSTOM" | string;
+    start_time: string | null;
+    end_time: string | null;
+    price: number;
+    currency: string | null;
+    priority: number;
+    active: boolean;
+  }[];
+
+  total_bookings?: number;
+  total_reviews?: number;
+  rating?: number;
+};
 type UiField = {
   id: number;
   name: string;
@@ -99,7 +135,22 @@ type UiField = {
   capacity: string;
   rejectedReason?: string;
 };
+function getPriceByDayType(
+  rules: AdminField["pricing_rules"],
+  dayType: "WEEKDAY" | "WEEKEND",
+  fallbackPrice: number,
+) {
+  if (!Array.isArray(rules) || rules.length === 0) {
+    return fallbackPrice;
+  }
 
+  const rule = rules.find(
+    (item) =>
+      String(item.day_type).toUpperCase() === dayType && item.active !== false,
+  );
+
+  return rule ? Number(rule.price || fallbackPrice) : fallbackPrice;
+}
 const API_ORIGIN = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api/v1"
 ).replace(/\/api\/v1\/?$/, "");
@@ -158,15 +209,59 @@ function getSportTypeName(type?: string | null) {
   return type || "Khác";
 }
 
+function getOperatingTimeText(hours?: AdminField["operating_hours"]) {
+  if (!Array.isArray(hours) || hours.length === 0) {
+    return {
+      openTime: "-",
+      closeTime: "-",
+    };
+  }
+
+  const validHours = hours.filter((hour) => hour.open_time && hour.close_time);
+
+  if (validHours.length === 0) {
+    return {
+      openTime: "-",
+      closeTime: "-",
+    };
+  }
+
+  const first = validHours[0];
+
+  return {
+    openTime: first.open_time || "-",
+    closeTime: first.close_time || "-",
+  };
+}
+
 function mapFieldToUi(field: AdminField): UiField {
-  const imageUrl = toAssetUrl(field.primary_image?.url);
-  const price = Number(field.base_price_per_hour || 0);
+  const fallbackImage = toAssetUrl(field.primary_image?.url);
+
+  const images =
+    Array.isArray(field.images) && field.images.length > 0
+      ? field.images.map((image) => toAssetUrl(image.url))
+      : [fallbackImage];
+
+  const basePrice = Number(field.base_price_per_hour || 0);
+
+  const priceWeekday = getPriceByDayType(
+    field.pricing_rules,
+    "WEEKDAY",
+    basePrice,
+  );
+
+  const priceWeekend = getPriceByDayType(
+    field.pricing_rules,
+    "WEEKEND",
+    basePrice,
+  );
+  const operatingTime = getOperatingTimeText(field.operating_hours);
 
   return {
     id: field.id,
     name: field.field_name || "Chưa cập nhật tên sân",
     owner: field.owner?.name || "Chưa cập nhật",
-    ownerPhone: "-",
+    ownerPhone: field.owner?.phone || "-",
     ownerEmail: field.owner?.email || "-",
     location: field.address || "-",
     district: getDistrictFromAddress(field.address),
@@ -178,21 +273,22 @@ function mapFieldToUi(field: AdminField): UiField {
         ? field.reject_reason || "Sân đã bị từ chối hoặc đã bị ẩn."
         : undefined,
     createdDate: formatDate(field.created_at),
-    priceWeekday: price,
-    priceWeekend: price,
-    openTime: "-",
-    closeTime: "-",
-    rating: 0,
-    totalBookings: 0,
-    totalReviews: 0,
+    priceWeekday,
+    priceWeekend,
+    openTime: operatingTime.openTime,
+    closeTime: operatingTime.closeTime,
+    rating: Number(field.rating || 0),
+    totalBookings: Number(field.total_bookings || 0),
+    totalReviews: Number(field.total_reviews || 0),
     description: field.description || "Chưa có mô tả.",
-    amenities: [],
-    images: [imageUrl],
+    amenities: Array.isArray(field.amenities)
+      ? field.amenities.map((amenity) => amenity.name)
+      : [],
+    images,
     size: "-",
     capacity: field.max_players ? `${field.max_players} người` : "-",
   };
 }
-
 function getFieldStatusLabel(status: string) {
   if (status === "pending") return "Chờ Duyệt";
   if (status === "active") return "Đã Duyệt";
@@ -228,6 +324,7 @@ export default function AdminFieldsPage() {
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [fieldToReject, setFieldToReject] = useState<number | null>(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const itemsPerPage = 8;
 
   const fetchAdminFields = useCallback(async () => {
@@ -332,9 +429,25 @@ export default function AdminFieldsPage() {
     }
   };
 
-  const handleViewDetail = (field: UiField) => {
-    setSelectedField(field);
-    setShowDetailDialog(true);
+  // const handleViewDetail = (field: UiField) => {
+  //   setSelectedField(field);
+  //   setShowDetailDialog(true);
+  // };
+  const handleViewDetail = async (field: UiField) => {
+    try {
+      const res = await apiGet<ApiResponse<AdminField>>(
+        `/admin/fields/${field.id}`,
+      );
+
+      setSelectedField(mapFieldToUi(res.data));
+      setSelectedImageIndex(0);
+      setShowDetailDialog(true);
+    } catch (error) {
+      console.error(error);
+      alert(
+        error instanceof Error ? error.message : "Không thể tải chi tiết sân",
+      );
+    }
   };
 
   const formatPrice = (price: number) => {
@@ -345,14 +458,22 @@ export default function AdminFieldsPage() {
     <div data-cy="admin-fields-page" className="p-4 md:p-8">
       {/* Page Header */}
       <div className="mb-6">
-        <h1 data-cy="admin-fields-title" className="text-2xl font-bold text-foreground">Quản Lý Sân</h1>
+        <h1
+          data-cy="admin-fields-title"
+          className="text-2xl font-bold text-foreground"
+        >
+          Quản Lý Sân
+        </h1>
         <p className="text-muted-foreground">
           Phê duyệt và quản lý các sân thể thao trong hệ thống
         </p>
       </div>
 
       {/* Stats Cards */}
-      <div data-cy="admin-fields-stats" className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div
+        data-cy="admin-fields-stats"
+        className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"
+      >
         <Card className="p-4">
           <p className="text-sm text-muted-foreground">Tổng số sân</p>
           <p className="text-2xl font-bold text-foreground">{stats.total}</p>
@@ -372,7 +493,10 @@ export default function AdminFieldsPage() {
       </div>
 
       {/* Search and Filters */}
-      <div data-cy="admin-fields-toolbar" className="flex flex-col md:flex-row gap-4 mb-6">
+      <div
+        data-cy="admin-fields-toolbar"
+        className="flex flex-col md:flex-row gap-4 mb-6"
+      >
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -414,7 +538,10 @@ export default function AdminFieldsPage() {
       </div>
 
       {loading && (
-        <Card data-cy="admin-fields-loading" className="p-6 mb-6 text-center text-muted-foreground">
+        <Card
+          data-cy="admin-fields-loading"
+          className="p-6 mb-6 text-center text-muted-foreground"
+        >
           Đang tải dữ liệu...
         </Card>
       )}
@@ -423,7 +550,11 @@ export default function AdminFieldsPage() {
       {!loading && (
         <div data-cy="admin-fields-list" className="space-y-4 mb-8">
           {paginatedFields.map((field) => (
-            <Card key={field.id} data-cy="admin-field-row" className="p-4 md:p-6">
+            <Card
+              key={field.id}
+              data-cy="admin-field-row"
+              className="p-4 md:p-6"
+            >
               <div className="flex flex-col md:flex-row md:items-start gap-4">
                 {/* Field Image */}
                 <div className="w-full md:w-32 h-24 rounded-lg overflow-hidden bg-muted flex-shrink-0">
@@ -441,7 +572,10 @@ export default function AdminFieldsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div>
-                      <h3 data-cy="admin-field-name" className="text-lg font-bold text-foreground">
+                      <h3
+                        data-cy="admin-field-name"
+                        className="text-lg font-bold text-foreground"
+                      >
                         {field.name}
                       </h3>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -563,13 +697,19 @@ export default function AdminFieldsPage() {
 
       {/* Field Detail Dialog */}
       <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
-        <DialogContent data-cy="admin-field-detail-dialog" className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent
+          data-cy="admin-field-detail-dialog"
+          className="max-w-2xl max-h-[85vh] overflow-y-auto"
+        >
           {selectedField && (
             <>
               <DialogHeader>
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <DialogTitle data-cy="admin-field-detail-name" className="text-xl">
+                    <DialogTitle
+                      data-cy="admin-field-detail-name"
+                      className="text-xl"
+                    >
                       {selectedField.name}
                     </DialogTitle>
                     <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
@@ -588,12 +728,39 @@ export default function AdminFieldsPage() {
               <div className="space-y-6 mt-4">
                 {/* Hình ảnh - chỉ hiện 1 ảnh chính */}
                 {selectedField.images.length > 0 && (
-                  <div className="aspect-video rounded-lg overflow-hidden bg-muted">
+                  <div className="space-y-3">
                     <img
-                      src={selectedField.images[0] || "/placeholder.svg"}
+                      src={
+                        selectedField.images[selectedImageIndex] ||
+                        selectedField.images[0] ||
+                        "/placeholder.svg?height=300&width=600&query=sports field"
+                      }
                       alt={selectedField.name}
-                      className="w-full h-full object-cover"
+                      className="h-56 w-full rounded-lg object-cover"
                     />
+
+                    {selectedField.images.length > 1 && (
+                      <div className="grid grid-cols-5 gap-2">
+                        {selectedField.images.map((image, index) => (
+                          <button
+                            key={`${image}-${index}`}
+                            type="button"
+                            onClick={() => setSelectedImageIndex(index)}
+                            className={`overflow-hidden rounded-lg border ${
+                              selectedImageIndex === index
+                                ? "border-primary"
+                                : "border-border"
+                            }`}
+                          >
+                            <img
+                              src={image}
+                              alt={`${selectedField.name} ${index + 1}`}
+                              className="h-16 w-full object-cover"
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -603,10 +770,10 @@ export default function AdminFieldsPage() {
                     <p className="text-muted-foreground">Loại sân</p>
                     <p className="font-medium">{selectedField.typeName}</p>
                   </div>
-                  <div className="space-y-1">
+                  {/* <div className="space-y-1">
                     <p className="text-muted-foreground">Kích thước</p>
                     <p className="font-medium">{selectedField.size}</p>
-                  </div>
+                  </div> */}
                   <div className="space-y-1">
                     <p className="text-muted-foreground">Sức chứa</p>
                     <p className="font-medium">{selectedField.capacity}</p>
@@ -671,7 +838,7 @@ export default function AdminFieldsPage() {
                       <p className="text-2xl font-bold text-primary">
                         {selectedField.rating}
                       </p>
-                      <p className="text-xs text-muted-foreground">Đánh giá</p>
+                      <p className="text-xs text-muted-foreground">Điểm TB</p>
                     </div>
                     <div className="p-3 bg-muted/50 rounded-lg">
                       <p className="text-2xl font-bold text-primary">

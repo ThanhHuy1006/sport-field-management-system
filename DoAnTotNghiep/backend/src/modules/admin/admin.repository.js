@@ -231,11 +231,39 @@ export const adminRepository = {
             id: true,
             name: true,
             email: true,
+            phone: true,
           },
         },
         field_images: {
           orderBy: [{ is_primary: "desc" }, { order_no: "asc" }],
           take: 1,
+        },
+        operating_hours: {
+          orderBy: { day_of_week: "asc" },
+        },
+        bookings: {
+          select: {
+            id: true,
+          },
+        },
+        reviews: {
+          where: {
+            visible: true,
+          },
+          select: {
+            id: true,
+            rating: true,
+          },
+        },
+        field_pricing_rules: {
+          where: {
+            active: true,
+          },
+          orderBy: [
+            { day_type: "asc" },
+            { priority: "desc" },
+            { start_time: "asc" },
+          ],
         },
       },
     });
@@ -250,11 +278,43 @@ export const adminRepository = {
             id: true,
             name: true,
             email: true,
+            phone: true,
           },
         },
         field_images: {
           orderBy: [{ is_primary: "desc" }, { order_no: "asc" }],
-          take: 1,
+        },
+        operating_hours: {
+          orderBy: { day_of_week: "asc" },
+        },
+        field_facilities: {
+          include: {
+            facilities: true,
+          },
+        },
+        field_pricing_rules: {
+          where: {
+            active: true,
+          },
+          orderBy: [
+            { day_type: "asc" },
+            { priority: "desc" },
+            { start_time: "asc" },
+          ],
+        },
+        bookings: {
+          select: {
+            id: true,
+          },
+        },
+        reviews: {
+          where: {
+            visible: true,
+          },
+          select: {
+            id: true,
+            rating: true,
+          },
         },
       },
     });
@@ -367,48 +427,47 @@ export const adminRepository = {
     });
   },
   approveField(fieldId) {
-  return prisma.fields.update({
-    where: { id: fieldId },
-    data: {
-      status: FIELD_STATUS.ACTIVE,
-      reject_reason: null,
-    },
-    include: {
-      users: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
+    return prisma.fields.update({
+      where: { id: fieldId },
+      data: {
+        status: FIELD_STATUS.ACTIVE,
+        reject_reason: null,
+      },
+      include: {
+        users: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        field_images: {
+          orderBy: [{ is_primary: "desc" }, { order_no: "asc" }],
+          take: 1,
         },
       },
-      field_images: {
-        orderBy: [{ is_primary: "desc" }, { order_no: "asc" }],
-        take: 1,
-      },
-    },
-  });
-},
+    });
+  },
   rejectField(fieldId, rejectReason) {
-  return prisma.fields.update({
-    where: { id: fieldId },
-    data: {
-      status: FIELD_STATUS.HIDDEN,
-      reject_reason: rejectReason,
-    },
-    include: {
-      users: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
+    return prisma.fields.update({
+      where: { id: fieldId },
+      data: {
+        status: FIELD_STATUS.HIDDEN,
+        reject_reason: rejectReason,
+      },
+      include: {
+        users: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        field_images: {
+          orderBy: [{ is_primary: "desc" }, { order_no: "asc" }],
+          take: 1,
         },
       },
-      field_images: {
-        orderBy: [{ is_primary: "desc" }, { order_no: "asc" }],
-        take: 1,
-      },
-    },
-  });
-},
+    });
+  },
 };
-
