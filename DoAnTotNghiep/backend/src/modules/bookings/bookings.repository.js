@@ -606,11 +606,12 @@ export const bookingsRepository = {
   const threshold = new Date(now.getTime() - GRACE_MINUTES * 60 * 1000);
 
   return prisma.$transaction(async (tx) => {
-    const expiredCheckedInBookings = await tx.bookings.findMany({
+    // 1. Chờ duyệt nhưng đã quá giờ bắt đầu
+    const expiredPendingBookings = await tx.bookings.findMany({
       where: {
-        status: "CHECKED_IN",
-        end_datetime: {
-          lte: threshold,
+        status: "PENDING_CONFIRM",
+        start_datetime: {
+          lte: now,
         },
       },
       select: {
@@ -619,6 +620,22 @@ export const bookingsRepository = {
       },
     });
 
+    // 2. Chờ thanh toán nhưng hết hạn thanh toán
+    const expiredPaymentBookings = await tx.bookings.findMany({
+      where: {
+        status: "AWAITING_PAYMENT",
+        payment_expires_at: {
+          not: null,
+          lte: now,
+        },
+      },
+      select: {
+        id: true,
+        status: true,
+      },
+    });
+
+    // 3. Đã duyệt / đã thanh toán nhưng khách không check-in
     const noShowBookings = await tx.bookings.findMany({
       where: {
         status: {
@@ -635,45 +652,86 @@ export const bookingsRepository = {
       },
     });
 
-    const completedIds = expiredCheckedInBookings.map((booking) => booking.id);
-    const noShowIds = noShowBookings.map((booking) => booking.id);
+    // 4. Đã check-in và đã hết giờ
+    const completedBookings = await tx.bookings.findMany({
+      where: {
+        status: "CHECKED_IN",
+        end_datetime: {
+          lte: threshold,
+        },
+      },
+      select: {
+        id: true,
+        status: true,
+      },
+    });
 
-    let completedResult = { count: 0 };
+    let rejectedResult = { count: 0 };
+    let paymentExpiredResult = { count: 0 };
     let noShowResult = { count: 0 };
+    let completedResult = { count: 0 };
 
-    if (completedIds.length > 0) {
-      completedResult = await tx.bookings.updateMany({
+    if (expiredPendingBookings.length > 0) {
+      const ids = expiredPendingBookings.map((item) => item.id);
+
+      rejectedResult = await tx.bookings.updateMany({
         where: {
-          id: {
-            in: completedIds,
-          },
-          status: "CHECKED_IN",
-          end_datetime: {
-            lte: threshold,
+          id: { in: ids },
+          status: "PENDING_CONFIRM",
+          start_datetime: {
+            lte: now,
           },
         },
         data: {
-          status: "COMPLETED",
+          status: "REJECTED",
           updated_at: now,
         },
       });
 
       await tx.booking_status_history.createMany({
-        data: expiredCheckedInBookings.map((booking) => ({
-          booking_id: booking.id,
-          from_status: "CHECKED_IN",
-          to_status: "COMPLETED",
-          reason: "AUTO_COMPLETED_AFTER_END_TIME",
+        data: expiredPendingBookings.map((item) => ({
+          booking_id: item.id,
+          from_status: item.status,
+          to_status: "REJECTED",
+          reason: "AUTO_REJECTED_AFTER_START_TIME",
         })),
       });
     }
 
-    if (noShowIds.length > 0) {
+    if (expiredPaymentBookings.length > 0) {
+      const ids = expiredPaymentBookings.map((item) => item.id);
+
+      paymentExpiredResult = await tx.bookings.updateMany({
+        where: {
+          id: { in: ids },
+          status: "AWAITING_PAYMENT",
+          payment_expires_at: {
+            not: null,
+            lte: now,
+          },
+        },
+        data: {
+          status: "PAYMENT_EXPIRED",
+          updated_at: now,
+        },
+      });
+
+      await tx.booking_status_history.createMany({
+        data: expiredPaymentBookings.map((item) => ({
+          booking_id: item.id,
+          from_status: item.status,
+          to_status: "PAYMENT_EXPIRED",
+          reason: "AUTO_PAYMENT_EXPIRED",
+        })),
+      });
+    }
+
+    if (noShowBookings.length > 0) {
+      const ids = noShowBookings.map((item) => item.id);
+
       noShowResult = await tx.bookings.updateMany({
         where: {
-          id: {
-            in: noShowIds,
-          },
+          id: { in: ids },
           status: {
             in: ["APPROVED", "PAID"],
           },
@@ -689,18 +747,47 @@ export const bookingsRepository = {
       });
 
       await tx.booking_status_history.createMany({
-        data: noShowBookings.map((booking) => ({
-          booking_id: booking.id,
-          from_status: booking.status,
+        data: noShowBookings.map((item) => ({
+          booking_id: item.id,
+          from_status: item.status,
           to_status: "NO_SHOW",
           reason: "AUTO_NO_SHOW_AFTER_END_TIME_WITHOUT_CHECKIN",
         })),
       });
     }
 
+    if (completedBookings.length > 0) {
+      const ids = completedBookings.map((item) => item.id);
+
+      completedResult = await tx.bookings.updateMany({
+        where: {
+          id: { in: ids },
+          status: "CHECKED_IN",
+          end_datetime: {
+            lte: threshold,
+          },
+        },
+        data: {
+          status: "COMPLETED",
+          updated_at: now,
+        },
+      });
+
+      await tx.booking_status_history.createMany({
+        data: completedBookings.map((item) => ({
+          booking_id: item.id,
+          from_status: item.status,
+          to_status: "COMPLETED",
+          reason: "AUTO_COMPLETED_AFTER_END_TIME",
+        })),
+      });
+    }
+
     return {
-      completed: completedResult.count,
+      rejected: rejectedResult.count,
+      payment_expired: paymentExpiredResult.count,
       no_show: noShowResult.count,
+      completed: completedResult.count,
     };
   });
 }

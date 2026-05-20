@@ -11,58 +11,52 @@ import {
 import { approveOwnerBooking } from "@/features/bookings/services/approve-owner-booking"
 import { rejectOwnerBooking } from "@/features/bookings/services/reject-owner-booking"
 
-function mapApiStatusToUi(
-  status: OwnerBookingListItem["status"],
-): Booking["status"] {
+function getApiStatus(item: OwnerBookingListItem) {
+  return String(item.status || "")
+}
+
+function isPastStartTime(item: OwnerBookingListItem) {
+  const time = new Date(item.start_datetime).getTime()
+
+  if (Number.isNaN(time)) {
+    return false
+  }
+
+  return time <= Date.now()
+}
+
+function mapApiStatusToUi(item: OwnerBookingListItem): Booking["status"] {
+  const status = getApiStatus(item)
+
   switch (status) {
     case "PENDING_CONFIRM":
       return "pending"
+
     case "APPROVED":
     case "AWAITING_PAYMENT":
     case "PAID":
     case "CHECKED_IN":
       return "confirmed"
+
     case "COMPLETED":
       return "completed"
+
     case "REJECTED":
     case "CANCELLED":
     case "PAY_FAILED":
+    case "PAYMENT_EXPIRED":
+    case "NO_SHOW":
       return "rejected"
+
     default:
-      return "pending"
+      return "rejected"
   }
 }
 
-// function mapApiBookingToUi(item: OwnerBookingListItem): Booking {
-//   const start = new Date(item.start_datetime)
-//   const end = new Date(item.end_datetime)
-//   const duration = Math.max(
-//     1,
-//     Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60)),
-//   )
-
-//   return {
-//     id: item.id,
-//     fieldId: item.field?.id ?? item.field_id,
-//     fieldName: item.field?.field_name ?? "Chưa có tên sân",
-//     customerName: item.user?.full_name ?? "Khách hàng",
-//     customerPhone: item.user?.phone_number ?? "Chưa cập nhật",
-//     date: item.start_datetime.slice(0, 10),
-//     startTime: item.start_datetime.slice(11, 16),
-//     endTime: item.end_datetime.slice(11, 16),
-//     duration,
-//     price: Number(item.total_price ?? 0),
-//     status: mapApiStatusToUi(item.status),
-//     location: item.field?.address ?? undefined,
-//     rejectionReason: item.rejection_reason ?? undefined,
-//   }
-// }
 const formatLocalDate = (iso: string) => {
-  const d = new Date(iso)
-  const year = d.getFullYear()
-  const month = String(d.getMonth() + 1).padStart(2, "0")
-  const day = String(d.getDate()).padStart(2, "0")
-  return `${year}-${month}-${day}`
+  return new Date(iso).toLocaleDateString("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+  })
 }
 
 const formatLocalTime = (iso: string) => {
@@ -73,30 +67,37 @@ const formatLocalTime = (iso: string) => {
     timeZone: "Asia/Ho_Chi_Minh",
   })
 }
-// function mapApiBookingToUi(item: OwnerBookingListItem): Booking {
-//   const start = new Date(item.start_datetime)
-//   const end = new Date(item.end_datetime)
-//   const duration = Math.max(
-//     1,
-//     Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60)),
-//   )
 
-//   return {
-//     id: item.id,
-//     fieldId: item.field?.id ?? item.field_id,
-//     fieldName: item.field?.field_name ?? "Chưa có tên sân",
-//     customerName: item.user?.name ?? "Khách hàng",
-//     customerPhone: item.user?.phone ?? "Chưa cập nhật",
-//     date: item.start_datetime.slice(0, 10),
-//     startTime: item.start_datetime.slice(11, 16),
-//     endTime: item.end_datetime.slice(11, 16),
-//     duration,
-//     price: Number(item.total_price ?? 0),
-//     status: mapApiStatusToUi(item.status),
-//     location: item.field?.address ?? undefined,
-//     rejectionReason: item.rejection_reason ?? undefined,
-//   }
-// }
+function getRejectionReason(item: OwnerBookingListItem) {
+  const status = getApiStatus(item)
+
+  if (status === "NO_SHOW") {
+    return "Khách không check-in trong thời gian đặt sân"
+  }
+
+  if (status === "PAYMENT_EXPIRED") {
+    return "Booking đã hết hạn thanh toán"
+  }
+
+  if (status === "PENDING_CONFIRM" && isPastStartTime(item)) {
+    return "Booking đã quá giờ bắt đầu, không thể duyệt"
+  }
+
+  if (status === "REJECTED") {
+    return "Booking đã bị từ chối"
+  }
+
+  if (status === "CANCELLED") {
+    return "Booking đã bị hủy"
+  }
+
+  if (status === "PAY_FAILED") {
+    return "Thanh toán thất bại"
+  }
+
+  return undefined
+}
+
 function mapApiBookingToUi(item: OwnerBookingListItem): Booking {
   const start = new Date(item.start_datetime)
   const end = new Date(item.end_datetime)
@@ -109,20 +110,20 @@ function mapApiBookingToUi(item: OwnerBookingListItem): Booking {
     id: item.id,
     fieldId: item.field?.id ?? item.field_id,
     fieldName: item.field?.field_name ?? "Chưa có tên sân",
-    // customerName: item.user?.name ?? "Khách hàng",
-    // customerPhone: item.user?.phone ?? "Chưa cập nhật",
     customerName: item.contact_name ?? item.user?.name ?? "Khách hàng",
-customerPhone: item.contact_phone ?? item.user?.phone ?? "Chưa cập nhật",
+    customerPhone: item.contact_phone ?? item.user?.phone ?? "Chưa cập nhật",
     date: formatLocalDate(item.start_datetime),
     startTime: formatLocalTime(item.start_datetime),
     endTime: formatLocalTime(item.end_datetime),
     duration,
     price: Number(item.total_price ?? 0),
-    status: mapApiStatusToUi(item.status),
+    status: mapApiStatusToUi(item),
+    rawStatus: getApiStatus(item),
     location: item.field?.address ?? undefined,
-    rejectionReason: item.rejection_reason ?? undefined,
+    rejectionReason: getRejectionReason(item),
   }
 }
+
 export default function OwnerSchedulePage() {
   const { toast } = useToast()
 
@@ -137,19 +138,6 @@ export default function OwnerSchedulePage() {
         page: 1,
         limit: 100,
       })
-      console.log(
-  "OWNER USER NAMES:",
-  res.data.items.map((item) => ({
-    bookingId: item.id,
-    userId: item.user_id,
-    user: item.user,
-    name: item.user?.name,
-    phone: item.user?.phone,
-  }))
-)
-      // console.log("OWNER BOOKINGS RAW:", res)
-      // console.log("OWNER BOOKINGS FIRST ITEM:", res.data.items?.[0])
-      // console.log("OWNER BOOKINGS USER:", res.data.items?.[0]?.user)
 
       setBookings(res.data.items.map(mapApiBookingToUi))
     } catch (error) {
@@ -158,11 +146,11 @@ export default function OwnerSchedulePage() {
         description: error instanceof Error ? error.message : "Đã có lỗi xảy ra",
         variant: "destructive",
       })
+
       setBookings([])
     } finally {
       setIsLoading(false)
     }
-  
   }
 
   useEffect(() => {
@@ -238,8 +226,11 @@ export default function OwnerSchedulePage() {
             <span className="text-muted-foreground">/</span>
             <span className="text-foreground font-medium">Quản lý đặt sân</span>
           </div>
+
           <div className="flex items-center justify-between">
-            <h1 data-cy="owner-bookings-title" className="text-xl font-bold">Quản Lý Đặt Sân</h1>
+            <h1 data-cy="owner-bookings-title" className="text-xl font-bold">
+              Quản Lý Đặt Sân
+            </h1>
           </div>
         </div>
       </header>

@@ -33,10 +33,8 @@ import {
   AlertTriangle,
   RefreshCw,
   DollarSign,
-  Info,
 } from "lucide-react"
 
-// Types
 export interface Booking {
   id: number
   fieldId: number
@@ -49,6 +47,7 @@ export interface Booking {
   duration: number
   price: number
   status: "pending" | "confirmed" | "completed" | "rejected" | "pending_reschedule"
+  rawStatus?: string
   ownerName?: string
   location?: string
   rejectionReason?: string
@@ -105,6 +104,7 @@ export function ScheduleManager({
   useEffect(() => {
     setBookings(initialBookings)
   }, [initialBookings])
+
   const [viewMode, setViewMode] = useState<"list" | "timeline">("list")
   const [selectedDate, setSelectedDate] = useState(() => new Date())
   const [selectedField, setSelectedField] = useState<string>("all")
@@ -118,7 +118,6 @@ export function ScheduleManager({
   const [rescheduleDialog, setRescheduleDialog] = useState<number | null>(null)
   const [rescheduleAction, setRescheduleAction] = useState<"approve" | "reject" | null>(null)
 
-  // Date helpers
   const formatDate = (date: Date) => {
     return date.toLocaleDateString("vi-VN", { weekday: "long", year: "numeric", month: "long", day: "numeric" })
   }
@@ -129,6 +128,38 @@ export function ScheduleManager({
 
   const formatCurrency = (amount: number) => {
     return amount.toLocaleString("vi-VN") + " VND"
+  }
+
+  const getBookingStartDateTime = (booking: Booking) => {
+    return new Date(`${booking.date}T${booking.startTime}`)
+  }
+
+  const isPastBookingStart = (booking: Booking) => {
+    return getBookingStartDateTime(booking).getTime() <= Date.now()
+  }
+
+  const isExpiredPendingBooking = (booking: Booking) => {
+    return booking.status === "pending" && isPastBookingStart(booking)
+  }
+
+  const canShowPendingActions = (booking: Booking) => {
+    return booking.status === "pending" && !isExpiredPendingBooking(booking)
+  }
+
+  const isConfirmedLikeBooking = (booking: Booking) => {
+    if (booking.rawStatus) {
+      return ["APPROVED", "PAID", "CHECKED_IN"].includes(booking.rawStatus)
+    }
+
+    return booking.status === "confirmed"
+  }
+
+  const isRevenueBooking = (booking: Booking) => {
+    if (booking.rawStatus) {
+      return ["PAID", "CHECKED_IN", "COMPLETED"].includes(booking.rawStatus)
+    }
+
+    return booking.status === "completed"
   }
 
   const previousDay = () => {
@@ -147,38 +178,46 @@ export function ScheduleManager({
     setSelectedDate(new Date())
   }
 
-  // Filter bookings
   const filteredBookings = bookings.filter((booking) => {
     const matchesDate = viewMode === "timeline" ? booking.date === formatDateISO(selectedDate) : true
     const matchesField = selectedField === "all" || booking.fieldId === Number.parseInt(selectedField)
     const matchesOwner =
       selectedOwner === "all" || booking.ownerName === owners.find((o) => o.id.toString() === selectedOwner)?.name
+
+    const expiredPending = isExpiredPendingBooking(booking)
+
     const matchesStatus =
       selectedStatus === "all" ||
       (selectedStatus === "pending"
-        ? booking.status === "pending" || booking.status === "pending_reschedule"
-        : booking.status === selectedStatus)
+        ? !expiredPending && (booking.status === "pending" || booking.status === "pending_reschedule")
+        : selectedStatus === "awaiting_payment"
+          ? booking.rawStatus === "AWAITING_PAYMENT"
+          : selectedStatus === "confirmed"
+            ? isConfirmedLikeBooking(booking)
+            : selectedStatus === "rejected"
+              ? booking.status === "rejected" || expiredPending
+              : booking.status === selectedStatus)
+
     const matchesSearch =
       searchQuery === "" ||
       booking.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       booking.fieldName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       booking.customerPhone.includes(searchQuery)
+
     return matchesDate && matchesField && matchesOwner && matchesStatus && matchesSearch
   })
 
-  // Stats
   const stats = {
     total: filteredBookings.length,
-    pending: filteredBookings.filter((b) => b.status === "pending" || b.status === "pending_reschedule").length,
-    confirmed: filteredBookings.filter((b) => b.status === "confirmed").length,
+    pending: filteredBookings.filter(
+      (b) => !isExpiredPendingBooking(b) && (b.status === "pending" || b.status === "pending_reschedule"),
+    ).length,
+    confirmed: filteredBookings.filter(isConfirmedLikeBooking).length,
     completed: filteredBookings.filter((b) => b.status === "completed").length,
-    rejected: filteredBookings.filter((b) => b.status === "rejected").length,
-    revenue: filteredBookings
-      .filter((b) => b.status === "confirmed" || b.status === "completed")
-      .reduce((sum, b) => sum + b.price, 0),
+    rejected: filteredBookings.filter((b) => b.status === "rejected" || isExpiredPendingBooking(b)).length,
+    revenue: filteredBookings.filter(isRevenueBooking).reduce((sum, b) => sum + b.price, 0),
   }
 
-  // Timeline helpers
   const getBookingStyle = (booking: Booking) => {
     const startHour = Number.parseInt(booking.startTime.split(":")[0])
     const endHour = Number.parseInt(booking.endTime.split(":")[0])
@@ -215,6 +254,8 @@ export function ScheduleManager({
         return "bg-purple-500/10 border-l-purple-500 hover:bg-purple-500/20"
       case "completed":
         return "bg-blue-500/10 border-l-blue-500 hover:bg-blue-500/20"
+      case "rejected":
+        return "bg-red-500/10 border-l-red-500 hover:bg-red-500/20"
       default:
         return "bg-gray-500/10 border-l-gray-500 hover:bg-gray-500/20"
     }
@@ -237,7 +278,91 @@ export function ScheduleManager({
     }
   }
 
-  // Actions
+  const getDisplayStatusText = (booking: Booking) => {
+    if (isExpiredPendingBooking(booking)) {
+      return "Đã quá giờ"
+    }
+
+    switch (booking.rawStatus) {
+      case "PENDING_CONFIRM":
+        return "Chờ duyệt"
+      case "APPROVED":
+        return "Đã xác nhận"
+      case "AWAITING_PAYMENT":
+        return "Chờ thanh toán"
+      case "PAID":
+        return "Đã thanh toán"
+      case "CHECKED_IN":
+        return "Đã check-in"
+      case "COMPLETED":
+        return "Hoàn thành"
+      case "REJECTED":
+        return "Đã từ chối"
+      case "CANCELLED":
+        return "Đã hủy"
+      case "PAY_FAILED":
+        return "Thanh toán thất bại"
+      case "PAYMENT_EXPIRED":
+        return "Hết hạn thanh toán"
+      case "NO_SHOW":
+        return "Không đến sân"
+      default:
+        return getStatusText(booking.status)
+    }
+  }
+
+  const getDisplayStatusColor = (booking: Booking) => {
+    if (isExpiredPendingBooking(booking)) {
+      return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+    }
+
+    switch (booking.rawStatus) {
+      case "AWAITING_PAYMENT":
+        return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+      case "APPROVED":
+      case "PAID":
+        return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+      case "CHECKED_IN":
+        return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+      case "COMPLETED":
+        return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+      case "REJECTED":
+      case "CANCELLED":
+      case "PAY_FAILED":
+      case "PAYMENT_EXPIRED":
+      case "NO_SHOW":
+        return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+      default:
+        return getStatusColor(booking.status)
+    }
+  }
+
+  const getDisplayStatusBgColor = (booking: Booking) => {
+    if (isExpiredPendingBooking(booking)) {
+      return "bg-red-500/10 border-l-red-500 hover:bg-red-500/20"
+    }
+
+    switch (booking.rawStatus) {
+      case "AWAITING_PAYMENT":
+        return "bg-yellow-500/10 border-l-yellow-500 hover:bg-yellow-500/20"
+      case "APPROVED":
+      case "PAID":
+        return "bg-green-500/10 border-l-green-500 hover:bg-green-500/20"
+      case "CHECKED_IN":
+        return "bg-emerald-500/10 border-l-emerald-500 hover:bg-emerald-500/20"
+      case "COMPLETED":
+        return "bg-blue-500/10 border-l-blue-500 hover:bg-blue-500/20"
+      case "REJECTED":
+      case "CANCELLED":
+      case "PAY_FAILED":
+      case "PAYMENT_EXPIRED":
+      case "NO_SHOW":
+        return "bg-red-500/10 border-l-red-500 hover:bg-red-500/20"
+      default:
+        return getStatusBgColor(booking.status)
+    }
+  }
+
   const handleApprove = (id: number) => {
     if (onApprove) {
       onApprove(id)
@@ -316,7 +441,7 @@ export function ScheduleManager({
       `${b.startTime}-${b.endTime}`,
       `${b.duration}h`,
       b.price,
-      getStatusText(b.status),
+      getDisplayStatusText(b),
     ])
     const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n")
     const blob = new Blob([csv], { type: "text/csv" })
@@ -345,7 +470,6 @@ export function ScheduleManager({
 
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <Card className="p-4">
           <div className="flex items-center gap-3">
@@ -358,6 +482,7 @@ export function ScheduleManager({
             </div>
           </div>
         </Card>
+
         <Card className="p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
@@ -369,6 +494,7 @@ export function ScheduleManager({
             </div>
           </div>
         </Card>
+
         <Card className="p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
@@ -380,6 +506,7 @@ export function ScheduleManager({
             </div>
           </div>
         </Card>
+
         <Card className="p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
@@ -391,6 +518,7 @@ export function ScheduleManager({
             </div>
           </div>
         </Card>
+
         <Card className="p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
@@ -402,6 +530,7 @@ export function ScheduleManager({
             </div>
           </div>
         </Card>
+
         <Card className="p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-primary/10 rounded-lg">
@@ -415,11 +544,8 @@ export function ScheduleManager({
         </Card>
       </div>
 
-
-      {/* Filters & Controls */}
       <Card className="p-4">
         <div className="flex flex-col gap-4">
-          {/* Row 1: View Toggle & Date */}
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <Button
@@ -463,7 +589,6 @@ export function ScheduleManager({
             </Button>
           </div>
 
-          {/* Row 2: Filters */}
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -506,12 +631,13 @@ export function ScheduleManager({
             </Select>
 
             <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-              <SelectTrigger className="w-[150px]">
+              <SelectTrigger className="w-[170px]">
                 <SelectValue placeholder="Trạng thái" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tất cả</SelectItem>
                 <SelectItem value="pending">Chờ duyệt</SelectItem>
+                <SelectItem value="awaiting_payment">Chờ thanh toán</SelectItem>
                 <SelectItem value="confirmed">Đã xác nhận</SelectItem>
                 <SelectItem value="completed">Hoàn thành</SelectItem>
                 <SelectItem value="rejected">Đã từ chối</SelectItem>
@@ -521,7 +647,6 @@ export function ScheduleManager({
         </div>
       </Card>
 
-      {/* List View */}
       {viewMode === "list" && (
         <div className="space-y-4">
           {filteredBookings.length === 0 ? (
@@ -536,7 +661,7 @@ export function ScheduleManager({
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-lg font-bold text-foreground">{booking.customerName}</h3>
-                      <Badge className={getStatusColor(booking.status)}>{getStatusText(booking.status)}</Badge>
+                      <Badge className={getDisplayStatusColor(booking)}>{getDisplayStatusText(booking)}</Badge>
                     </div>
 
                     <p className="text-sm text-muted-foreground mb-3">
@@ -544,7 +669,6 @@ export function ScheduleManager({
                       {isAdmin && booking.ownerName && ` • ${booking.ownerName}`}
                     </p>
 
-                    {/* Reschedule Request */}
                     {booking.status === "pending_reschedule" && booking.rescheduleRequest && (
                       <div className="mb-4 p-4 bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900 rounded-lg">
                         <div className="flex items-center gap-2 mb-2">
@@ -592,13 +716,20 @@ export function ScheduleManager({
                     {booking.status === "rejected" && booking.rejectionReason && (
                       <div className="mt-3 p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-lg">
                         <p className="text-sm text-red-800 dark:text-red-200">
-                          <strong>Lý do từ chối:</strong> {booking.rejectionReason}
+                          <strong>Lý do:</strong> {booking.rejectionReason}
+                        </p>
+                      </div>
+                    )}
+
+                    {isExpiredPendingBooking(booking) && (
+                      <div className="mt-3 p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-lg">
+                        <p className="text-sm text-red-800 dark:text-red-200">
+                          <strong>Thông báo:</strong> Booking đã quá giờ bắt đầu, không thể duyệt.
                         </p>
                       </div>
                     )}
                   </div>
 
-                  {/* Actions - Only for Owner */}
                   {!isAdmin && (
                     <>
                       {booking.status === "pending_reschedule" && (
@@ -629,7 +760,7 @@ export function ScheduleManager({
                         </div>
                       )}
 
-                      {booking.status === "pending" && (
+                      {canShowPendingActions(booking) && (
                         <div className="flex gap-2">
                           <Button
                             size="sm"
@@ -650,6 +781,12 @@ export function ScheduleManager({
                           </Button>
                         </div>
                       )}
+
+                      {isExpiredPendingBooking(booking) && (
+                        <div className="flex items-center">
+                          <Badge variant="destructive">Đã quá giờ</Badge>
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
@@ -659,12 +796,10 @@ export function ScheduleManager({
         </div>
       )}
 
-      {/* Timeline View */}
       {viewMode === "timeline" && (
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <div className="min-w-[800px]">
-              {/* Header */}
               <div
                 className="grid border-b border-border bg-muted/50"
                 style={{ gridTemplateColumns: `80px repeat(${fieldsToShow.length}, 1fr)` }}
@@ -685,9 +820,7 @@ export function ScheduleManager({
                 ))}
               </div>
 
-              {/* Timeline Grid */}
               <div className="grid" style={{ gridTemplateColumns: `80px repeat(${fieldsToShow.length}, 1fr)` }}>
-                {/* Time Column */}
                 <div className="border-r border-border">
                   {timeSlots.map((time) => (
                     <div
@@ -701,10 +834,8 @@ export function ScheduleManager({
                   ))}
                 </div>
 
-                {/* Field Columns */}
                 {fieldsToShow.map((field) => (
                   <div key={field.id} className="relative border-r border-border last:border-r-0">
-                    {/* Grid lines */}
                     {timeSlots.map((time) => (
                       <div
                         key={time}
@@ -713,13 +844,12 @@ export function ScheduleManager({
                       />
                     ))}
 
-                    {/* Booking blocks */}
                     {getBookingsForField(field.id).map((booking) => {
                       const { top, height } = getBookingStyle(booking)
                       return (
                         <div
                           key={booking.id}
-                          className={`absolute left-1 right-1 rounded-lg border-l-4 cursor-pointer transition-all ${getStatusBgColor(booking.status)}`}
+                          className={`absolute left-1 right-1 rounded-lg border-l-4 cursor-pointer transition-all ${getDisplayStatusBgColor(booking)}`}
                           style={{ top: top + 2, height }}
                           onClick={() => {
                             setSelectedBooking(booking)
@@ -728,12 +858,9 @@ export function ScheduleManager({
                         >
                           <div className="p-2 space-y-0.5">
                             <div className="flex items-center justify-between">
-                              <Badge className={`text-[10px] px-1.5 py-0 ${getStatusColor(booking.status)}`}>
-                                {getStatusText(booking.status)}
+                              <Badge className={`text-[10px] px-1.5 py-0 ${getDisplayStatusColor(booking)}`}>
+                                {getDisplayStatusText(booking)}
                               </Badge>
-                              {/* <span className="text-[10px] text-muted-foreground">
-                                {booking.startTime} - {booking.endTime}
-                              </span> */}
                             </div>
                             <p className="text-xs font-medium truncate flex items-center gap-1">
                               <User className="w-3 h-3" />
@@ -744,9 +871,6 @@ export function ScheduleManager({
                                 <Phone className="w-2.5 h-2.5" />
                                 {booking.customerPhone}
                               </span>
-                              {/* <span className="text-xs font-semibold text-primary">
-                                {formatCurrency(booking.price)}
-                              </span> */}
                             </div>
                           </div>
                         </div>
@@ -760,7 +884,6 @@ export function ScheduleManager({
         </Card>
       )}
 
-      {/* Booking Details Dialog */}
       <Dialog open={showDetails} onOpenChange={setShowDetails}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -769,8 +892,8 @@ export function ScheduleManager({
           {selectedBooking && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <Badge className={getStatusColor(selectedBooking.status)}>
-                  {getStatusText(selectedBooking.status)}
+                <Badge className={getDisplayStatusColor(selectedBooking)}>
+                  {getDisplayStatusText(selectedBooking)}
                 </Badge>
                 <span className="text-sm text-muted-foreground">#{selectedBooking.id}</span>
               </div>
@@ -783,6 +906,7 @@ export function ScheduleManager({
                     <p className="font-medium">{selectedBooking.customerName}</p>
                   </div>
                 </div>
+
                 <div className="flex items-center gap-3">
                   <Phone className="w-4 h-4 text-muted-foreground" />
                   <div>
@@ -790,6 +914,7 @@ export function ScheduleManager({
                     <p className="font-medium">{selectedBooking.customerPhone}</p>
                   </div>
                 </div>
+
                 <div className="flex items-center gap-3">
                   <MapPin className="w-4 h-4 text-muted-foreground" />
                   <div>
@@ -797,6 +922,7 @@ export function ScheduleManager({
                     <p className="font-medium">{selectedBooking.fieldName}</p>
                   </div>
                 </div>
+
                 <div className="flex items-center gap-3">
                   <Calendar className="w-4 h-4 text-muted-foreground" />
                   <div>
@@ -807,6 +933,7 @@ export function ScheduleManager({
                     </p>
                   </div>
                 </div>
+
                 <div className="flex items-center gap-3">
                   <DollarSign className="w-4 h-4 text-muted-foreground" />
                   <div>
@@ -816,8 +943,7 @@ export function ScheduleManager({
                 </div>
               </div>
 
-              {/* Actions for Owner */}
-              {!isAdmin && selectedBooking.status === "pending" && (
+              {!isAdmin && canShowPendingActions(selectedBooking) && (
                 <div className="flex gap-2 pt-4 border-t">
                   <Button
                     className="flex-1 bg-green-600 hover:bg-green-700"
@@ -840,6 +966,16 @@ export function ScheduleManager({
                 </div>
               )}
 
+              {!isAdmin && isExpiredPendingBooking(selectedBooking) && (
+                <div className="pt-4 border-t">
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-950/20">
+                    <p className="text-sm text-red-800 dark:text-red-200">
+                      Booking đã quá giờ bắt đầu, không thể duyệt.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {isAdmin && (
                 <div className="pt-4 border-t">
                   <p className="text-sm text-muted-foreground text-center">
@@ -852,7 +988,6 @@ export function ScheduleManager({
         </DialogContent>
       </Dialog>
 
-      {/* Reject Dialog */}
       <Dialog
         open={rejectDialog !== null}
         onOpenChange={() => {
@@ -896,7 +1031,6 @@ export function ScheduleManager({
         </DialogContent>
       </Dialog>
 
-      {/* Reschedule Dialog */}
       <Dialog
         open={rescheduleDialog !== null}
         onOpenChange={() => {
@@ -914,6 +1048,7 @@ export function ScheduleManager({
                 : "Vui lòng nhập lý do từ chối để khách hàng hiểu rõ tình huống."}
             </DialogDescription>
           </DialogHeader>
+
           {rescheduleAction === "reject" && (
             <div className="py-4">
               <Label htmlFor="reschedule-reason">Lý do từ chối *</Label>
@@ -927,6 +1062,7 @@ export function ScheduleManager({
               />
             </div>
           )}
+
           <DialogFooter>
             <Button
               variant="outline"
