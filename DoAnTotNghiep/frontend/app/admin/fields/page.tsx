@@ -325,6 +325,7 @@ export default function AdminFieldsPage() {
   const [rejectReason, setRejectReason] = useState("");
   const [fieldToReject, setFieldToReject] = useState<number | null>(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const itemsPerPage = 8;
 
   const fetchAdminFields = useCallback(async () => {
@@ -428,11 +429,6 @@ export default function AdminFieldsPage() {
       alert(error instanceof Error ? error.message : "Không thể từ chối sân");
     }
   };
-
-  // const handleViewDetail = (field: UiField) => {
-  //   setSelectedField(field);
-  //   setShowDetailDialog(true);
-  // };
   const handleViewDetail = async (field: UiField) => {
     try {
       const res = await apiGet<ApiResponse<AdminField>>(
@@ -729,39 +725,47 @@ export default function AdminFieldsPage() {
                 {/* Hình ảnh - chỉ hiện 1 ảnh chính */}
                 {selectedField.images.length > 0 && (
                   <div className="space-y-3">
-                    <img
-                      src={
-                        selectedField.images[selectedImageIndex] ||
-                        selectedField.images[0] ||
-                        "/placeholder.svg?height=300&width=600&query=sports field"
-                      }
-                      alt={selectedField.name}
-                      className="h-56 w-full rounded-lg object-cover"
-                    />
+  {selectedField.images.length > 0 ? (
+    <>
+      <button
+        type="button"
+        onClick={() => setPreviewImage(selectedField.images[0])}
+        className="block w-full overflow-hidden rounded-lg"
+      >
+        <img
+          src={selectedField.images[0]}
+          alt={selectedField.name}
+          className="h-56 w-full rounded-lg object-cover transition hover:opacity-90"
+        />
+      </button>
 
-                    {selectedField.images.length > 1 && (
-                      <div className="grid grid-cols-5 gap-2">
-                        {selectedField.images.map((image, index) => (
-                          <button
-                            key={`${image}-${index}`}
-                            type="button"
-                            onClick={() => setSelectedImageIndex(index)}
-                            className={`overflow-hidden rounded-lg border ${
-                              selectedImageIndex === index
-                                ? "border-primary"
-                                : "border-border"
-                            }`}
-                          >
-                            <img
-                              src={image}
-                              alt={`${selectedField.name} ${index + 1}`}
-                              className="h-16 w-full object-cover"
-                            />
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+      {selectedField.images.length > 1 && (
+        <div className="grid grid-cols-5 gap-2">
+          {selectedField.images.slice(1).map((image, index) => (
+            <button
+              key={`${image}-${index}`}
+              type="button"
+              onClick={() => setPreviewImage(image)}
+              className="overflow-hidden rounded-lg border border-border"
+            >
+              <img
+                src={image}
+                alt={`${selectedField.name} ${index + 2}`}
+                className="h-16 w-full object-cover transition hover:opacity-90"
+              />
+            </button>
+          ))}
+        </div>
+      )}
+    </>
+  ) : (
+    <img
+      src="/placeholder.svg?height=300&width=600&query=sports field"
+      alt={selectedField.name}
+      className="h-56 w-full rounded-lg object-cover"
+    />
+  )}
+</div>
                 )}
 
                 {/* Thông tin chính - 2 columns */}
@@ -952,6 +956,27 @@ export default function AdminFieldsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {previewImage && (
+  <div
+    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4"
+    onClick={() => setPreviewImage(null)}
+  >
+    <button
+      type="button"
+      onClick={() => setPreviewImage(null)}
+      className="absolute right-4 top-4 rounded-full bg-white/10 px-3 py-1 text-xl text-white hover:bg-white/20"
+    >
+      ×
+    </button>
+
+    <img
+      src={previewImage}
+      alt="Ảnh sân"
+      className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain"
+      onClick={(event) => event.stopPropagation()}
+    />
+  </div>
+)}
     </div>
   );
 }
