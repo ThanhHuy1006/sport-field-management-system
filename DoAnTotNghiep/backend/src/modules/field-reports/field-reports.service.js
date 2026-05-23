@@ -4,25 +4,24 @@ import {
   ForbiddenError,
   NotFoundError,
 } from "../../core/errors/index.js";
-import {
-  UPLOAD_FOLDERS,
-  UPLOAD_PUBLIC_PATH,
-} from "../uploads/uploads.constants.js";
 
+import { UPLOAD_FOLDERS } from "../uploads/uploads.constants.js";
+import { uploadsService } from "../uploads/uploads.service.js";
 const REASONS_REQUIRE_BOOKING = ["BAD_QUALITY", "OWNER_ATTITUDE"];
 
-const VALID_REPORT_BOOKING_STATUSES = [
-  "PAID",
-  "CHECKED_IN",
-  "COMPLETED",
-];
+const VALID_REPORT_BOOKING_STATUSES = ["PAID", "CHECKED_IN", "COMPLETED"];
 
-function toFieldReportAttachments(files = []) {
-  return files.map((file) => ({
-    image_url: `${UPLOAD_PUBLIC_PATH}/${UPLOAD_FOLDERS.FIELD_REPORTS}/${file.filename}`,
-    file_name: file.originalname,
-    mime_type: file.mimetype,
-    file_size: file.size,
+async function toFieldReportAttachments(files = []) {
+  const uploadedFiles = await uploadsService.toPublicFiles(
+    files,
+    UPLOAD_FOLDERS.FIELD_REPORTS,
+  );
+
+  return uploadedFiles.map((file) => ({
+    image_url: file.url,
+    file_name: file.original_name,
+    mime_type: file.mime_type,
+    file_size: file.size_bytes,
   }));
 }
 
@@ -39,12 +38,12 @@ export const fieldReportsService = {
     }
 
     const isReasonRequireBooking = REASONS_REQUIRE_BOOKING.includes(
-      payload.reason
+      payload.reason,
     );
 
     if (isReasonRequireBooking && !payload.booking_id) {
       throw new ForbiddenError(
-        "Bạn cần có đơn đặt sân liên quan để báo cáo lý do này"
+        "Bạn cần có đơn đặt sân liên quan để báo cáo lý do này",
       );
     }
 
@@ -52,18 +51,18 @@ export const fieldReportsService = {
       const booking = await fieldReportsRepository.findBookingForReport(
         userId,
         payload.booking_id,
-        payload.field_id
+        payload.field_id,
       );
 
       if (!booking) {
         throw new ForbiddenError(
-          "Booking không tồn tại hoặc không thuộc về bạn"
+          "Booking không tồn tại hoặc không thuộc về bạn",
         );
       }
 
       if (!VALID_REPORT_BOOKING_STATUSES.includes(booking.status)) {
         throw new ForbiddenError(
-          "Chỉ có thể báo cáo sân khi đơn đặt sân đã được thanh toán, check-in hoặc hoàn tất"
+          "Chỉ có thể báo cáo sân khi đơn đặt sân đã được thanh toán, check-in hoặc hoàn tất",
         );
       }
     }
@@ -72,14 +71,15 @@ export const fieldReportsService = {
       await fieldReportsRepository.findOpenReportByUserFieldReason(
         userId,
         payload.field_id,
-        payload.reason
+        payload.reason,
       );
 
     if (existed) {
       throw new ConflictError(
-        "Bạn đã gửi báo cáo tương tự cho sân này và đang chờ xử lý"
+        "Bạn đã gửi báo cáo tương tự cho sân này và đang chờ xử lý",
       );
     }
+    const attachments = await toFieldReportAttachments(files);
 
     return fieldReportsRepository.createFieldReport({
       reporter_id: userId,
@@ -88,7 +88,7 @@ export const fieldReportsService = {
       reason: payload.reason,
       description: payload.description,
       status: "PENDING",
-      attachments: toFieldReportAttachments(files),
+      attachments,
     });
   },
 

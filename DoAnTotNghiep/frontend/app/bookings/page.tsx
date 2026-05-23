@@ -1146,11 +1146,11 @@ export default function BookingsPage() {
                   </div>
                 )}
               </div>
-              {qrToken && (
+              {/* {qrToken && (
                 <p className="max-w-[320px] text-xs font-mono break-all text-center text-muted-foreground">
                   {qrToken}
                 </p>
-              )}
+              )} */}
 
               <div className="w-full space-y-3 text-sm">
                 <div className="flex justify-between items-center py-2 border-b">

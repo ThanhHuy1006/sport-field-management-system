@@ -1110,7 +1110,7 @@ export default function ReportsManagementPage() {
 
       {/* Detail Dialog */}
       <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
-        <DialogContent className="max-w-2xl bg-card border-border">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-foreground">
               <Flag className="w-5 h-5 text-red-500" />
@@ -1274,57 +1274,11 @@ export default function ReportsManagementPage() {
             </div>
           )}
 
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowDetailDialog(false)}
-              className="bg-transparent"
-            >
-              Đóng
-            </Button>
-            {selectedReport &&
-              (selectedReport.status === "PENDING" ||
-                selectedReport.status === "REVIEWING") && (
-                <>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setAdminNote("");
-                      setActionType("reject");
-                      setShowActionDialog(true);
-                    }}
-                    className="text-red-600 border-red-300 hover:bg-red-50 dark:hover:bg-red-950/30 bg-transparent"
-                  >
-                    <XCircle className="w-4 h-4 mr-2" />
-                    Từ chối
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setAdminNote("");
-                      setActionType("resolve");
-                      setShowActionDialog(true);
-                    }}
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                  >
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                    Giải quyết
-                  </Button>
-                  {selectedReport.type === "field" && (
-                    <Button
-                      onClick={() => {
-                        setAdminNote("");
-                        setActionType("resolve_hide_field");
-                        setShowActionDialog(true);
-                      }}
-                      className="bg-red-600 hover:bg-red-700 text-white"
-                    >
-                      <AlertTriangle className="w-4 h-4 mr-2" />
-                      Giải quyết & ẩn sân
-                    </Button>
-                  )}
-                </>
-              )}
-          </DialogFooter>
+         <DialogFooter>
+  <Button variant="outline" onClick={() => setShowDetailDialog(false)}>
+    Đóng
+  </Button>
+</DialogFooter>
         </DialogContent>
       </Dialog>
 
