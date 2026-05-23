@@ -8,9 +8,7 @@ import {
   Users,
   MapPin,
   Calendar,
-  Star,
   BarChart3,
-  Settings,
   LogOut,
   ChevronLeft,
   Menu,
@@ -25,9 +23,10 @@ const adminNavItems = [
   { href: "/admin/fields", label: "Quản lý sân", icon: MapPin },
   { href: "/admin/schedule", label: "Quản lý đặt sân", icon: Calendar },
 
-  { href: "/admin/field-reports", label: "Báo cáo sân", icon: Flag },
-  { href: "/admin/reviews", label: "Báo cáo đánh giá", icon: Star },
+  // Page gộp: Báo cáo sân + Báo cáo đánh giá
+  { href: "/admin/moderation-reports", label: "Báo cáo vi phạm", icon: Flag },
 
+  // Giữ nguyên trang thống kê hiện tại
   { href: "/admin/reports", label: "Thống kê", icon: BarChart3 },
 
   // { href: "/admin/settings", label: "Cài đặt", icon: Settings },
@@ -54,13 +53,18 @@ export function AdminSidebar() {
             <span className="font-bold">Admin Panel</span>
           </Link>
         )}
+
         <Button
           variant="ghost"
           size="icon"
           onClick={() => setCollapsed(!collapsed)}
           className={collapsed ? "mx-auto" : ""}
         >
-          {collapsed ? <Menu className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+          {collapsed ? (
+            <Menu className="w-5 h-5" />
+          ) : (
+            <ChevronLeft className="w-5 h-5" />
+          )}
         </Button>
       </div>
 
@@ -68,7 +72,8 @@ export function AdminSidebar() {
       <nav className="p-3 space-y-1">
         {adminNavItems.map((item) => {
           const Icon = item.icon
-          const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
+          const isActive =
+            pathname === item.href || pathname.startsWith(item.href + "/")
 
           return (
             <Link
@@ -82,7 +87,9 @@ export function AdminSidebar() {
               )}
             >
               <Icon className="w-5 h-5 shrink-0" />
-              {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
+              {!collapsed && (
+                <span className="text-sm font-medium">{item.label}</span>
+              )}
             </Link>
           )
         })}
@@ -97,7 +104,9 @@ export function AdminSidebar() {
           )}
         >
           <LogOut className="w-5 h-5 shrink-0" />
-          {!collapsed && <span className="text-sm font-medium">Thoát Admin</span>}
+          {!collapsed && (
+            <span className="text-sm font-medium">Thoát Admin</span>
+          )}
         </Link>
       </div>
     </aside>
