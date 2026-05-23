@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import {
   AlertCircle,
@@ -49,6 +49,35 @@ const emptySummary: OwnerDashboardSummary = {
   total_revenue_this_month: 0,
 }
 
+function normalizeSummary(
+  data?: Partial<OwnerDashboardSummary> | null,
+): OwnerDashboardSummary {
+  return {
+    total_fields: Number(data?.total_fields || 0),
+    pending_bookings: Number(data?.pending_bookings || 0),
+    total_bookings_this_month: Number(data?.total_bookings_this_month || 0),
+    total_revenue_this_month: Number(data?.total_revenue_this_month || 0),
+  }
+}
+
+function normalizeArray<T>(value: T[] | null | undefined): T[] {
+  return Array.isArray(value) ? value : []
+}
+
+function getLocalDateKey(value: Date | string | null | undefined) {
+  if (!value) return ""
+
+  const date = value instanceof Date ? value : new Date(value)
+
+  if (Number.isNaN(date.getTime())) return ""
+
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+
+  return `${year}-${month}-${day}`
+}
+
 function formatCurrency(value: string | number | null | undefined) {
   const amount = Number(value || 0)
 
@@ -77,7 +106,9 @@ function formatShortCurrency(value: string | number | null | undefined) {
   return amount.toString()
 }
 
-function formatDate(value: string) {
+function formatDate(value: string | null | undefined) {
+  if (!value) return "--"
+
   const date = new Date(value)
 
   if (Number.isNaN(date.getTime())) return "--"
@@ -90,7 +121,9 @@ function formatDate(value: string) {
   })
 }
 
-function formatTime(value: string) {
+function formatTime(value: string | null | undefined) {
+  if (!value) return "--:--"
+
   const date = new Date(value)
 
   if (Number.isNaN(date.getTime())) return "--:--"
@@ -101,7 +134,9 @@ function formatTime(value: string) {
   })
 }
 
-function getDurationHours(start: string, end: string) {
+function getDurationHours(start: string | null | undefined, end: string | null | undefined) {
+  if (!start || !end) return 0
+
   const startDate = new Date(start)
   const endDate = new Date(end)
 
@@ -157,6 +192,8 @@ function getStatusLabel(status: string) {
       return "Thanh toán lỗi"
     case "PAYMENT_EXPIRED":
       return "Hết hạn thanh toán"
+    case "NO_SHOW":
+      return "Khách không đến"
     default:
       return status
   }
@@ -178,6 +215,7 @@ function getStatusColor(status: string) {
     case "CANCELLED":
     case "PAY_FAILED":
     case "PAYMENT_EXPIRED":
+    case "NO_SHOW":
       return "bg-red-100 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-900"
     default:
       return "bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-950 dark:text-gray-400 dark:border-gray-900"
@@ -259,11 +297,15 @@ export default function OwnerDashboard() {
   const [selectedBooking, setSelectedBooking] =
     useState<OwnerDashboardBooking | null>(null)
   const [showDetailDialog, setShowDetailDialog] = useState(false)
+  const [showRejectDialog, setShowRejectDialog] = useState(false)
+  const [bookingToReject, setBookingToReject] =
+    useState<OwnerDashboardBooking | null>(null)
+  const [rejectReason, setRejectReason] = useState("")
   const [isLoading, setIsLoading] = useState(true)
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null)
   const [error, setError] = useState("")
 
-  async function fetchDashboard() {
+  const fetchDashboard = useCallback(async () => {
     try {
       setIsLoading(true)
       setError("")
@@ -275,23 +317,26 @@ export default function OwnerDashboard() {
           getRecentOwnerNotifications(),
         ])
 
-      setSummary(summaryResult.data || emptySummary)
-      setRecentBookings(bookingsResult.data || [])
-      setNotifications(notificationsResult.data || [])
+      setSummary(normalizeSummary(summaryResult.data))
+      setRecentBookings(normalizeArray(bookingsResult.data))
+      setNotifications(normalizeArray(notificationsResult.data))
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
           : "Không thể tải dữ liệu dashboard owner",
       )
+      setSummary(emptySummary)
+      setRecentBookings([])
+      setNotifications([])
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     fetchDashboard()
-  }, [])
+  }, [fetchDashboard])
 
   const pendingBookings = useMemo(
     () =>
@@ -301,9 +346,20 @@ export default function OwnerDashboard() {
     [recentBookings],
   )
 
-  const expectedRevenue = useMemo(
+  const todayBookings = useMemo(() => {
+    const today = getLocalDateKey(new Date())
+
+    return recentBookings.filter(
+      (booking) => getLocalDateKey(booking.start_datetime) === today,
+    )
+  }, [recentBookings])
+
+  const displayBookings =
+    todayBookings.length > 0 ? todayBookings : recentBookings
+
+  const displayExpectedRevenue = useMemo(
     () =>
-      recentBookings
+      displayBookings
         .filter((booking) =>
           [
             "APPROVED",
@@ -314,23 +370,8 @@ export default function OwnerDashboard() {
           ].includes(booking.status),
         )
         .reduce((sum, booking) => sum + Number(booking.total_price || 0), 0),
-    [recentBookings],
+    [displayBookings],
   )
-
-  const todayBookings = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10)
-
-    return recentBookings.filter((booking) => {
-      const date = new Date(booking.start_datetime)
-
-      if (Number.isNaN(date.getTime())) return false
-
-      return date.toISOString().slice(0, 10) === today
-    })
-  }, [recentBookings])
-
-  const displayBookings =
-    todayBookings.length > 0 ? todayBookings : recentBookings
 
   const unreadNotificationCount = notifications.filter(
     (item) => !item.is_read,
@@ -358,14 +399,32 @@ export default function OwnerDashboard() {
     }
   }
 
-  const handleRejectBooking = async (bookingId: number) => {
+  const openRejectDialog = (booking: OwnerDashboardBooking) => {
+    setBookingToReject(booking)
+    setRejectReason("")
+    setShowDetailDialog(false)
+    setShowRejectDialog(true)
+  }
+
+  const handleRejectBooking = async () => {
+    if (!bookingToReject) return
+
+    const reason = rejectReason.trim()
+
+    if (!reason) {
+      setError("Vui lòng nhập lý do từ chối đơn đặt sân")
+      return
+    }
+
     try {
-      setActionLoadingId(bookingId)
+      setActionLoadingId(bookingToReject.id)
       setError("")
 
-      await rejectOwnerBooking(bookingId, "Rejected from owner dashboard")
+      await rejectOwnerBooking(bookingToReject.id, reason)
 
-      setShowDetailDialog(false)
+      setShowRejectDialog(false)
+      setBookingToReject(null)
+      setRejectReason("")
       setSelectedBooking(null)
       await fetchDashboard()
     } catch (err) {
@@ -393,7 +452,18 @@ export default function OwnerDashboard() {
         {error && (
           <Card className="border-red-200 bg-red-50 dark:bg-red-950/20">
             <CardContent className="p-4 text-sm text-red-600">
-              {error}
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p>{error}</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={fetchDashboard}
+                  disabled={isLoading}
+                  className="w-fit"
+                >
+                  Thử lại
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}
@@ -471,7 +541,7 @@ export default function OwnerDashboard() {
                 </Card>
               </Link>
 
-              <Link href="/owner/bookings" className="block">
+              <Link href="/owner/schedule" className="block">
                 <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
@@ -513,7 +583,7 @@ export default function OwnerDashboard() {
                 </Card>
               </Link>
 
-              <Link href="/owner/bookings" className="block">
+              <Link href="/owner/schedule" className="block">
                 <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
@@ -664,7 +734,7 @@ export default function OwnerDashboard() {
                           Doanh thu dự kiến
                         </p>
                         <p className="text-xl font-bold text-green-600">
-                          {formatShortCurrency(expectedRevenue)} VND
+                          {formatShortCurrency(displayExpectedRevenue)} VND
                         </p>
                       </div>
 
@@ -790,7 +860,7 @@ export default function OwnerDashboard() {
                       </Button>
                     </Link>
 
-                    <Link href="/owner/bookings">
+                    <Link href="/owner/schedule">
                       <Button variant="outline" className="w-full justify-start">
                         <Calendar className="w-4 h-4 mr-2" />
                         Quản Lý Đặt Sân
@@ -825,7 +895,16 @@ export default function OwnerDashboard() {
         )}
       </div>
 
-      <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
+      <Dialog
+        open={showDetailDialog}
+        onOpenChange={(open) => {
+          setShowDetailDialog(open)
+
+          if (!open) {
+            setSelectedBooking(null)
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-[540px]">
           <DialogHeader>
             <DialogTitle>Chi Tiết Đặt Sân</DialogTitle>
@@ -914,7 +993,7 @@ export default function OwnerDashboard() {
                   variant="outline"
                   className="flex-1"
                   disabled={actionLoadingId === selectedBooking.id}
-                  onClick={() => handleRejectBooking(selectedBooking.id)}
+                  onClick={() => openRejectDialog(selectedBooking)}
                 >
                   <XCircle className="w-4 h-4 mr-2" />
                   Từ Chối
@@ -937,6 +1016,78 @@ export default function OwnerDashboard() {
                 Đóng
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showRejectDialog}
+        onOpenChange={(open) => {
+          setShowRejectDialog(open)
+
+          if (!open) {
+            setBookingToReject(null)
+            setRejectReason("")
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Từ Chối Đơn Đặt Sân</DialogTitle>
+            <DialogDescription>
+              Nhập lý do để khách hàng biết vì sao đơn đặt sân bị từ chối.
+            </DialogDescription>
+          </DialogHeader>
+
+          {bookingToReject && (
+            <div className="space-y-4">
+              <div className="rounded-lg bg-muted p-4 space-y-1">
+                <p className="font-semibold">{getFieldName(bookingToReject)}</p>
+                <p className="text-sm text-muted-foreground">
+                  {getCustomerName(bookingToReject)} •{" "}
+                  {formatDate(bookingToReject.start_datetime)} •{" "}
+                  {formatTime(bookingToReject.start_datetime)} -{" "}
+                  {formatTime(bookingToReject.end_datetime)}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label
+                  htmlFor="reject-reason"
+                  className="text-sm font-medium leading-none"
+                >
+                  Lý do từ chối
+                </label>
+                <textarea
+                  id="reject-reason"
+                  value={rejectReason}
+                  onChange={(event) => setRejectReason(event.target.value)}
+                  placeholder="Ví dụ: Khung giờ này sân đang bảo trì hoặc đã có lịch nội bộ."
+                  className="min-h-[110px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowRejectDialog(false)}
+              disabled={bookingToReject ? actionLoadingId === bookingToReject.id : false}
+            >
+              Hủy
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleRejectBooking}
+              disabled={
+                !rejectReason.trim() ||
+                (bookingToReject ? actionLoadingId === bookingToReject.id : false)
+              }
+            >
+              <XCircle className="w-4 h-4 mr-2" />
+              Xác Nhận Từ Chối
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
