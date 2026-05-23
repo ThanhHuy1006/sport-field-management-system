@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import Link from "next/link"
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   Users,
   MapPin,
@@ -14,11 +14,12 @@ import {
   Star,
   TrendingUp,
   BarChart3,
-} from "lucide-react"
+  Flag,
+} from "lucide-react";
 import {
   getAdminReports,
   type AdminReportsData,
-} from "@/features/reports/services/admin-reports"
+} from "@/features/reports/services/admin-reports";
 
 function createEmptyReports(): AdminReportsData {
   return {
@@ -64,90 +65,171 @@ function createEmptyReports(): AdminReportsData {
       voucher_booking_count: 0,
       voucher_usage_rate: 0,
     },
-  }
+  };
+}
+
+function mergeReports(data?: AdminReportsData | null): AdminReportsData {
+  const empty = createEmptyReports();
+
+  if (!data) return empty;
+
+  return {
+    ...empty,
+    ...data,
+    range: {
+      ...empty.range,
+      ...(data.range ?? {}),
+    },
+    filters: {
+      ...empty.filters,
+      ...(data.filters ?? {}),
+    },
+    summary: {
+      ...empty.summary,
+      ...(data.summary ?? {}),
+    },
+    revenue_series: Array.isArray(data.revenue_series)
+      ? data.revenue_series
+      : [],
+    booking_status: Array.isArray(data.booking_status)
+      ? data.booking_status
+      : [],
+    field_status: Array.isArray(data.field_status) ? data.field_status : [],
+    top_fields: Array.isArray(data.top_fields) ? data.top_fields : [],
+    top_owners: Array.isArray(data.top_owners) ? data.top_owners : [],
+    sport_breakdown: Array.isArray(data.sport_breakdown)
+      ? data.sport_breakdown
+      : [],
+    district_breakdown: Array.isArray(data.district_breakdown)
+      ? data.district_breakdown
+      : [],
+    payment_methods: Array.isArray(data.payment_methods)
+      ? data.payment_methods
+      : [],
+    voucher_impact: {
+      ...empty.voucher_impact,
+      ...(data.voucher_impact ?? {}),
+    },
+  };
 }
 
 function formatCurrencyShort(value: number) {
-  if (!Number.isFinite(value)) return "0"
+  if (!Number.isFinite(value)) return "0";
 
   if (value >= 1_000_000_000) {
-    return `${(value / 1_000_000_000).toFixed(1)} tỷ`
+    return `${(value / 1_000_000_000).toFixed(1)} tỷ`;
   }
 
   if (value >= 1_000_000) {
-    return `${(value / 1_000_000).toFixed(1)} triệu`
+    return `${(value / 1_000_000).toFixed(1)} triệu`;
   }
 
   if (value >= 1_000) {
-    return `${Math.round(value / 1_000)}K`
+    return `${Math.round(value / 1_000)}K`;
   }
 
-  return value.toString()
+  return value.toString();
 }
 
 function formatNumber(value: number) {
-  if (!Number.isFinite(value)) return "0"
-  return value.toLocaleString("vi-VN")
+  if (!Number.isFinite(value)) return "0";
+  return value.toLocaleString("vi-VN");
+}
+
+function toNumber(value: number | null | undefined) {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : 0;
+}
+
+function getGrowthClassName(value: number) {
+  return value >= 0 ? "text-green-600" : "text-red-600";
+}
+
+function formatGrowth(value: number) {
+  const numberValue = toNumber(value);
+  return `${numberValue >= 0 ? "+" : ""}${numberValue}% so với kỳ trước`;
 }
 
 export default function AdminDashboard() {
   const [reports, setReports] = useState<AdminReportsData>(() =>
     createEmptyReports(),
-  )
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState("")
+  );
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const fetchDashboard = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError("");
+
+      const result = await getAdminReports({
+        range: "month",
+      });
+
+      setReports(mergeReports(result.data));
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Không thể tải dữ liệu dashboard admin",
+      );
+      setReports(createEmptyReports());
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let cancelled = false
+    let cancelled = false;
 
-    async function fetchDashboard() {
+    async function run() {
       try {
-        setIsLoading(true)
-        setError("")
+        setIsLoading(true);
+        setError("");
 
         const result = await getAdminReports({
           range: "month",
-        })
+        });
 
-        if (cancelled) return
+        if (cancelled) return;
 
-        setReports(result.data)
+        setReports(mergeReports(result.data));
       } catch (err) {
-        if (cancelled) return
+        if (cancelled) return;
 
         setError(
           err instanceof Error
             ? err.message
             : "Không thể tải dữ liệu dashboard admin",
-        )
-        setReports(createEmptyReports())
+        );
+        setReports(createEmptyReports());
       } finally {
         if (!cancelled) {
-          setIsLoading(false)
+          setIsLoading(false);
         }
       }
     }
 
-    fetchDashboard()
+    run();
 
     return () => {
-      cancelled = true
-    }
-  }, [])
+      cancelled = true;
+    };
+  }, []);
 
-  const summary = reports.summary
+  const summary = reports.summary;
 
-  const flaggedReviewsCount = summary.hidden_reviews ?? 0
-  const pendingOwnersCount = summary.pending_owners ?? 0
-  const pendingFieldsCount = summary.pending_fields ?? 0
+  const hiddenReviewsCount = toNumber(summary.hidden_reviews);
+  const pendingOwnersCount = toNumber(summary.pending_owners);
+  const pendingFieldsCount = toNumber(summary.pending_fields);
+  const bookingGrowthPercent = toNumber(summary.booking_growth_percent);
+  const revenueGrowthPercent = toNumber(summary.revenue_growth_percent);
 
   return (
     <div className="p-8">
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-foreground">
-          Bảng Điều Khiển
-        </h1>
+        <h1 className="text-2xl font-bold text-foreground">Bảng Điều Khiển</h1>
         <p className="text-muted-foreground">
           Tổng quan hệ thống quản lý sân thể thao
         </p>
@@ -155,7 +237,19 @@ export default function AdminDashboard() {
 
       {error && (
         <Card className="p-4 mb-6 border-red-200 bg-red-50 dark:bg-red-950/20">
-          <p className="text-sm text-red-600">{error}</p>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <p className="text-sm text-red-600">{error}</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={fetchDashboard}
+              disabled={isLoading}
+              className="w-fit border-red-300 text-red-700 hover:bg-red-100 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/30"
+            >
+              Thử lại
+            </Button>
+          </div>
         </Card>
       )}
 
@@ -219,17 +313,18 @@ export default function AdminDashboard() {
               </Link>
             )}
 
-            {flaggedReviewsCount > 0 && (
-              <Link href="/admin/reviews">
+            {hiddenReviewsCount > 0 && (
+              <Link href="/admin/moderation-reports">
                 <Card className="p-4 bg-red-50 border-red-200 hover:bg-red-100 transition cursor-pointer dark:bg-red-950/20 dark:border-red-800">
                   <div className="flex items-center gap-3">
                     <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-500" />
                     <div className="flex-1">
                       <p className="font-medium text-red-900 dark:text-red-300">
-                        Đánh Giá Đã Ẩn
+                        Đánh giá đang bị ẩn
                       </p>
                       <p className="text-sm text-red-800 dark:text-red-400">
-                        {flaggedReviewsCount} đánh giá cần được xem xét
+                        {hiddenReviewsCount} đánh giá hiện không hiển thị công
+                        khai
                       </p>
                     </div>
                     <Button
@@ -294,10 +389,13 @@ export default function AdminDashboard() {
                 <p className="text-2xl font-bold text-foreground">
                   {formatNumber(summary.total_bookings)}
                 </p>
-                <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                <p
+                  className={`text-xs mt-1 flex items-center gap-1 ${getGrowthClassName(
+                    bookingGrowthPercent,
+                  )}`}
+                >
                   <TrendingUp className="w-3 h-3" />
-                  {summary.booking_growth_percent >= 0 ? "+" : ""}
-                  {summary.booking_growth_percent}% so với kỳ trước
+                  {formatGrowth(bookingGrowthPercent)}
                 </p>
               </Card>
             </Link>
@@ -313,15 +411,18 @@ export default function AdminDashboard() {
                 <p className="text-2xl font-bold text-foreground">
                   {formatCurrencyShort(summary.total_revenue)}
                 </p>
-                <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                <p
+                  className={`text-xs mt-1 flex items-center gap-1 ${getGrowthClassName(
+                    revenueGrowthPercent,
+                  )}`}
+                >
                   <TrendingUp className="w-3 h-3" />
-                  {summary.revenue_growth_percent >= 0 ? "+" : ""}
-                  {summary.revenue_growth_percent}% so với kỳ trước
+                  {formatGrowth(revenueGrowthPercent)}
                 </p>
               </Card>
             </Link>
 
-            <Link href="/admin/reviews">
+            <Link href="/admin/reports">
               <Card className="p-6 hover:shadow-lg transition cursor-pointer">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-medium text-muted-foreground">
@@ -372,12 +473,12 @@ export default function AdminDashboard() {
               </Card>
             </Link>
 
-            <Link href="/admin/reviews" className="block h-full">
+            <Link href="/admin/moderation-reports" className="block h-full">
               <Card className="p-6 hover:shadow-lg transition cursor-pointer h-full flex flex-col">
-                <Star className="w-8 h-8 text-primary mb-3" />
-                <h3 className="font-bold mb-2">Kiểm Duyệt Review</h3>
+                <Flag className="w-8 h-8 text-primary mb-3" />
+                <h3 className="font-bold mb-2">Báo Cáo Vi Phạm</h3>
                 <p className="text-sm text-muted-foreground flex-1">
-                  Ẩn hoặc khôi phục đánh giá sân
+                  Xử lý báo cáo sân và báo cáo đánh giá
                 </p>
               </Card>
             </Link>
@@ -395,5 +496,5 @@ export default function AdminDashboard() {
         </>
       )}
     </div>
-  )
+  );
 }

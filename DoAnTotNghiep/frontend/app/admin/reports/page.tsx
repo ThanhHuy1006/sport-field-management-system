@@ -24,9 +24,7 @@ import {
   MapPin,
   Printer,
   Star,
-  Tag,
   TrendingUp,
-  Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -234,8 +232,11 @@ function getPaymentMethodLabel(value?: string | null) {
 }
 
 function getBookingStatusLabel(status?: string | null) {
+  const normalizedStatus = String(status || "").toUpperCase();
+
   const labels: Record<string, string> = {
     PENDING_CONFIRM: "Chờ xác nhận",
+    APPROVED: "Đã duyệt",
     AWAITING_PAYMENT: "Chờ thanh toán",
     PAID: "Đã thanh toán",
     CHECKED_IN: "Đã check-in",
@@ -243,21 +244,26 @@ function getBookingStatusLabel(status?: string | null) {
     CANCELLED: "Đã hủy",
     REJECTED: "Bị từ chối",
     PAY_FAILED: "Thanh toán lỗi",
+    PAYMENT_EXPIRED: "Quá hạn thanh toán",
+    NO_SHOW: "Không đến sân",
   };
 
-  return labels[String(status || "")] || String(status || "Không rõ");
+  return labels[normalizedStatus] || String(status || "Không rõ");
 }
 
 function getFieldStatusLabel(status?: string | null) {
+  const normalizedStatus = String(status || "").toLowerCase();
+
   const labels: Record<string, string> = {
     active: "Đang hoạt động",
     pending: "Chờ duyệt",
     inactive: "Tạm ngưng",
     maintenance: "Bảo trì",
     rejected: "Bị từ chối",
+    hidden: "Đã ẩn",
   };
 
-  return labels[String(status || "").toLowerCase()] || String(status || "Không rõ");
+  return labels[normalizedStatus] || String(status || "Không rõ");
 }
 
 function createEmptyReports(): AdminReportsData {
@@ -309,6 +315,53 @@ function pickArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
 }
 
+function normalizeSummary(
+  summary?: Partial<Record<keyof AdminReportsData["summary"], unknown>> | null,
+): AdminReportsData["summary"] {
+  const empty = createEmptyReports().summary;
+
+  return {
+    total_revenue: toNumber(summary?.total_revenue ?? empty.total_revenue),
+    total_bookings: toNumber(summary?.total_bookings ?? empty.total_bookings),
+    revenue_bookings: toNumber(summary?.revenue_bookings ?? empty.revenue_bookings),
+    total_users: toNumber(summary?.total_users ?? empty.total_users),
+    total_owners: toNumber(summary?.total_owners ?? empty.total_owners),
+    locked_users: toNumber(summary?.locked_users ?? empty.locked_users),
+    total_fields: toNumber(summary?.total_fields ?? empty.total_fields),
+    active_fields: toNumber(summary?.active_fields ?? empty.active_fields),
+    pending_fields: toNumber(summary?.pending_fields ?? empty.pending_fields),
+    maintenance_fields: toNumber(summary?.maintenance_fields ?? empty.maintenance_fields),
+    avg_rating: toNumber(summary?.avg_rating ?? empty.avg_rating),
+    voucher_discount_total: toNumber(
+      summary?.voucher_discount_total ?? empty.voucher_discount_total,
+    ),
+    revenue_growth_percent: toNumber(
+      summary?.revenue_growth_percent ?? empty.revenue_growth_percent,
+    ),
+    booking_growth_percent: toNumber(
+      summary?.booking_growth_percent ?? empty.booking_growth_percent,
+    ),
+  };
+}
+
+function normalizeVoucherImpact(
+  voucherImpact?: Partial<Record<keyof VoucherImpact, unknown>> | null,
+): VoucherImpact {
+  const empty = createEmptyReports().voucher_impact;
+
+  return {
+    original_revenue: toNumber(voucherImpact?.original_revenue ?? empty.original_revenue),
+    final_revenue: toNumber(voucherImpact?.final_revenue ?? empty.final_revenue),
+    discount_total: toNumber(voucherImpact?.discount_total ?? empty.discount_total),
+    voucher_booking_count: toNumber(
+      voucherImpact?.voucher_booking_count ?? empty.voucher_booking_count,
+    ),
+    voucher_usage_rate: toNumber(
+      voucherImpact?.voucher_usage_rate ?? empty.voucher_usage_rate,
+    ),
+  };
+}
+
 function normalizeReports(payload?: Partial<AdminReportsData> | null): AdminReportsData {
   const empty = createEmptyReports();
   const source = payload ?? {};
@@ -324,10 +377,7 @@ function normalizeReports(payload?: Partial<AdminReportsData> | null): AdminRepo
       ...empty.filters,
       ...(source.filters ?? {}),
     },
-    summary: {
-      ...empty.summary,
-      ...(source.summary ?? {}),
-    },
+    summary: normalizeSummary(source.summary as Partial<Record<keyof AdminReportsData["summary"], unknown>>),
     revenue_series: pickArray<RevenuePoint>(source.revenue_series),
     booking_status: pickArray<BookingStatusItem>(source.booking_status),
     field_status: pickArray<FieldStatusItem>(source.field_status),
@@ -336,10 +386,7 @@ function normalizeReports(payload?: Partial<AdminReportsData> | null): AdminRepo
     sport_breakdown: pickArray<BreakdownItem>(source.sport_breakdown),
     district_breakdown: pickArray<BreakdownItem>(source.district_breakdown),
     payment_methods: pickArray<PaymentMethodItem>(source.payment_methods),
-    voucher_impact: {
-      ...empty.voucher_impact,
-      ...(source.voucher_impact ?? {}),
-    },
+    voucher_impact: normalizeVoucherImpact(source.voucher_impact as Partial<Record<keyof VoucherImpact, unknown>>),
   };
 }
 
@@ -396,7 +443,7 @@ function ChartTooltip({
 
         const value =
           item.name === "revenue"
-            ? formatFullCurrency(Number(item.value || 0))
+            ? formatFullCurrency(toNumber(item.value))
             : item.value;
 
         return (
@@ -438,7 +485,14 @@ function StatCard({
           </div>
 
           {growth !== undefined && (
-            <div className="rounded-full border border-border px-2 py-1 text-xs font-medium text-muted-foreground">
+            <div
+              className={[
+                "rounded-full border px-2 py-1 text-xs font-medium",
+                growth >= 0
+                  ? "border-green-600/30 text-green-600"
+                  : "border-red-600/30 text-red-600",
+              ].join(" ")}
+            >
               {formatPercent(growth)}
             </div>
           )}
@@ -489,6 +543,7 @@ export default function AdminReportsPage() {
   const [reports, setReports] = useState<AdminReportsData>(() => createEmptyReports());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -585,7 +640,7 @@ export default function AdminReportsPage() {
     return () => {
       cancelled = true;
     };
-  }, [dateRange, selectedSportType, selectedDistrict]);
+  }, [dateRange, selectedSportType, selectedDistrict, reloadKey]);
 
   const summary = reports.summary;
 
@@ -795,12 +850,12 @@ export default function AdminReportsPage() {
           </div>
 
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleExportCsv}>
+            <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={isLoading}>
               <Download className="mr-2 h-4 w-4" />
               Xuất CSV
             </Button>
 
-            <Button variant="outline" size="sm" onClick={handlePrint}>
+            <Button variant="outline" size="sm" onClick={handlePrint} disabled={isLoading}>
               <Printer className="mr-2 h-4 w-4" />
               In / PDF
             </Button>
@@ -809,7 +864,19 @@ export default function AdminReportsPage() {
 
         {error && (
           <Card className="border-destructive/40">
-            <CardContent className="p-4 text-sm text-destructive">{error}</CardContent>
+            <CardContent className="flex flex-col gap-3 p-4 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
+              <span>{error}</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setReloadKey((current) => current + 1)}
+                disabled={isLoading}
+                className="w-fit"
+              >
+                Thử lại
+              </Button>
+            </CardContent>
           </Card>
         )}
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -34,12 +34,25 @@ import {
 } from "lucide-react"
 import { Pagination } from "@/components/pagination"
 import { apiGet, apiRequest } from "@/lib/api-client"
+import { getImageUrl } from "@/lib/image-url"
 
 type ApiResponse<T> = {
-  success: boolean
-  message: string
-  data: T
+  success?: boolean
+  message?: string
+  data?: T
 }
+
+type ApiListData<T> =
+  | T[]
+  | {
+      items?: T[]
+      pagination?: {
+        page?: number
+        limit?: number
+        total?: number
+        total_pages?: number
+      }
+    }
 
 type AdminUser = {
   id: number
@@ -48,7 +61,7 @@ type AdminUser = {
   phone: string | null
   avatar_url: string | null
   role: "USER" | "OWNER" | "ADMIN" | string
-  status: "active" | "locked" | "deleted" | string
+  status: "active" | "locked" | "deleted" | "ACTIVE" | "LOCKED" | "DELETED" | string
   created_at: string | null
   updated_at?: string | null
   owner_profile?: {
@@ -72,7 +85,7 @@ type AdminOwnerRegistration = {
   license_url: string | null
   id_front_url: string | null
   id_back_url: string | null
-  status: "pending" | "approved" | "rejected" | string
+  status: "pending" | "approved" | "rejected" | "PENDING" | "APPROVED" | "REJECTED" | string
   approved_by: number | null
   approved_at: string | null
   reject_reason: string | null
@@ -100,7 +113,6 @@ type UiUser = {
   phone: string
   type: "customer" | "owner" | "admin"
   joinDate: string
-  bookings: number
   status: "active" | "locked" | "deleted" | string
   avatar: string
   businessName?: string | null
@@ -129,20 +141,60 @@ type PendingOwner = {
 
 type TabType = "all" | "customer" | "owner" | "pending"
 
-const API_ORIGIN = (
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api/v1"
-).replace(/\/api\/v1\/?$/, "")
+const ITEMS_PER_PAGE = 10
+const PLACEHOLDER_IMAGE = "/placeholder.svg"
+
+function extractItems<T>(data: ApiListData<T> | null | undefined): T[] {
+  if (Array.isArray(data)) return data
+  if (Array.isArray(data?.items)) return data.items
+  return []
+}
 
 function formatDate(value?: string | null) {
   if (!value) return "-"
-  return new Date(value).toLocaleDateString("vi-VN")
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  return date.toLocaleDateString("vi-VN")
+}
+
+function normalizeUserStatus(status?: string | null) {
+  const normalized = String(status || "active").toLowerCase()
+
+  if (normalized === "active" || normalized === "locked" || normalized === "deleted") {
+    return normalized
+  }
+
+  return normalized || "active"
+}
+
+function normalizeOwnerRegistrationStatus(status?: string | null) {
+  return String(status || "").toLowerCase()
+}
+
+function getCurrentAdminId() {
+  if (typeof window === "undefined") return null
+
+  const rawCurrentUser = localStorage.getItem("currentUser")
+  if (!rawCurrentUser) return null
+
+  try {
+    const parsed = JSON.parse(rawCurrentUser)
+    const id = Number(parsed?.id ?? parsed?.user?.id)
+
+    return Number.isFinite(id) ? id : null
+  } catch {
+    return null
+  }
 }
 
 function toAssetUrl(url?: string | null) {
-  if (!url) return "/placeholder.svg"
-  if (url.startsWith("http")) return url
-  if (url.startsWith("/uploads")) return `${API_ORIGIN}${url}`
-  return url
+  if (!url) return PLACEHOLDER_IMAGE
+  return getImageUrl(url)
 }
 
 function mapUserToUi(user: AdminUser): UiUser {
@@ -151,12 +203,11 @@ function mapUserToUi(user: AdminUser): UiUser {
   return {
     id: user.id,
     name: user.name || "Chưa cập nhật",
-    email: user.email,
+    email: user.email || "-",
     phone: user.phone || "-",
     type: role === "OWNER" ? "owner" : role === "ADMIN" ? "admin" : "customer",
     joinDate: formatDate(user.created_at),
-    bookings: 0,
-    status: user.status,
+    status: normalizeUserStatus(user.status),
     avatar: toAssetUrl(user.avatar_url),
     businessName: user.owner_profile?.business_name ?? null,
     businessAddress: user.owner_profile?.address ?? null,
@@ -204,19 +255,28 @@ function getUserTypeClassName(type: UiUser["type"]) {
 }
 
 function getStatusLabel(status: string) {
-  if (status === "active") return "Hoạt động"
-  if (status === "locked") return "Tạm khóa"
-  if (status === "deleted") return "Đã xóa"
-  return status
+  const normalizedStatus = normalizeUserStatus(status)
+
+  if (normalizedStatus === "active") return "Hoạt động"
+  if (normalizedStatus === "locked") return "Tạm khóa"
+  if (normalizedStatus === "deleted") return "Đã xóa"
+
+  return status || "Không xác định"
 }
 
 function getStatusClassName(status: string) {
-  if (status === "active") {
+  const normalizedStatus = normalizeUserStatus(status)
+
+  if (normalizedStatus === "active") {
     return "bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700"
   }
 
-  if (status === "locked") {
+  if (normalizedStatus === "locked") {
     return "bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-700"
+  }
+
+  if (normalizedStatus === "deleted") {
+    return "bg-slate-50 dark:bg-slate-900/30 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700"
   }
 
   return "bg-slate-50 dark:bg-slate-900/30 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700"
@@ -226,40 +286,54 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<UiUser[]>([])
   const [pendingOwners, setPendingOwners] = useState<PendingOwner[]>([])
   const [loading, setLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState("")
   const [searchTerm, setSearchTerm] = useState("")
   const [activeTab, setActiveTab] = useState<TabType>("all")
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedUser, setSelectedUser] = useState<UiUser | null>(null)
   const [selectedPendingOwner, setSelectedPendingOwner] = useState<PendingOwner | null>(null)
+  const [userToDelete, setUserToDelete] = useState<UiUser | null>(null)
   const [showUserDialog, setShowUserDialog] = useState(false)
   const [showPendingDialog, setShowPendingDialog] = useState(false)
   const [showRejectDialog, setShowRejectDialog] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [rejectReason, setRejectReason] = useState("")
+  const [actionLoadingKey, setActionLoadingKey] = useState<string | null>(null)
+  const [currentAdminId, setCurrentAdminId] = useState<number | null>(null)
   const { toast } = useToast()
-  const itemsPerPage = 10
 
   const fetchAdminUsers = useCallback(async () => {
     setLoading(true)
+    setErrorMessage("")
 
     try {
       const [usersRes, ownersRes] = await Promise.all([
-        apiGet<ApiResponse<AdminUser[]>>("/admin/users"),
-        apiGet<ApiResponse<AdminOwnerRegistration[]>>("/admin/owner-registrations"),
+        apiGet<ApiResponse<ApiListData<AdminUser>>>("/admin/users"),
+        apiGet<ApiResponse<ApiListData<AdminOwnerRegistration>>>("/admin/owner-registrations"),
       ])
 
-      setUsers(usersRes.data.map(mapUserToUi))
+      const userItems = extractItems(usersRes.data)
+      const ownerRegistrationItems = extractItems(ownersRes.data)
+
+      setUsers(userItems.map(mapUserToUi))
       setPendingOwners(
-        ownersRes.data
-          .filter((item) => item.status === "pending")
-          .map(mapOwnerRegistrationToUi)
+        ownerRegistrationItems
+          .filter((item) => normalizeOwnerRegistrationStatus(item.status) === "pending")
+          .map(mapOwnerRegistrationToUi),
       )
     } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Vui lòng kiểm tra lại quyền admin hoặc kết nối server."
+
+      setUsers([])
+      setPendingOwners([])
+      setErrorMessage(message)
+
       toast({
         title: "Không thể tải dữ liệu",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Vui lòng kiểm tra lại quyền admin hoặc kết nối server.",
+        description: message,
         variant: "destructive",
       })
     } finally {
@@ -268,46 +342,85 @@ export default function AdminUsersPage() {
   }, [toast])
 
   useEffect(() => {
+    setCurrentAdminId(getCurrentAdminId())
     fetchAdminUsers()
   }, [fetchAdminUsers])
 
-  const filteredUsers = users.filter((user) => {
-    const keyword = searchTerm.toLowerCase()
-    const matchesSearch =
-      user.name.toLowerCase().includes(keyword) ||
-      user.email.toLowerCase().includes(keyword)
+  const filteredUsers = useMemo(() => {
+    return users.filter((user) => {
+      const keyword = searchTerm.trim().toLowerCase()
+      const matchesSearch =
+        !keyword ||
+        user.name.toLowerCase().includes(keyword) ||
+        user.email.toLowerCase().includes(keyword) ||
+        user.phone.toLowerCase().includes(keyword)
 
-    const matchesTab =
-      activeTab === "all" ||
-      (activeTab === "customer" && user.type === "customer") ||
-      (activeTab === "owner" && user.type === "owner")
+      const matchesTab =
+        activeTab === "all" ||
+        (activeTab === "customer" && user.type === "customer") ||
+        (activeTab === "owner" && user.type === "owner")
 
-    return matchesSearch && matchesTab
-  })
+      return matchesSearch && matchesTab
+    })
+  }, [activeTab, searchTerm, users])
 
-  const filteredPendingOwners = pendingOwners.filter((owner) => {
-    const keyword = searchTerm.toLowerCase()
+  const filteredPendingOwners = useMemo(() => {
+    return pendingOwners.filter((owner) => {
+      const keyword = searchTerm.trim().toLowerCase()
 
-    return (
-      owner.name.toLowerCase().includes(keyword) ||
-      owner.email.toLowerCase().includes(keyword) ||
-      owner.businessName.toLowerCase().includes(keyword)
-    )
-  })
+      return (
+        !keyword ||
+        owner.name.toLowerCase().includes(keyword) ||
+        owner.email.toLowerCase().includes(keyword) ||
+        owner.businessName.toLowerCase().includes(keyword) ||
+        owner.taxCode.toLowerCase().includes(keyword)
+      )
+    })
+  }, [pendingOwners, searchTerm])
 
   const totalItems = activeTab === "pending" ? filteredPendingOwners.length : filteredUsers.length
-  const totalPages = Math.ceil(totalItems / itemsPerPage)
-  const paginatedUsers = filteredUsers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-  const paginatedPendingOwners = filteredPendingOwners.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+  const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE))
+
+  const paginatedUsers = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+    return filteredUsers.slice(startIndex, startIndex + ITEMS_PER_PAGE)
+  }, [currentPage, filteredUsers])
+
+  const paginatedPendingOwners = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+    return filteredPendingOwners.slice(startIndex, startIndex + ITEMS_PER_PAGE)
+  }, [currentPage, filteredPendingOwners])
+
+  const stats = useMemo(
+    () => ({
+      total: users.length,
+      customers: users.filter((u) => u.type === "customer").length,
+      owners: users.filter((u) => u.type === "owner").length,
+      pending: pendingOwners.length,
+    }),
+    [pendingOwners.length, users],
   )
 
-  const stats = {
-    total: users.length + pendingOwners.length,
-    customers: users.filter((u) => u.type === "customer").length,
-    owners: users.filter((u) => u.type === "owner").length,
-    pending: pendingOwners.length,
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [currentPage, totalPages])
+
+  const canManageUser = (user: UiUser) => {
+    if (user.status === "deleted") return false
+    if (user.id === currentAdminId) return false
+    if (user.type === "admin") return false
+
+    return true
+  }
+
+  const getManageDisabledReason = (user: UiUser) => {
+    if (user.status === "deleted") return "Tài khoản đã xóa"
+    if (user.id === currentAdminId) return "Không thể thao tác trên chính tài khoản của bạn"
+    if (user.type === "admin") return "Không thao tác trực tiếp trên tài khoản quản trị"
+
+    return ""
   }
 
   const handleViewUser = (user: UiUser) => {
@@ -320,9 +433,35 @@ export default function AdminUsersPage() {
     setShowPendingDialog(true)
   }
 
-  const handleDeleteUser = async (id: number) => {
+  const openRejectOwnerDialog = (owner: PendingOwner) => {
+    setSelectedPendingOwner(owner)
+    setRejectReason("")
+    setShowRejectDialog(true)
+  }
+
+  const openDeleteUserDialog = (user: UiUser) => {
+    if (!canManageUser(user)) {
+      toast({
+        title: "Không thể xóa tài khoản",
+        description: getManageDisabledReason(user),
+        variant: "destructive",
+      })
+      return
+    }
+
+    setUserToDelete(user)
+    setShowDeleteDialog(true)
+  }
+
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return
+    if (!canManageUser(userToDelete)) return
+
+    const actionKey = `delete-user-${userToDelete.id}`
+    setActionLoadingKey(actionKey)
+
     try {
-      await apiRequest<ApiResponse<AdminUser>>(`/admin/users/${id}/status`, {
+      await apiRequest<ApiResponse<AdminUser>>(`/admin/users/${userToDelete.id}/status`, {
         method: "PATCH",
         body: JSON.stringify({
           status: "deleted",
@@ -330,6 +469,9 @@ export default function AdminUsersPage() {
       })
 
       await fetchAdminUsers()
+
+      setShowDeleteDialog(false)
+      setUserToDelete(null)
 
       toast({
         title: "Đã xóa",
@@ -341,6 +483,8 @@ export default function AdminUsersPage() {
         description: error instanceof Error ? error.message : "Có lỗi xảy ra.",
         variant: "destructive",
       })
+    } finally {
+      setActionLoadingKey(null)
     }
   }
 
@@ -348,7 +492,18 @@ export default function AdminUsersPage() {
     const user = users.find((u) => u.id === id)
     if (!user) return
 
+    if (!canManageUser(user)) {
+      toast({
+        title: "Không thể cập nhật trạng thái",
+        description: getManageDisabledReason(user),
+        variant: "destructive",
+      })
+      return
+    }
+
     const nextStatus = user.status === "active" ? "locked" : "active"
+    const actionKey = `toggle-user-${id}`
+    setActionLoadingKey(actionKey)
 
     try {
       await apiRequest<ApiResponse<AdminUser>>(`/admin/users/${id}/status`, {
@@ -372,6 +527,8 @@ export default function AdminUsersPage() {
         description: error instanceof Error ? error.message : "Có lỗi xảy ra.",
         variant: "destructive",
       })
+    } finally {
+      setActionLoadingKey(null)
     }
   }
 
@@ -379,12 +536,15 @@ export default function AdminUsersPage() {
     const approvedOwner = pendingOwners.find((o) => o.id === id)
     if (!approvedOwner) return
 
+    const actionKey = `approve-owner-${id}`
+    setActionLoadingKey(actionKey)
+
     try {
       await apiRequest<ApiResponse<AdminOwnerRegistration>>(
         `/admin/owner-registrations/${id}/approve`,
         {
           method: "PATCH",
-        }
+        },
       )
 
       await fetchAdminUsers()
@@ -402,23 +562,27 @@ export default function AdminUsersPage() {
         description: error instanceof Error ? error.message : "Có lỗi xảy ra.",
         variant: "destructive",
       })
+    } finally {
+      setActionLoadingKey(null)
     }
   }
 
   const handleRejectOwner = async () => {
     if (!selectedPendingOwner || !rejectReason.trim()) return
 
-    const rejectedName = selectedPendingOwner.name
+    const rejectedOwner = selectedPendingOwner
+    const actionKey = `reject-owner-${rejectedOwner.id}`
+    setActionLoadingKey(actionKey)
 
     try {
       await apiRequest<ApiResponse<AdminOwnerRegistration>>(
-        `/admin/owner-registrations/${selectedPendingOwner.id}/reject`,
+        `/admin/owner-registrations/${rejectedOwner.id}/reject`,
         {
           method: "PATCH",
           body: JSON.stringify({
             reject_reason: rejectReason.trim(),
           }),
-        }
+        },
       )
 
       await fetchAdminUsers()
@@ -430,7 +594,7 @@ export default function AdminUsersPage() {
 
       toast({
         title: "Đã Từ Chối",
-        description: `Đơn của ${rejectedName} đã bị từ chối.`,
+        description: `Đơn của ${rejectedOwner.name} đã bị từ chối.`,
         variant: "destructive",
       })
     } catch (error) {
@@ -439,6 +603,8 @@ export default function AdminUsersPage() {
         description: error instanceof Error ? error.message : "Có lỗi xảy ra.",
         variant: "destructive",
       })
+    } finally {
+      setActionLoadingKey(null)
     }
   }
 
@@ -498,6 +664,17 @@ export default function AdminUsersPage() {
         </Card>
       </div>
 
+      {errorMessage && (
+        <Card className="p-4 mb-6 border-destructive/30 bg-destructive/10">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <p className="text-sm text-destructive">{errorMessage}</p>
+            <Button variant="outline" size="sm" onClick={fetchAdminUsers}>
+              Thử lại
+            </Button>
+          </div>
+        </Card>
+      )}
+
       {/* Tabs */}
       <Tabs
         value={activeTab}
@@ -527,7 +704,7 @@ export default function AdminUsersPage() {
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
           <Input
-            placeholder="Tìm kiếm theo tên hoặc email..."
+            placeholder="Tìm kiếm theo tên, email hoặc số điện thoại..."
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value)
@@ -539,9 +716,7 @@ export default function AdminUsersPage() {
       </div>
 
       {loading ? (
-        <Card className="p-6 mb-6 text-center text-muted-foreground">
-          Đang tải dữ liệu...
-        </Card>
+        <Card className="p-6 mb-6 text-center text-muted-foreground">Đang tải dữ liệu...</Card>
       ) : activeTab === "pending" ? (
         // Pending Owners List
         <div className="space-y-4">
@@ -552,67 +727,76 @@ export default function AdminUsersPage() {
               <p className="text-muted-foreground">Tất cả đơn đăng ký chủ sân đã được xử lý</p>
             </Card>
           ) : (
-            paginatedPendingOwners.map((owner) => (
-              <Card key={owner.id} className="p-4 md:p-6">
-                <div className="flex flex-col md:flex-row md:items-center gap-4">
-                  <img
-                    src={owner.avatar || "/placeholder.svg"}
-                    alt={owner.name}
-                    className="w-16 h-16 rounded-full object-cover"
-                  />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-foreground">{owner.name}</h3>
-                      <Badge
-                        variant="outline"
-                        className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700"
-                      >
-                        Chờ Duyệt
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">{owner.email}</p>
-                    <p className="text-sm text-muted-foreground">
-                      <Building2 className="w-3 h-3 inline mr-1" />
-                      {owner.businessName}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">Đăng ký ngày {owner.joinDate}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => handleViewPendingOwner(owner)}>
-                      <Eye className="w-4 h-4 mr-1" />
-                      Xem
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                      onClick={() => handleApproveOwner(owner.id)}
-                    >
-                      <CheckCircle2 className="w-4 h-4 mr-1" />
-                      Duyệt
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-red-600 border-red-200 hover:bg-red-50 dark:hover:bg-red-950/30 bg-transparent"
-                      onClick={() => {
-                        setSelectedPendingOwner(owner)
-                        setShowRejectDialog(true)
+            paginatedPendingOwners.map((owner) => {
+              const approveActionKey = `approve-owner-${owner.id}`
+              const rejectActionKey = `reject-owner-${owner.id}`
+              const isApproving = actionLoadingKey === approveActionKey
+              const isRejecting = actionLoadingKey === rejectActionKey
+
+              return (
+                <Card key={owner.id} className="p-4 md:p-6">
+                  <div className="flex flex-col md:flex-row md:items-center gap-4">
+                    <img
+                      src={owner.avatar || PLACEHOLDER_IMAGE}
+                      alt={owner.name}
+                      className="w-16 h-16 rounded-full object-cover"
+                      onError={(event) => {
+                        event.currentTarget.src = PLACEHOLDER_IMAGE
                       }}
-                    >
-                      <XCircle className="w-4 h-4 mr-1" />
-                      Từ chối
-                    </Button>
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold text-foreground">{owner.name}</h3>
+                        <Badge
+                          variant="outline"
+                          className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700"
+                        >
+                          Chờ Duyệt
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{owner.email}</p>
+                      <p className="text-sm text-muted-foreground">
+                        <Building2 className="w-3 h-3 inline mr-1" />
+                        {owner.businessName}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">Đăng ký ngày {owner.joinDate}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => handleViewPendingOwner(owner)}>
+                        <Eye className="w-4 h-4 mr-1" />
+                        Xem
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                        onClick={() => handleApproveOwner(owner.id)}
+                        disabled={Boolean(actionLoadingKey)}
+                      >
+                        <CheckCircle2 className="w-4 h-4 mr-1" />
+                        {isApproving ? "Đang duyệt..." : "Duyệt"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-red-600 border-red-200 hover:bg-red-50 dark:hover:bg-red-950/30 bg-transparent"
+                        onClick={() => openRejectOwnerDialog(owner)}
+                        disabled={Boolean(actionLoadingKey)}
+                      >
+                        <XCircle className="w-4 h-4 mr-1" />
+                        {isRejecting ? "Đang từ chối..." : "Từ chối"}
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              </Card>
-            ))
+                </Card>
+              )
+            })
           )}
         </div>
       ) : (
         // Users Table
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[850px]">
               <thead className="bg-muted border-b border-border">
                 <tr>
                   <th className="px-4 md:px-6 py-3 text-left text-sm font-medium text-foreground">Người dùng</th>
@@ -623,77 +807,92 @@ export default function AdminUsersPage() {
                   <th className="px-4 md:px-6 py-3 text-left text-sm font-medium text-foreground hidden lg:table-cell">
                     Ngày tham gia
                   </th>
-                  <th className="px-4 md:px-6 py-3 text-left text-sm font-medium text-foreground hidden md:table-cell">
-                    Đặt sân
-                  </th>
                   <th className="px-4 md:px-6 py-3 text-left text-sm font-medium text-foreground">Trạng thái</th>
                   <th className="px-4 md:px-6 py-3 text-left text-sm font-medium text-foreground">Hành động</th>
                 </tr>
               </thead>
               <tbody>
-                {paginatedUsers.map((user) => (
-                  <tr key={user.id} className="border-b border-border hover:bg-muted/50 transition">
-                    <td className="px-4 md:px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={user.avatar || "/placeholder.svg"}
-                          alt={user.name}
-                          className="w-10 h-10 rounded-full object-cover"
-                        />
-                        <div>
-                          <p className="text-sm font-medium text-foreground">{user.name}</p>
-                          <p className="text-xs text-muted-foreground md:hidden">{user.email}</p>
+                {paginatedUsers.map((user) => {
+                  const toggleActionKey = `toggle-user-${user.id}`
+                  const deleteActionKey = `delete-user-${user.id}`
+                  const disabledReason = getManageDisabledReason(user)
+                  const canManage = canManageUser(user)
+                  const isToggleLoading = actionLoadingKey === toggleActionKey
+                  const isDeleteLoading = actionLoadingKey === deleteActionKey
+
+                  return (
+                    <tr key={user.id} className="border-b border-border hover:bg-muted/50 transition">
+                      <td className="px-4 md:px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={user.avatar || PLACEHOLDER_IMAGE}
+                            alt={user.name}
+                            className="w-10 h-10 rounded-full object-cover"
+                            onError={(event) => {
+                              event.currentTarget.src = PLACEHOLDER_IMAGE
+                            }}
+                          />
+                          <div>
+                            <p className="text-sm font-medium text-foreground">{user.name}</p>
+                            <p className="text-xs text-muted-foreground md:hidden">{user.email}</p>
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-4 md:px-6 py-4 text-sm text-muted-foreground hidden md:table-cell">
-                      {user.email}
-                    </td>
-                    <td className="px-4 md:px-6 py-4 text-sm">
-                      <Badge variant="outline" className={getUserTypeClassName(user.type)}>
-                        {getUserTypeLabel(user.type)}
-                      </Badge>
-                    </td>
-                    <td className="px-4 md:px-6 py-4 text-sm text-muted-foreground hidden lg:table-cell">
-                      {user.joinDate}
-                    </td>
-                    <td className="px-4 md:px-6 py-4 text-sm font-medium text-foreground hidden md:table-cell">
-                      {user.bookings}
-                    </td>
-                    <td className="px-4 md:px-6 py-4 text-sm">
-                      <Badge variant="outline" className={getStatusClassName(user.status)}>
-                        {getStatusLabel(user.status)}
-                      </Badge>
-                    </td>
-                    <td className="px-4 md:px-6 py-4 text-sm">
-                      <div className="flex gap-1">
-                        <Button variant="outline" size="sm" onClick={() => handleViewUser(user)} title="Xem chi tiết">
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleToggleStatus(user.id)}
-                          title={user.status === "active" ? "Khóa tài khoản" : "Mở khóa"}
-                          className={user.status === "active" ? "text-amber-600" : "text-green-600"}
-                          disabled={user.status === "deleted"}
-                        >
-                          {user.status === "active" ? <Ban className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-destructive bg-transparent"
-                          onClick={() => handleDeleteUser(user.id)}
-                          title="Xóa"
-                          disabled={user.status === "deleted"}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-4 md:px-6 py-4 text-sm text-muted-foreground hidden md:table-cell">
+                        {user.email}
+                      </td>
+                      <td className="px-4 md:px-6 py-4 text-sm">
+                        <Badge variant="outline" className={getUserTypeClassName(user.type)}>
+                          {getUserTypeLabel(user.type)}
+                        </Badge>
+                      </td>
+                      <td className="px-4 md:px-6 py-4 text-sm text-muted-foreground hidden lg:table-cell">
+                        {user.joinDate}
+                      </td>
+                      <td className="px-4 md:px-6 py-4 text-sm">
+                        <Badge variant="outline" className={getStatusClassName(user.status)}>
+                          {getStatusLabel(user.status)}
+                        </Badge>
+                      </td>
+                      <td className="px-4 md:px-6 py-4 text-sm">
+                        <div className="flex gap-1">
+                          <Button variant="outline" size="sm" onClick={() => handleViewUser(user)} title="Xem chi tiết">
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleToggleStatus(user.id)}
+                            title={
+                              disabledReason ||
+                              (user.status === "active" ? "Khóa tài khoản" : "Mở khóa")
+                            }
+                            className={user.status === "active" ? "text-amber-600" : "text-green-600"}
+                            disabled={!canManage || Boolean(actionLoadingKey)}
+                          >
+                            {isToggleLoading ? (
+                              <span className="text-xs">...</span>
+                            ) : user.status === "active" ? (
+                              <Ban className="w-4 h-4" />
+                            ) : (
+                              <ShieldCheck className="w-4 h-4" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-destructive bg-transparent"
+                            onClick={() => openDeleteUserDialog(user)}
+                            title={disabledReason || "Xóa"}
+                            disabled={!canManage || Boolean(actionLoadingKey)}
+                          >
+                            {isDeleteLoading ? <span className="text-xs">...</span> : <Trash2 className="w-4 h-4" />}
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -704,7 +903,7 @@ export default function AdminUsersPage() {
                 currentPage={currentPage}
                 totalPages={totalPages}
                 onPageChange={setCurrentPage}
-                itemsPerPage={itemsPerPage}
+                itemsPerPage={ITEMS_PER_PAGE}
                 totalItems={totalItems}
               />
             </div>
@@ -719,7 +918,16 @@ export default function AdminUsersPage() {
       )}
 
       {/* User Detail Dialog */}
-      <Dialog open={showUserDialog} onOpenChange={setShowUserDialog}>
+      <Dialog
+        open={showUserDialog}
+        onOpenChange={(open) => {
+          setShowUserDialog(open)
+
+          if (!open) {
+            setSelectedUser(null)
+          }
+        }}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Chi Tiết Người Dùng</DialogTitle>
@@ -728,9 +936,12 @@ export default function AdminUsersPage() {
             <div className="space-y-4">
               <div className="flex items-center gap-4">
                 <img
-                  src={selectedUser.avatar || "/placeholder.svg"}
+                  src={selectedUser.avatar || PLACEHOLDER_IMAGE}
                   alt={selectedUser.name}
                   className="w-20 h-20 rounded-full object-cover"
+                  onError={(event) => {
+                    event.currentTarget.src = PLACEHOLDER_IMAGE
+                  }}
                 />
                 <div>
                   <h3 className="text-lg font-semibold text-foreground">{selectedUser.name}</h3>
@@ -761,18 +972,14 @@ export default function AdminUsersPage() {
                     </div>
                     <div className="flex items-start gap-3 text-sm">
                       <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
-                      <span className="text-foreground">{selectedUser.businessAddress}</span>
+                      <span className="text-foreground">{selectedUser.businessAddress || "Chưa cập nhật"}</span>
                     </div>
                   </>
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border">
-                <div className="text-center p-3 bg-muted rounded-lg">
-                  <p className="text-2xl font-bold text-foreground">{selectedUser.bookings}</p>
-                  <p className="text-sm text-muted-foreground">Lượt đặt sân</p>
-                </div>
-                <div className="text-center p-3 bg-muted rounded-lg">
+              <div className="pt-4 border-t border-border">
+                <div className="w-fit rounded-lg bg-muted px-4 py-3">
                   <Badge variant="outline" className={getStatusClassName(selectedUser.status)}>
                     {getStatusLabel(selectedUser.status)}
                   </Badge>
@@ -790,7 +997,16 @@ export default function AdminUsersPage() {
       </Dialog>
 
       {/* Pending Owner Detail Dialog */}
-      <Dialog open={showPendingDialog} onOpenChange={setShowPendingDialog}>
+      <Dialog
+        open={showPendingDialog}
+        onOpenChange={(open) => {
+          setShowPendingDialog(open)
+
+          if (!open && !showRejectDialog) {
+            setSelectedPendingOwner(null)
+          }
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Chi Tiết Đơn Đăng Ký Chủ Sân</DialogTitle>
@@ -800,9 +1016,12 @@ export default function AdminUsersPage() {
               {/* Personal Info */}
               <div className="flex items-center gap-4">
                 <img
-                  src={selectedPendingOwner.avatar || "/placeholder.svg"}
+                  src={selectedPendingOwner.avatar || PLACEHOLDER_IMAGE}
                   alt={selectedPendingOwner.name}
                   className="w-20 h-20 rounded-full object-cover"
+                  onError={(event) => {
+                    event.currentTarget.src = PLACEHOLDER_IMAGE
+                  }}
                 />
                 <div>
                   <h3 className="text-lg font-semibold text-foreground">{selectedPendingOwner.name}</h3>
@@ -857,29 +1076,38 @@ export default function AdminUsersPage() {
                   <div>
                     <p className="text-sm font-medium text-foreground mb-2">Giấy Phép Kinh Doanh</p>
                     <img
-                      src={selectedPendingOwner.documents.businessLicense || "/placeholder.svg"}
-                      alt="Business License"
+                      src={selectedPendingOwner.documents.businessLicense || PLACEHOLDER_IMAGE}
+                      alt="Giấy phép kinh doanh"
                       className="w-full max-w-md rounded border border-border cursor-pointer hover:opacity-80 transition"
                       onClick={() => window.open(selectedPendingOwner.documents.businessLicense, "_blank")}
+                      onError={(event) => {
+                        event.currentTarget.src = PLACEHOLDER_IMAGE
+                      }}
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-4 max-w-md">
                     <div>
                       <p className="text-sm font-medium text-foreground mb-2">CMND/CCCD (Trước)</p>
                       <img
-                        src={selectedPendingOwner.documents.idCardFront || "/placeholder.svg"}
-                        alt="ID Card Front"
+                        src={selectedPendingOwner.documents.idCardFront || PLACEHOLDER_IMAGE}
+                        alt="CMND/CCCD mặt trước"
                         className="w-full rounded border border-border cursor-pointer hover:opacity-80 transition"
                         onClick={() => window.open(selectedPendingOwner.documents.idCardFront, "_blank")}
+                        onError={(event) => {
+                          event.currentTarget.src = PLACEHOLDER_IMAGE
+                        }}
                       />
                     </div>
                     <div>
                       <p className="text-sm font-medium text-foreground mb-2">CMND/CCCD (Sau)</p>
                       <img
-                        src={selectedPendingOwner.documents.idCardBack || "/placeholder.svg"}
-                        alt="ID Card Back"
+                        src={selectedPendingOwner.documents.idCardBack || PLACEHOLDER_IMAGE}
+                        alt="CMND/CCCD mặt sau"
                         className="w-full rounded border border-border cursor-pointer hover:opacity-80 transition"
                         onClick={() => window.open(selectedPendingOwner.documents.idCardBack, "_blank")}
+                        onError={(event) => {
+                          event.currentTarget.src = PLACEHOLDER_IMAGE
+                        }}
                       />
                     </div>
                   </div>
@@ -894,6 +1122,7 @@ export default function AdminUsersPage() {
             <Button
               className="bg-green-600 hover:bg-green-700 text-white"
               onClick={() => selectedPendingOwner && handleApproveOwner(selectedPendingOwner.id)}
+              disabled={Boolean(actionLoadingKey)}
             >
               <CheckCircle2 className="w-4 h-4 mr-2" />
               Phê Duyệt
@@ -901,7 +1130,8 @@ export default function AdminUsersPage() {
             <Button
               variant="outline"
               className="text-red-600 border-red-200 hover:bg-red-50 dark:hover:bg-red-950/30 bg-transparent"
-              onClick={() => setShowRejectDialog(true)}
+              onClick={() => selectedPendingOwner && openRejectOwnerDialog(selectedPendingOwner)}
+              disabled={Boolean(actionLoadingKey)}
             >
               <XCircle className="w-4 h-4 mr-2" />
               Từ Chối
@@ -911,7 +1141,16 @@ export default function AdminUsersPage() {
       </Dialog>
 
       {/* Reject Dialog */}
-      <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+      <Dialog
+        open={showRejectDialog}
+        onOpenChange={(open) => {
+          setShowRejectDialog(open)
+
+          if (!open) {
+            setRejectReason("")
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Từ Chối Đơn Đăng Ký</DialogTitle>
@@ -930,9 +1169,50 @@ export default function AdminUsersPage() {
             <Button
               className="bg-red-600 hover:bg-red-700 text-white"
               onClick={handleRejectOwner}
-              disabled={!rejectReason.trim()}
+              disabled={!rejectReason.trim() || Boolean(actionLoadingKey)}
             >
               Xác Nhận Từ Chối
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete User Dialog */}
+      <Dialog
+        open={showDeleteDialog}
+        onOpenChange={(open) => {
+          setShowDeleteDialog(open)
+
+          if (!open) {
+            setUserToDelete(null)
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Xác Nhận Xóa Người Dùng</DialogTitle>
+            <DialogDescription>
+              {userToDelete ? (
+                <>
+                  Bạn có chắc muốn chuyển tài khoản <strong>{userToDelete.name}</strong> sang trạng thái đã xóa không?
+                  Thao tác này có thể ảnh hưởng đến dữ liệu liên quan của người dùng.
+                </>
+              ) : (
+                "Bạn có chắc muốn xóa người dùng này không?"
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+              Hủy
+            </Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={handleDeleteUser}
+              disabled={!userToDelete || Boolean(actionLoadingKey)}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Xác Nhận Xóa
             </Button>
           </DialogFooter>
         </DialogContent>

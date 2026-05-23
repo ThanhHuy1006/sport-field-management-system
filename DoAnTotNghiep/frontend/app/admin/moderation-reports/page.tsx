@@ -48,6 +48,7 @@ import { Label } from "@/components/ui/label"
 import { Pagination } from "@/components/pagination"
 import { useToast } from "@/hooks/use-toast"
 import { apiGet, apiRequest } from "@/lib/api-client"
+import { getImageUrl } from "@/lib/image-url"
 
 // Types
 type ReportStatus = "PENDING" | "REVIEWING" | "RESOLVED" | "REJECTED"
@@ -228,6 +229,7 @@ function extractAttachmentUrls(
       return item.url || item.image_url || item.file_url || item.path || ""
     })
     .filter(Boolean)
+    .map((url) => getImageUrl(url))
 }
 
 function mapFieldReportToUi(item: RawFieldReport): FieldReport {
@@ -500,7 +502,13 @@ export default function ReportsManagementPage() {
 
   // Format date
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("vi-VN", {
+    const date = new Date(dateString)
+
+    if (Number.isNaN(date.getTime())) {
+      return "Không xác định"
+    }
+
+    return date.toLocaleDateString("vi-VN", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
@@ -673,7 +681,7 @@ export default function ReportsManagementPage() {
         <TabsContent value="field" className="mt-0">
           <Card className="bg-card border-border overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[1050px]">
                 <thead className="bg-muted/50 border-b border-border">
                   <tr>
                     <th className="text-left p-4 font-medium text-muted-foreground text-sm">Sân</th>
@@ -754,6 +762,7 @@ export default function ReportsManagementPage() {
                                   <DropdownMenuItem
                                     onClick={() => {
                                       setSelectedReport(report)
+                                      setAdminNote("")
                                       setActionType("resolve")
                                       setShowActionDialog(true)
                                     }}
@@ -765,6 +774,7 @@ export default function ReportsManagementPage() {
                                   <DropdownMenuItem
                                     onClick={() => {
                                       setSelectedReport(report)
+                                      setAdminNote("")
                                       setActionType("reject")
                                       setShowActionDialog(true)
                                     }}
@@ -807,7 +817,7 @@ export default function ReportsManagementPage() {
         <TabsContent value="review" className="mt-0">
           <Card className="bg-card border-border overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[1050px]">
                 <thead className="bg-muted/50 border-b border-border">
                   <tr>
                     <th className="text-left p-4 font-medium text-muted-foreground text-sm">Đánh giá</th>
@@ -907,6 +917,7 @@ export default function ReportsManagementPage() {
                                   <DropdownMenuItem
                                     onClick={() => {
                                       setSelectedReport(report)
+                                      setAdminNote("")
                                       setActionType("resolve")
                                       setShowActionDialog(true)
                                     }}
@@ -918,6 +929,7 @@ export default function ReportsManagementPage() {
                                   <DropdownMenuItem
                                     onClick={() => {
                                       setSelectedReport(report)
+                                      setAdminNote("")
                                       setActionType("reject")
                                       setShowActionDialog(true)
                                     }}
@@ -994,7 +1006,7 @@ export default function ReportsManagementPage() {
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Lý do</p>
                   <Badge variant="outline">
-                    {(activeTab === "field" ? FIELD_REASON_LABELS : REVIEW_REASON_LABELS)[selectedReport.reason]}
+                    {(selectedReport.type === "field" ? FIELD_REASON_LABELS : REVIEW_REASON_LABELS)[selectedReport.reason] || selectedReport.reason}
                   </Badge>
                 </div>
               </div>
@@ -1050,9 +1062,23 @@ export default function ReportsManagementPage() {
                   <p className="text-sm text-muted-foreground mb-2">Hình ảnh đính kèm</p>
                   <div className="flex gap-2 flex-wrap">
                     {(selectedReport as FieldReport).attachments.map((url, i) => (
-                      <div key={i} className="w-20 h-20 rounded-lg bg-muted flex items-center justify-center border border-border">
-                        <ImageIcon className="w-6 h-6 text-muted-foreground" />
-                      </div>
+                      <a
+                        key={i}
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="relative w-20 h-20 rounded-lg bg-muted flex items-center justify-center border border-border overflow-hidden"
+                      >
+                        <img
+                          src={url}
+                          alt={`Ảnh báo cáo ${i + 1}`}
+                          className="relative z-10 w-full h-full object-cover"
+                          onError={(event) => {
+                            event.currentTarget.style.display = "none"
+                          }}
+                        />
+                        <ImageIcon className="w-6 h-6 text-muted-foreground absolute" />
+                      </a>
                     ))}
                   </div>
                 </div>
@@ -1070,13 +1096,14 @@ export default function ReportsManagementPage() {
 
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setShowDetailDialog(false)} className="bg-transparent">
-              Dong
+              Đóng
             </Button>
             {selectedReport && (selectedReport.status === "PENDING" || selectedReport.status === "REVIEWING") && (
               <>
                 <Button
                   variant="outline"
                   onClick={() => {
+                    setAdminNote("")
                     setActionType("reject")
                     setShowActionDialog(true)
                   }}
@@ -1087,6 +1114,7 @@ export default function ReportsManagementPage() {
                 </Button>
                 <Button
                   onClick={() => {
+                    setAdminNote("")
                     setActionType("resolve")
                     setShowActionDialog(true)
                   }}
@@ -1131,7 +1159,7 @@ export default function ReportsManagementPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowActionDialog(false)} className="bg-transparent">
-              Huy
+              Hủy
             </Button>
             <Button
               onClick={() => handleUpdateStatus(actionType === "resolve" ? "RESOLVED" : "REJECTED")}

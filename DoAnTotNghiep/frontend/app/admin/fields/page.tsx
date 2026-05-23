@@ -1,8 +1,6 @@
 "use client";
 
-import type React from "react";
-
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -37,12 +35,34 @@ import {
 } from "lucide-react";
 import { Pagination } from "@/components/pagination";
 import { apiGet, apiRequest } from "@/lib/api-client";
+import { getImageUrl } from "@/lib/image-url";
 
 type ApiResponse<T> = {
   success: boolean;
   message: string;
   data: T;
 };
+
+type AdminFieldsPagination = {
+  page?: number;
+  limit?: number;
+  total?: number;
+  total_pages?: number;
+};
+
+type AdminFieldsListData =
+  | AdminField[]
+  | {
+      items?: AdminField[];
+      pagination?: AdminFieldsPagination;
+    };
+
+type AdminFieldDetailData =
+  | AdminField
+  | {
+      item?: AdminField;
+      field?: AdminField;
+    };
 
 type AdminField = {
   id: number;
@@ -94,6 +114,7 @@ type AdminField = {
     name: string;
     icon: string | null;
   }[];
+
   pricing_rules?: {
     id: number;
     day_type: "WEEKDAY" | "WEEKEND" | "HOLIDAY" | "CUSTOM" | string;
@@ -109,6 +130,7 @@ type AdminField = {
   total_reviews?: number;
   rating?: number;
 };
+
 type UiField = {
   id: number;
   name: string;
@@ -119,7 +141,7 @@ type UiField = {
   district: string;
   type: string;
   typeName: string;
-  status: "pending" | "active" | "inactive" | "maintenance" | string;
+  status: string;
   createdDate: string;
   priceWeekday: number;
   priceWeekend: number;
@@ -135,27 +157,12 @@ type UiField = {
   capacity: string;
   rejectedReason?: string;
 };
-function getPriceByDayType(
-  rules: AdminField["pricing_rules"],
-  dayType: "WEEKDAY" | "WEEKEND",
-  fallbackPrice: number,
-) {
-  if (!Array.isArray(rules) || rules.length === 0) {
-    return fallbackPrice;
-  }
 
-  const rule = rules.find(
-    (item) =>
-      String(item.day_type).toUpperCase() === dayType && item.active !== false,
-  );
+const PLACEHOLDER_IMAGE = "/placeholder.svg?height=96&width=128&query=sports field";
+const DETAIL_PLACEHOLDER_IMAGE =
+  "/placeholder.svg?height=300&width=600&query=sports field";
 
-  return rule ? Number(rule.price || fallbackPrice) : fallbackPrice;
-}
-const API_ORIGIN = (
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api/v1"
-).replace(/\/api\/v1\/?$/, "");
-
-const amenityIcons: Record<string, { icon: React.ReactNode; label: string }> = {
+const amenityIcons: Record<string, { icon: ReactNode; label: string }> = {
   wifi: { icon: <Wifi className="w-4 h-4" />, label: "Wifi miễn phí" },
   parking: { icon: <Car className="w-4 h-4" />, label: "Bãi đỗ xe" },
   shower: { icon: <ShowerHead className="w-4 h-4" />, label: "Phòng tắm" },
@@ -167,20 +174,28 @@ const amenityIcons: Record<string, { icon: React.ReactNode; label: string }> = {
   lighting: { icon: <LampDesk className="w-4 h-4" />, label: "Đèn chiếu sáng" },
 };
 
+function normalizeFieldStatus(status?: string | null) {
+  return String(status || "pending").toLowerCase();
+}
+
 function formatDate(value?: string | null) {
   if (!value) return "-";
-  return new Date(value).toLocaleDateString("vi-VN");
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "-";
+
+  return date.toLocaleDateString("vi-VN");
 }
 
 function toAssetUrl(url?: string | null) {
-  if (!url) return "/placeholder.svg?height=96&width=128&query=sports field";
-  if (url.startsWith("http")) return url;
-  if (url.startsWith("/uploads")) return `${API_ORIGIN}${url}`;
-  return url;
+  if (!url) return PLACEHOLDER_IMAGE;
+  return getImageUrl(url);
 }
 
 function getDistrictFromAddress(address?: string | null) {
   if (!address) return "-";
+
   const parts = address
     .split(",")
     .map((item) => item.trim())
@@ -196,17 +211,42 @@ function getSportTypeName(type?: string | null) {
     value.includes("football") ||
     value.includes("soccer") ||
     value.includes("bóng đá")
-  )
+  ) {
     return "Bóng Đá";
-  if (value.includes("basketball") || value.includes("bóng rổ"))
+  }
+
+  if (value.includes("basketball") || value.includes("bóng rổ")) {
     return "Bóng Rổ";
-  if (value.includes("badminton") || value.includes("cầu lông"))
+  }
+
+  if (value.includes("badminton") || value.includes("cầu lông")) {
     return "Cầu Lông";
+  }
+
   if (value.includes("tennis")) return "Tennis";
-  if (value.includes("volleyball") || value.includes("bóng chuyền"))
+
+  if (value.includes("volleyball") || value.includes("bóng chuyền")) {
     return "Bóng Chuyền";
+  }
 
   return type || "Khác";
+}
+
+function getPriceByDayType(
+  rules: AdminField["pricing_rules"],
+  dayType: "WEEKDAY" | "WEEKEND",
+  fallbackPrice: number,
+) {
+  if (!Array.isArray(rules) || rules.length === 0) {
+    return fallbackPrice;
+  }
+
+  const rule = rules.find(
+    (item) =>
+      String(item.day_type).toUpperCase() === dayType && item.active !== false,
+  );
+
+  return rule ? Number(rule.price || fallbackPrice) : fallbackPrice;
 }
 
 function getOperatingTimeText(hours?: AdminField["operating_hours"]) {
@@ -234,6 +274,20 @@ function getOperatingTimeText(hours?: AdminField["operating_hours"]) {
   };
 }
 
+function getAdminFieldListItems(data: AdminFieldsListData) {
+  if (Array.isArray(data)) return data;
+
+  if (Array.isArray(data?.items)) return data.items;
+
+  return [];
+}
+
+function getAdminFieldDetail(data: AdminFieldDetailData) {
+  if ("id" in data) return data;
+
+  return data.item ?? data.field ?? null;
+}
+
 function mapFieldToUi(field: AdminField): UiField {
   const fallbackImage = toAssetUrl(field.primary_image?.url);
 
@@ -243,19 +297,10 @@ function mapFieldToUi(field: AdminField): UiField {
       : [fallbackImage];
 
   const basePrice = Number(field.base_price_per_hour || 0);
-
-  const priceWeekday = getPriceByDayType(
-    field.pricing_rules,
-    "WEEKDAY",
-    basePrice,
-  );
-
-  const priceWeekend = getPriceByDayType(
-    field.pricing_rules,
-    "WEEKEND",
-    basePrice,
-  );
+  const priceWeekday = getPriceByDayType(field.pricing_rules, "WEEKDAY", basePrice);
+  const priceWeekend = getPriceByDayType(field.pricing_rules, "WEEKEND", basePrice);
   const operatingTime = getOperatingTimeText(field.operating_hours);
+  const normalizedStatus = normalizeFieldStatus(field.status);
 
   return {
     id: field.id,
@@ -267,9 +312,9 @@ function mapFieldToUi(field: AdminField): UiField {
     district: getDistrictFromAddress(field.address),
     type: field.sport_type || "unknown",
     typeName: getSportTypeName(field.sport_type),
-    status: field.status,
+    status: normalizedStatus,
     rejectedReason:
-      field.status === "hidden"
+      normalizedStatus === "hidden"
         ? field.reject_reason || "Sân đã bị từ chối hoặc đã bị ẩn."
         : undefined,
     createdDate: formatDate(field.created_at),
@@ -289,24 +334,30 @@ function mapFieldToUi(field: AdminField): UiField {
     capacity: field.max_players ? `${field.max_players} người` : "-",
   };
 }
+
 function getFieldStatusLabel(status: string) {
-  if (status === "pending") return "Chờ Duyệt";
-  if (status === "active") return "Đã Duyệt";
-  if (status === "hidden") return "Từ Chối";
-  if (status === "maintenance") return "Bảo Trì";
-  return status;
+  const normalizedStatus = normalizeFieldStatus(status);
+
+  if (normalizedStatus === "pending") return "Chờ Duyệt";
+  if (normalizedStatus === "active") return "Đã Duyệt";
+  if (normalizedStatus === "hidden") return "Từ Chối";
+  if (normalizedStatus === "maintenance") return "Bảo Trì";
+
+  return status || "Không xác định";
 }
 
 function getFieldStatusClassName(status: string) {
-  if (status === "pending") {
+  const normalizedStatus = normalizeFieldStatus(status);
+
+  if (normalizedStatus === "pending") {
     return "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300";
   }
 
-  if (status === "active") {
+  if (normalizedStatus === "active") {
     return "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300";
   }
 
-  if (status === "maintenance") {
+  if (normalizedStatus === "maintenance") {
     return "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300";
   }
 
@@ -324,18 +375,24 @@ export default function AdminFieldsPage() {
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [fieldToReject, setFieldToReject] = useState<number | null>(null);
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
   const itemsPerPage = 8;
 
   const fetchAdminFields = useCallback(async () => {
     setLoading(true);
 
     try {
-      const res = await apiGet<ApiResponse<AdminField[]>>("/admin/fields");
-      setFields(res.data.map(mapFieldToUi));
+      const res = await apiGet<ApiResponse<AdminFieldsListData>>("/admin/fields");
+      const items = getAdminFieldListItems(res.data);
+
+      setFields(items.map(mapFieldToUi));
     } catch (error) {
       console.error(error);
+      alert(
+        error instanceof Error ? error.message : "Không thể tải danh sách sân",
+      );
+      setFields([]);
     } finally {
       setLoading(false);
     }
@@ -345,17 +402,19 @@ export default function AdminFieldsPage() {
     fetchAdminFields();
   }, [fetchAdminFields]);
 
-  const filteredFields = fields.filter((f) => {
-    const matchStatus = filterStatus === "all" || f.status === filterStatus;
+  const filteredFields = fields.filter((field) => {
+    const matchStatus = filterStatus === "all" || field.status === filterStatus;
+    const normalizedSearchQuery = searchQuery.trim().toLowerCase();
     const matchSearch =
-      searchQuery === "" ||
-      f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      f.owner.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      f.location.toLowerCase().includes(searchQuery.toLowerCase());
+      normalizedSearchQuery === "" ||
+      field.name.toLowerCase().includes(normalizedSearchQuery) ||
+      field.owner.toLowerCase().includes(normalizedSearchQuery) ||
+      field.location.toLowerCase().includes(normalizedSearchQuery);
+
     return matchStatus && matchSearch;
   });
 
-  const totalPages = Math.ceil(filteredFields.length / itemsPerPage);
+  const totalPages = Math.max(1, Math.ceil(filteredFields.length / itemsPerPage));
   const paginatedFields = filteredFields.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage,
@@ -363,12 +422,16 @@ export default function AdminFieldsPage() {
 
   const stats = {
     total: fields.length,
-    pending: fields.filter((f) => f.status === "pending").length,
-    approved: fields.filter((f) => f.status === "active").length,
-    rejected: fields.filter((f) => f.status === "hidden").length,
+    pending: fields.filter((field) => field.status === "pending").length,
+    approved: fields.filter((field) => field.status === "active").length,
+    rejected: fields.filter((field) => field.status === "hidden").length,
   };
 
   const handleApprove = async (id: number) => {
+    if (actionLoadingId !== null) return;
+
+    setActionLoadingId(id);
+
     try {
       await apiRequest<ApiResponse<AdminField>>(`/admin/fields/${id}/approve`, {
         method: "PATCH",
@@ -378,12 +441,14 @@ export default function AdminFieldsPage() {
 
       if (selectedField?.id === id) {
         setSelectedField((prev) =>
-          prev ? { ...prev, status: "active" } : prev,
+          prev ? { ...prev, status: "active", rejectedReason: undefined } : prev,
         );
       }
     } catch (error) {
       console.error(error);
       alert(error instanceof Error ? error.message : "Không thể duyệt sân");
+    } finally {
+      setActionLoadingId(null);
     }
   };
 
@@ -393,50 +458,68 @@ export default function AdminFieldsPage() {
     setShowRejectDialog(true);
   };
 
+  const resetRejectDialog = () => {
+    setShowRejectDialog(false);
+    setFieldToReject(null);
+    setRejectReason("");
+  };
+
   const handleReject = async () => {
-    if (fieldToReject === null) return;
+    if (fieldToReject === null || actionLoadingId !== null) return;
+
+    const targetFieldId = fieldToReject;
+    const reason = rejectReason.trim();
+
+    if (!reason) return;
+
+    setActionLoadingId(targetFieldId);
 
     try {
       await apiRequest<ApiResponse<AdminField>>(
-        `/admin/fields/${fieldToReject}/reject`,
+        `/admin/fields/${targetFieldId}/reject`,
         {
           method: "PATCH",
           body: JSON.stringify({
-            reject_reason: rejectReason.trim(),
+            reject_reason: reason,
           }),
         },
       );
 
       await fetchAdminFields();
 
-      if (selectedField?.id === fieldToReject) {
+      if (selectedField?.id === targetFieldId) {
         setSelectedField((prev) =>
           prev
             ? {
                 ...prev,
                 status: "hidden",
-                rejectedReason: rejectReason || "Không đạt yêu cầu",
+                rejectedReason: reason || "Không đạt yêu cầu",
               }
             : prev,
         );
       }
 
-      setShowRejectDialog(false);
-      setFieldToReject(null);
-      setRejectReason("");
+      resetRejectDialog();
     } catch (error) {
       console.error(error);
       alert(error instanceof Error ? error.message : "Không thể từ chối sân");
+    } finally {
+      setActionLoadingId(null);
     }
   };
+
   const handleViewDetail = async (field: UiField) => {
     try {
-      const res = await apiGet<ApiResponse<AdminField>>(
+      const res = await apiGet<ApiResponse<AdminFieldDetailData>>(
         `/admin/fields/${field.id}`,
       );
+      const detail = getAdminFieldDetail(res.data);
 
-      setSelectedField(mapFieldToUi(res.data));
-      setSelectedImageIndex(0);
+      if (!detail) {
+        throw new Error("Không tìm thấy dữ liệu chi tiết sân");
+      }
+
+      setSelectedField(mapFieldToUi(detail));
       setShowDetailDialog(true);
     } catch (error) {
       console.error(error);
@@ -447,7 +530,7 @@ export default function AdminFieldsPage() {
   };
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("vi-VN").format(price) + " VND";
+    return `${new Intl.NumberFormat("vi-VN").format(price)} VND`;
   };
 
   return (
@@ -499,8 +582,8 @@ export default function AdminFieldsPage() {
             data-cy="admin-fields-search-input"
             placeholder="Tìm kiếm theo tên sân, chủ sân, địa chỉ..."
             value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
+            onChange={(event) => {
+              setSearchQuery(event.target.value);
               setCurrentPage(1);
             }}
             className="pl-10"
@@ -555,12 +638,12 @@ export default function AdminFieldsPage() {
                 {/* Field Image */}
                 <div className="w-full md:w-32 h-24 rounded-lg overflow-hidden bg-muted flex-shrink-0">
                   <img
-                    src={
-                      field.images[0] ||
-                      "/placeholder.svg?height=96&width=128&query=sports field"
-                    }
+                    src={field.images[0] || PLACEHOLDER_IMAGE}
                     alt={field.name}
                     className="w-full h-full object-cover"
+                    onError={(event) => {
+                      event.currentTarget.src = PLACEHOLDER_IMAGE;
+                    }}
                   />
                 </div>
 
@@ -591,9 +674,7 @@ export default function AdminFieldsPage() {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-3">
                     <div className="flex items-center gap-1.5">
                       <User className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-foreground truncate">
-                        {field.owner}
-                      </span>
+                      <span className="text-foreground truncate">{field.owner}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <DollarSign className="w-4 h-4 text-muted-foreground" />
@@ -609,9 +690,7 @@ export default function AdminFieldsPage() {
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Calendar className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-foreground">
-                        {field.createdDate}
-                      </span>
+                      <span className="text-foreground">{field.createdDate}</span>
                     </div>
                   </div>
 
@@ -639,6 +718,7 @@ export default function AdminFieldsPage() {
                         data-cy="admin-field-approve-button"
                         size="sm"
                         onClick={() => handleApprove(field.id)}
+                        disabled={actionLoadingId === field.id}
                         className="bg-green-600 hover:bg-green-700"
                       >
                         <Check className="w-4 h-4 mr-1" />
@@ -650,6 +730,7 @@ export default function AdminFieldsPage() {
                         variant="outline"
                         className="text-destructive bg-transparent"
                         onClick={() => openRejectDialog(field.id)}
+                        disabled={actionLoadingId === field.id}
                       >
                         <X className="w-4 h-4 mr-1" />
                         Từ Chối
@@ -661,6 +742,7 @@ export default function AdminFieldsPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => handleViewDetail(field)}
+                    disabled={actionLoadingId === field.id}
                   >
                     <Eye className="w-4 h-4 mr-1" />
                     Xem
@@ -674,9 +756,7 @@ export default function AdminFieldsPage() {
 
       {!loading && filteredFields.length === 0 && (
         <Card data-cy="admin-fields-empty" className="p-12 text-center">
-          <p className="text-muted-foreground text-lg">
-            Không tìm thấy sân nào
-          </p>
+          <p className="text-muted-foreground text-lg">Không tìm thấy sân nào</p>
         </Card>
       )}
 
@@ -692,7 +772,17 @@ export default function AdminFieldsPage() {
       )}
 
       {/* Field Detail Dialog */}
-      <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
+      <Dialog
+        open={showDetailDialog}
+        onOpenChange={(open) => {
+          setShowDetailDialog(open);
+
+          if (!open) {
+            setSelectedField(null);
+            setPreviewImage(null);
+          }
+        }}
+      >
         <DialogContent
           data-cy="admin-field-detail-dialog"
           className="max-w-2xl max-h-[85vh] overflow-y-auto"
@@ -713,60 +803,54 @@ export default function AdminFieldsPage() {
                       {selectedField.location}
                     </p>
                   </div>
-                  <Badge
-                    className={`${getFieldStatusClassName(selectedField.status)}`}
-                  >
+                  <Badge className={`${getFieldStatusClassName(selectedField.status)}`}>
                     {getFieldStatusLabel(selectedField.status)}
                   </Badge>
                 </div>
               </DialogHeader>
 
               <div className="space-y-6 mt-4">
-                {/* Hình ảnh - chỉ hiện 1 ảnh chính */}
-                {selectedField.images.length > 0 && (
-                  <div className="space-y-3">
-  {selectedField.images.length > 0 ? (
-    <>
-      <button
-        type="button"
-        onClick={() => setPreviewImage(selectedField.images[0])}
-        className="block w-full overflow-hidden rounded-lg"
-      >
-        <img
-          src={selectedField.images[0]}
-          alt={selectedField.name}
-          className="h-56 w-full rounded-lg object-cover transition hover:opacity-90"
-        />
-      </button>
+                {/* Hình ảnh */}
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPreviewImage(selectedField.images[0] || DETAIL_PLACEHOLDER_IMAGE)
+                    }
+                    className="block w-full overflow-hidden rounded-lg"
+                  >
+                    <img
+                      src={selectedField.images[0] || DETAIL_PLACEHOLDER_IMAGE}
+                      alt={selectedField.name}
+                      className="h-56 w-full rounded-lg object-cover transition hover:opacity-90"
+                      onError={(event) => {
+                        event.currentTarget.src = DETAIL_PLACEHOLDER_IMAGE;
+                      }}
+                    />
+                  </button>
 
-      {selectedField.images.length > 1 && (
-        <div className="grid grid-cols-5 gap-2">
-          {selectedField.images.slice(1).map((image, index) => (
-            <button
-              key={`${image}-${index}`}
-              type="button"
-              onClick={() => setPreviewImage(image)}
-              className="overflow-hidden rounded-lg border border-border"
-            >
-              <img
-                src={image}
-                alt={`${selectedField.name} ${index + 2}`}
-                className="h-16 w-full object-cover transition hover:opacity-90"
-              />
-            </button>
-          ))}
-        </div>
-      )}
-    </>
-  ) : (
-    <img
-      src="/placeholder.svg?height=300&width=600&query=sports field"
-      alt={selectedField.name}
-      className="h-56 w-full rounded-lg object-cover"
-    />
-  )}
-</div>
-                )}
+                  {selectedField.images.length > 1 && (
+                    <div className="grid grid-cols-5 gap-2">
+                      {selectedField.images.slice(1).map((image, index) => (
+                        <button
+                          key={`${image}-${index}`}
+                          type="button"
+                          onClick={() => setPreviewImage(image)}
+                          className="overflow-hidden rounded-lg border border-border"
+                        >
+                          <img
+                            src={image}
+                            alt={`${selectedField.name} ${index + 2}`}
+                            className="h-16 w-full object-cover transition hover:opacity-90"
+                            onError={(event) => {
+                              event.currentTarget.src = PLACEHOLDER_IMAGE;
+                            }}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 {/* Thông tin chính - 2 columns */}
                 <div className="grid grid-cols-2 gap-4 text-sm">
@@ -774,10 +858,6 @@ export default function AdminFieldsPage() {
                     <p className="text-muted-foreground">Loại sân</p>
                     <p className="font-medium">{selectedField.typeName}</p>
                   </div>
-                  {/* <div className="space-y-1">
-                    <p className="text-muted-foreground">Kích thước</p>
-                    <p className="font-medium">{selectedField.size}</p>
-                  </div> */}
                   <div className="space-y-1">
                     <p className="text-muted-foreground">Sức chứa</p>
                     <p className="font-medium">{selectedField.capacity}</p>
@@ -860,17 +940,16 @@ export default function AdminFieldsPage() {
                 )}
 
                 {/* Lý do từ chối */}
-                {selectedField.status === "hidden" &&
-                  selectedField.rejectedReason && (
-                    <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-                      <p className="text-sm font-medium text-red-700 dark:text-red-300 mb-1">
-                        Lý do từ chối
-                      </p>
-                      <p className="text-sm text-red-600 dark:text-red-400">
-                        {selectedField.rejectedReason}
-                      </p>
-                    </div>
-                  )}
+                {selectedField.status === "hidden" && selectedField.rejectedReason && (
+                  <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                    <p className="text-sm font-medium text-red-700 dark:text-red-300 mb-1">
+                      Lý do từ chối
+                    </p>
+                    <p className="text-sm text-red-600 dark:text-red-400">
+                      {selectedField.rejectedReason}
+                    </p>
+                  </div>
+                )}
 
                 {/* Actions */}
                 {selectedField.status === "pending" && (
@@ -879,6 +958,7 @@ export default function AdminFieldsPage() {
                       data-cy="admin-field-detail-approve-button"
                       className="flex-1 bg-primary hover:bg-primary/90"
                       onClick={() => handleApprove(selectedField.id)}
+                      disabled={actionLoadingId === selectedField.id}
                     >
                       <Check className="w-4 h-4 mr-2" />
                       Phê Duyệt
@@ -888,10 +968,12 @@ export default function AdminFieldsPage() {
                       variant="outline"
                       className="flex-1 border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20 bg-transparent"
                       onClick={() => {
-                        setFieldToReject(selectedField.id);
+                        const fieldId = selectedField.id;
+
                         setShowDetailDialog(false);
-                        setShowRejectDialog(true);
+                        openRejectDialog(fieldId);
                       }}
+                      disabled={actionLoadingId === selectedField.id}
                     >
                       <X className="w-4 h-4 mr-2" />
                       Từ Chối
@@ -905,7 +987,19 @@ export default function AdminFieldsPage() {
       </Dialog>
 
       {/* Reject Dialog */}
-      <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+      <Dialog
+        open={showRejectDialog}
+        onOpenChange={(open) => {
+          if (open) {
+            setShowRejectDialog(true);
+            return;
+          }
+
+          if (actionLoadingId === fieldToReject) return;
+
+          resetRejectDialog();
+        }}
+      >
         <DialogContent data-cy="admin-field-reject-dialog" className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
@@ -923,12 +1017,11 @@ export default function AdminFieldsPage() {
                 id="rejectReason"
                 placeholder="Nhập lý do từ chối sân này (ví dụ: Hình ảnh không rõ ràng, thiếu giấy phép kinh doanh...)"
                 value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
+                onChange={(event) => setRejectReason(event.target.value)}
                 rows={4}
               />
               <p className="text-sm text-muted-foreground">
-                Hiện backend đang chuyển sân sang hidden. Nếu muốn lưu lý do từ
-                chối, cần bổ sung cột reject_reason cho bảng fields.
+                Sau khi từ chối, sân sẽ không được hiển thị công khai trên hệ thống.
               </p>
             </div>
           </div>
@@ -936,11 +1029,8 @@ export default function AdminFieldsPage() {
             <Button
               data-cy="admin-field-reject-cancel"
               variant="outline"
-              onClick={() => {
-                setShowRejectDialog(false);
-                setFieldToReject(null);
-                setRejectReason("");
-              }}
+              onClick={resetRejectDialog}
+              disabled={actionLoadingId === fieldToReject}
             >
               Hủy
             </Button>
@@ -948,7 +1038,7 @@ export default function AdminFieldsPage() {
               data-cy="admin-field-reject-confirm"
               variant="destructive"
               onClick={handleReject}
-              disabled={!rejectReason.trim()}
+              disabled={!rejectReason.trim() || actionLoadingId === fieldToReject}
             >
               <X className="w-4 h-4 mr-2" />
               Xác Nhận Từ Chối
@@ -956,27 +1046,31 @@ export default function AdminFieldsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {previewImage && (
-  <div
-    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4"
-    onClick={() => setPreviewImage(null)}
-  >
-    <button
-      type="button"
-      onClick={() => setPreviewImage(null)}
-      className="absolute right-4 top-4 rounded-full bg-white/10 px-3 py-1 text-xl text-white hover:bg-white/20"
-    >
-      ×
-    </button>
 
-    <img
-      src={previewImage}
-      alt="Ảnh sân"
-      className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain"
-      onClick={(event) => event.stopPropagation()}
-    />
-  </div>
-)}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4"
+          onClick={() => setPreviewImage(null)}
+        >
+          <button
+            type="button"
+            onClick={() => setPreviewImage(null)}
+            className="absolute right-4 top-4 rounded-full bg-white/10 px-3 py-1 text-xl text-white hover:bg-white/20"
+          >
+            ×
+          </button>
+
+          <img
+            src={previewImage}
+            alt="Ảnh sân"
+            className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain"
+            onClick={(event) => event.stopPropagation()}
+            onError={(event) => {
+              event.currentTarget.src = DETAIL_PLACEHOLDER_IMAGE;
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
