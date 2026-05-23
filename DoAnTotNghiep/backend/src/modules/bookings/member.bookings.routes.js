@@ -12,6 +12,7 @@ import {
   validateCreateBookingPayload,
   validateBookingListQuery,
   validateAvailabilitySlotsQuery,
+  validateCreateRescheduleRequestPayload,
 } from "./bookings.validator.js";
 import { requireRole } from "../../core/middlewares/role.middleware.js";
 import { APP_ROLES } from "../../config/constant.js";
@@ -71,6 +72,13 @@ router.post(
   requireRole(APP_ROLES.USER),
   validateBody(validateCreateBookingPayload),
   bookingsController.createBooking
+);
+router.post(
+  "/my/:bookingId/reschedule-requests",
+  requireAuth,
+  validateParams(validateBookingIdParams),
+  validateBody(validateCreateRescheduleRequestPayload),
+  bookingsController.createMyRescheduleRequest
 );
 
 export default router;

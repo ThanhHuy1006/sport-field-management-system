@@ -85,6 +85,7 @@ function assertCheckInWindow(startDatetime) {
   const openWindow = new Date(
     start.getTime() - CHECKIN_EARLY_MINUTES * 60 * 1000,
   );
+
   const closeWindow = new Date(
     start.getTime() + CHECKIN_LATE_MINUTES * 60 * 1000,
   );
@@ -97,9 +98,11 @@ function assertCheckInWindow(startDatetime) {
     throw new ForbiddenError("Đã quá thời gian cho phép check-in");
   }
 }
+
 async function syncBookingLifecycle() {
   await bookingsRepository.syncBookingLifecycle();
 }
+
 function assertCanCheckInBooking(booking) {
   if (!booking) {
     throw new NotFoundError("Không tìm thấy booking");
@@ -130,10 +133,8 @@ function assertCanCheckInBooking(booking) {
       "Booking thanh toán tại sân phải được xác nhận trước khi check-in",
     );
   }
-  async function syncBookingLifecycle() {
-    await bookingsRepository.syncExpiredCheckedInBookings();
-  }
 
+  // Nếu muốn chặn check-in quá sớm / quá trễ thì mở dòng này:
   // assertCheckInWindow(booking.start_datetime);
 }
 
@@ -164,10 +165,12 @@ async function assertBookableField(valid) {
   assertFutureBooking(valid.start_datetime);
 
   const dayOfWeek = getDayOfWeek(valid.start_datetime);
-  const operatingHour = await bookingsRepository.findOperatingHourByFieldAndDay(
-    field.id,
-    dayOfWeek,
-  );
+
+  const operatingHour =
+    await bookingsRepository.findOperatingHourByFieldAndDay(
+      field.id,
+      dayOfWeek,
+    );
 
   if (!operatingHour) {
     throw new ForbiddenError("Sân không hoạt động vào ngày này");
@@ -188,6 +191,42 @@ async function assertBookableField(valid) {
     minDuration,
     operatingHour,
   };
+}
+
+async function assertRescheduleSlotAvailable(
+  fieldId,
+  startDatetime,
+  endDatetime,
+  bookingId,
+) {
+  const { field } = await assertBookableField({
+    field_id: fieldId,
+    start_datetime: startDatetime,
+    end_datetime: endDatetime,
+  });
+
+  const blackout = await bookingsRepository.findBlackoutByFieldAndRange(
+    field.id,
+    startDatetime,
+    endDatetime,
+  );
+
+  if (blackout) {
+    throw new ConflictError("Khung giờ mới đang bị khóa hoặc bảo trì");
+  }
+
+  const conflicts = await bookingsRepository.findConflictingBookingsExceptSelf(
+    field.id,
+    startDatetime,
+    endDatetime,
+    bookingId,
+  );
+
+  if (conflicts.length > 0) {
+    throw new ConflictError("Khung giờ mới đã được đặt");
+  }
+
+  return field;
 }
 
 export const bookingsService = {
@@ -458,6 +497,7 @@ export const bookingsService = {
 
   async getMyBookings(userId, query) {
     await syncBookingLifecycle();
+
     const { items, total } = await bookingsRepository.findMyBookings(
       userId,
       query,
@@ -476,6 +516,7 @@ export const bookingsService = {
 
   async getMyBookingDetail(userId, bookingId) {
     await syncBookingLifecycle();
+
     const booking = await bookingsRepository.findMyBookingById(
       userId,
       bookingId,
@@ -541,7 +582,13 @@ export const bookingsService = {
       throw new NotFoundError("Không tìm thấy booking");
     }
 
-    if (!["APPROVED", "PAID"].includes(booking.status)) {
+    const paymentMethod = booking.requested_payment_method || "ONSITE";
+
+    const canGetQr =
+      booking.status === "PAID" ||
+      (booking.status === "APPROVED" && paymentMethod === "ONSITE");
+
+    if (!canGetQr) {
       throw new ForbiddenError("Booking hiện chưa thể tạo mã check-in");
     }
 
@@ -559,6 +606,7 @@ export const bookingsService = {
     const expiresAt = new Date(
       start.getTime() + CHECKIN_LATE_MINUTES * 60 * 1000,
     );
+
     const expiresInSeconds = Math.max(
       60,
       Math.floor((expiresAt.getTime() - Date.now()) / 1000),
@@ -583,6 +631,7 @@ export const bookingsService = {
 
   async getOwnerBookings(ownerId, query) {
     await syncBookingLifecycle();
+
     const { items, total } = await bookingsRepository.findOwnerBookings(
       ownerId,
       query,
@@ -601,6 +650,7 @@ export const bookingsService = {
 
   async getOwnerBookingDetail(ownerId, bookingId) {
     await syncBookingLifecycle();
+
     const booking = await bookingsRepository.findOwnerBookingById(
       ownerId,
       bookingId,
@@ -750,41 +800,223 @@ export const bookingsService = {
   },
 
   async completeOwnerBooking(ownerId, bookingId, payload) {
-  await syncBookingLifecycle();
+    await syncBookingLifecycle();
 
-  const booking = await bookingsRepository.findOwnerBookingById(
-    ownerId,
-    bookingId,
-  );
-
-  if (!booking) {
-    throw new NotFoundError("Không tìm thấy booking");
-  }
-
-  if (booking.status === "COMPLETED") {
-    return booking;
-  }
-
-  if (booking.status !== "CHECKED_IN") {
-    throw new ForbiddenError(
-      "Chỉ booking đã CHECKED_IN mới được chuyển COMPLETED",
+    const booking = await bookingsRepository.findOwnerBookingById(
+      ownerId,
+      bookingId,
     );
-  }
 
-  const now = new Date();
-  const GRACE_MINUTES = 5;
-  const threshold = new Date(now.getTime() - GRACE_MINUTES * 60 * 1000);
+    if (!booking) {
+      throw new NotFoundError("Không tìm thấy booking");
+    }
 
-  if (new Date(booking.end_datetime).getTime() > threshold.getTime()) {
-    throw new ForbiddenError(
-      "Booking chưa đến giờ kết thúc. Hệ thống sẽ tự động hoàn thành sau khi hết giờ đặt sân.",
+    if (booking.status === "COMPLETED") {
+      return booking;
+    }
+
+    if (booking.status !== "CHECKED_IN") {
+      throw new ForbiddenError(
+        "Chỉ booking đã CHECKED_IN mới được chuyển COMPLETED",
+      );
+    }
+
+    const now = new Date();
+    const GRACE_MINUTES = 5;
+    const threshold = new Date(now.getTime() - GRACE_MINUTES * 60 * 1000);
+
+    if (new Date(booking.end_datetime).getTime() > threshold.getTime()) {
+      throw new ForbiddenError(
+        "Booking chưa đến giờ kết thúc. Hệ thống sẽ tự động hoàn thành sau khi hết giờ đặt sân.",
+      );
+    }
+
+    return bookingsRepository.completeOwnerBooking(
+      ownerId,
+      bookingId,
+      payload.note || "Completed after end time",
     );
-  }
+  },
 
-  return bookingsRepository.completeOwnerBooking(
-    ownerId,
-    bookingId,
-    payload.note || "Completed after end time",
-  );
-}
+  async createMyRescheduleRequest(userId, bookingId, payload) {
+    const booking = await bookingsRepository.findMyBookingById(
+      userId,
+      bookingId,
+    );
+
+    if (!booking) {
+      throw new NotFoundError("Không tìm thấy booking");
+    }
+
+    if (!["APPROVED", "PAID"].includes(booking.status)) {
+      throw new ForbiddenError("Booking hiện không thể đổi lịch");
+    }
+
+    if (booking.checked_in_at || booking.status === "CHECKED_IN") {
+      throw new ForbiddenError("Booking đã check-in, không thể đổi lịch");
+    }
+
+    if (new Date() >= new Date(booking.start_datetime)) {
+      throw new ForbiddenError(
+        "Không thể đổi lịch booking đã bắt đầu hoặc đã qua",
+      );
+    }
+
+    if (payload.start_datetime <= new Date()) {
+      throw new ValidationError("Không thể đổi sang thời điểm đã qua");
+    }
+
+    const existedPending =
+      await bookingsRepository.findPendingRescheduleRequestByBookingId(
+        booking.id,
+      );
+
+    if (existedPending) {
+      throw new ConflictError("Booking này đang có yêu cầu đổi lịch chờ duyệt");
+    }
+
+    await assertRescheduleSlotAvailable(
+      booking.field_id,
+      payload.start_datetime,
+      payload.end_datetime,
+      booking.id,
+    );
+
+    const approvalMode = booking.approval_mode_snapshot || "MANUAL";
+
+    if (approvalMode === "AUTO") {
+      const request = await bookingsRepository.autoApproveRescheduleRequest({
+        booking_id: booking.id,
+        requested_by: userId,
+        old_start_datetime: booking.start_datetime,
+        old_end_datetime: booking.end_datetime,
+        new_start_datetime: payload.start_datetime,
+        new_end_datetime: payload.end_datetime,
+        booking_status: booking.status,
+        reason: payload.reason,
+      });
+
+      await safeCreateNotification({
+        user_id: booking.user_id,
+        title: "Đổi lịch thành công",
+        body: "Yêu cầu đổi lịch của bạn đã được hệ thống tự động duyệt.",
+        type: "BOOKING",
+      });
+
+      return request;
+    }
+
+    const request = await bookingsRepository.createRescheduleRequest({
+      booking_id: booking.id,
+      requested_by: userId,
+      old_start_datetime: booking.start_datetime,
+      old_end_datetime: booking.end_datetime,
+      new_start_datetime: payload.start_datetime,
+      new_end_datetime: payload.end_datetime,
+      reason: payload.reason,
+    });
+
+    const ownerId = booking.fields?.owner_id;
+
+    if (ownerId) {
+      await safeCreateNotification({
+        user_id: ownerId,
+        title: "Có yêu cầu đổi lịch mới",
+        body: `Khách hàng yêu cầu đổi lịch cho sân ${
+          booking.fields?.field_name || ""
+        }.`,
+        type: "BOOKING",
+      });
+    }
+
+    return request;
+  },
+
+  async getOwnerRescheduleRequests(ownerId, query) {
+    return bookingsRepository.findOwnerRescheduleRequests(ownerId, query);
+  },
+
+  async approveOwnerRescheduleRequest(ownerId, requestId) {
+    const request = await bookingsRepository.findOwnerRescheduleRequestById(
+      ownerId,
+      requestId,
+    );
+
+    if (!request) {
+      throw new NotFoundError("Không tìm thấy yêu cầu đổi lịch");
+    }
+
+    if (request.status !== "PENDING") {
+      throw new ForbiddenError("Yêu cầu đổi lịch này đã được xử lý");
+    }
+
+    const booking = request.bookings;
+
+    if (!["APPROVED", "PAID"].includes(booking.status)) {
+      throw new ForbiddenError("Booking hiện không thể đổi lịch");
+    }
+
+    if (booking.checked_in_at || booking.status === "CHECKED_IN") {
+      throw new ForbiddenError("Booking đã check-in, không thể đổi lịch");
+    }
+
+    await assertRescheduleSlotAvailable(
+      booking.field_id,
+      request.new_start_datetime,
+      request.new_end_datetime,
+      booking.id,
+    );
+
+    const updated = await bookingsRepository.approveRescheduleRequest(
+      ownerId,
+      requestId,
+    );
+
+    if (!updated) {
+      throw new NotFoundError("Không tìm thấy yêu cầu đổi lịch");
+    }
+
+    await safeCreateNotification({
+      user_id: booking.user_id,
+      title: "Yêu cầu đổi lịch đã được duyệt",
+      body: "Chủ sân đã duyệt yêu cầu đổi lịch của bạn.",
+      type: "BOOKING",
+    });
+
+    return updated;
+  },
+
+  async rejectOwnerRescheduleRequest(ownerId, requestId, payload) {
+    const request = await bookingsRepository.findOwnerRescheduleRequestById(
+      ownerId,
+      requestId,
+    );
+
+    if (!request) {
+      throw new NotFoundError("Không tìm thấy yêu cầu đổi lịch");
+    }
+
+    if (request.status !== "PENDING") {
+      throw new ForbiddenError("Yêu cầu đổi lịch này đã được xử lý");
+    }
+
+    const updated = await bookingsRepository.rejectRescheduleRequest(
+      ownerId,
+      requestId,
+      payload.owner_note,
+    );
+
+    if (!updated) {
+      throw new NotFoundError("Không tìm thấy yêu cầu đổi lịch");
+    }
+
+    await safeCreateNotification({
+      user_id: request.bookings.user_id,
+      title: "Yêu cầu đổi lịch bị từ chối",
+      body: payload.owner_note || "Chủ sân đã từ chối yêu cầu đổi lịch của bạn.",
+      type: "BOOKING",
+    });
+
+    return updated;
+  },
 };

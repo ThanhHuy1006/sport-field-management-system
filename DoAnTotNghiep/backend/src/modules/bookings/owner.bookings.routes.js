@@ -15,6 +15,9 @@ import {
   validateCheckInQrPayload,
   validateCompleteBookingPayload,
   validateBookingListQuery,
+  validateRescheduleRequestIdParams,
+validateRejectRescheduleRequestPayload,
+validateRescheduleRequestListQuery,
 } from "./bookings.validator.js";
 
 const router = Router();
@@ -25,6 +28,24 @@ router.get(
   "/",
   validateQuery(validateBookingListQuery),
   bookingsController.getOwnerBookings
+);
+router.get(
+  "/reschedule-requests",
+  validateQuery(validateRescheduleRequestListQuery),
+  bookingsController.getOwnerRescheduleRequests
+);
+
+router.patch(
+  "/reschedule-requests/:requestId/approve",
+  validateParams(validateRescheduleRequestIdParams),
+  bookingsController.approveOwnerRescheduleRequest
+);
+
+router.patch(
+  "/reschedule-requests/:requestId/reject",
+  validateParams(validateRescheduleRequestIdParams),
+  validateBody(validateRejectRescheduleRequestPayload),
+  bookingsController.rejectOwnerRescheduleRequest
 );
 
 router.get(

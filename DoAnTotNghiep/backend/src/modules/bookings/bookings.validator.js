@@ -1,5 +1,7 @@
 import { ValidationError } from "../../core/errors/index.js";
+
 const ALLOWED_BOOKING_PAYMENT_METHODS = ["ONSITE", "BANK_TRANSFER"];
+
 function parseDateTime(value, fieldName) {
   const raw = String(value || "").trim();
 
@@ -8,6 +10,7 @@ function parseDateTime(value, fieldName) {
   }
 
   const parsed = new Date(raw);
+
   if (Number.isNaN(parsed.getTime())) {
     throw new ValidationError(`${fieldName} không hợp lệ`);
   }
@@ -15,7 +18,11 @@ function parseDateTime(value, fieldName) {
   return parsed;
 }
 
-function parsePositiveInt(value, fieldName, { min = 1, max = Number.MAX_SAFE_INTEGER } = {}) {
+function parsePositiveInt(
+  value,
+  fieldName,
+  { min = 1, max = Number.MAX_SAFE_INTEGER } = {},
+) {
   const num = Number(value);
 
   if (Number.isNaN(num) || num < min || num > max || !Number.isInteger(num)) {
@@ -56,39 +63,6 @@ export function validateCheckAvailabilityPayload(payload) {
   };
 }
 
-// export function validateCreateBookingPayload(payload) {
-//   const base = validateCheckAvailabilityPayload(payload);
-//   const rawNotes = payload.notes ?? payload.note ?? null;
-
-//   return {
-//     ...base,
-//     notes: rawNotes ? String(rawNotes).trim() : null,
-//   };
-// }
-// export function validateCreateBookingPayload(payload) {
-//   const base = validateCheckAvailabilityPayload(payload);
-//   const rawNotes = payload.notes ?? payload.note ?? null;
-//   const rawContactName = payload.contact_name ?? null;
-//   const rawContactEmail = payload.contact_email ?? null;
-//   const rawContactPhone = payload.contact_phone ?? null;
-//   const rawRequestedPaymentMethod =
-//     payload.requested_payment_method ?? payload.payment_method ?? "ONSITE";
-
-//   const requested_payment_method = String(rawRequestedPaymentMethod).trim();
-
-//   if (!ALLOWED_BOOKING_PAYMENT_METHODS.includes(requested_payment_method)) {
-//     throw new ValidationError("requested_payment_method không hợp lệ");
-//   }
-
-//   return {
-//     ...base,
-//     notes: rawNotes ? String(rawNotes).trim() : null,
-//     contact_name: rawContactName ? String(rawContactName).trim() : null,
-//     contact_email: rawContactEmail ? String(rawContactEmail).trim() : null,
-//     contact_phone: rawContactPhone ? String(rawContactPhone).trim() : null,
-//     requested_payment_method,
-//   };
-// }
 export function validateCreateBookingPayload(payload) {
   const base = validateCheckAvailabilityPayload(payload);
   const rawNotes = payload.notes ?? payload.note ?? null;
@@ -107,6 +81,7 @@ export function validateCreateBookingPayload(payload) {
   }
 
   const rawVoucherCode = payload.voucher_code ?? payload.voucherCode ?? null;
+
   const voucher_code = rawVoucherCode
     ? String(rawVoucherCode).trim().toUpperCase()
     : null;
@@ -153,8 +128,15 @@ export function validateCompleteBookingPayload(payload) {
 }
 
 export function validateBookingListQuery(query) {
-  const page = parsePositiveInt(query.page ?? 1, "page", { min: 1, max: 100000 });
-  const limit = parsePositiveInt(query.limit ?? 10, "limit", { min: 1, max: 100 });
+  const page = parsePositiveInt(query.page ?? 1, "page", {
+    min: 1,
+    max: 100000,
+  });
+
+  const limit = parsePositiveInt(query.limit ?? 10, "limit", {
+    min: 1,
+    max: 100,
+  });
 
   const allowedStatuses = [
     "PENDING_CONFIRM",
@@ -187,6 +169,7 @@ export function validateAvailabilitySlotsQuery(query) {
   const field_id = parsePositiveInt(query.field_id, "field_id", { min: 1 });
 
   const date = String(query.date || "").trim();
+
   if (!date) {
     throw new ValidationError("date là bắt buộc");
   }
@@ -197,12 +180,82 @@ export function validateAvailabilitySlotsQuery(query) {
 
   const duration_minutes =
     query.duration_minutes !== undefined && query.duration_minutes !== ""
-      ? parsePositiveInt(query.duration_minutes, "duration_minutes", { min: 1, max: 1440 })
+      ? parsePositiveInt(query.duration_minutes, "duration_minutes", {
+          min: 1,
+          max: 1440,
+        })
       : undefined;
 
   return {
     field_id,
     date,
     duration_minutes,
+  };
+}
+
+export function validateCreateRescheduleRequestPayload(payload) {
+  const start_datetime = parseDateTime(
+    payload.start_datetime ?? payload.new_start_datetime,
+    "start_datetime",
+  );
+
+  const end_datetime = parseDateTime(
+    payload.end_datetime ?? payload.new_end_datetime,
+    "end_datetime",
+  );
+
+  if (start_datetime >= end_datetime) {
+    throw new ValidationError("end_datetime phải lớn hơn start_datetime");
+  }
+
+  const reason = payload?.reason ? String(payload.reason).trim() : null;
+
+  return {
+    start_datetime,
+    end_datetime,
+    reason,
+  };
+}
+
+export function validateRescheduleRequestIdParams(params) {
+  const requestId = Number(params.requestId);
+
+  if (Number.isNaN(requestId) || requestId <= 0) {
+    throw new ValidationError("requestId không hợp lệ");
+  }
+
+  return { requestId };
+}
+
+export function validateRejectRescheduleRequestPayload(payload) {
+  return {
+    owner_note: payload?.owner_note
+      ? String(payload.owner_note).trim()
+      : "Owner rejected reschedule request",
+  };
+}
+
+export function validateRescheduleRequestListQuery(query) {
+  const page = parsePositiveInt(query.page ?? 1, "page", {
+    min: 1,
+    max: 100000,
+  });
+
+  const limit = parsePositiveInt(query.limit ?? 10, "limit", {
+    min: 1,
+    max: 100,
+  });
+
+  const allowedStatuses = ["PENDING", "APPROVED", "REJECTED", "CANCELLED"];
+  const status = query.status ? String(query.status).trim().toUpperCase() : "";
+
+  if (status && !allowedStatuses.includes(status)) {
+    throw new ValidationError("status yêu cầu đổi lịch không hợp lệ");
+  }
+
+  return {
+    page,
+    limit,
+    status: status || undefined,
   };
 }
