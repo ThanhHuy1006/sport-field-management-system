@@ -2,6 +2,7 @@ import { Router } from "express";
 import { bookingsController } from "./bookings.controller.js";
 import { requireAuth } from "../../core/middlewares/auth.middleware.js";
 import { requireApprovedOwner } from "../../core/middlewares/role.middleware.js";
+import { ownerBookingsController } from "../owners/owner.bookings.controller.js";
 import {
   validateBody,
   validateParams,
@@ -50,6 +51,11 @@ router.patch(
   validateParams(validateBookingIdParams),
   validateBody(validateManualCheckInPayload),
   bookingsController.checkInOwnerBooking
+);
+router.post(
+  "/check-in/verify",
+  validateBody(validateCheckInQrPayload),
+  ownerBookingsController.verifyOwnerBookingQr
 );
 
 router.post(
