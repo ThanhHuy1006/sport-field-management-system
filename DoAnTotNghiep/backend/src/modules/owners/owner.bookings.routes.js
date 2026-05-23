@@ -48,6 +48,11 @@ router.patch(
   validateBody(validateManualCheckInPayload),
   ownerBookingsController.checkInOwnerBooking
 );
+router.post(
+  "/check-in/verify",
+  validateBody(validateCheckInQrPayload),
+  ownerBookingsController.verifyOwnerBookingQr
+);
 
 router.post(
   "/check-in/scan",

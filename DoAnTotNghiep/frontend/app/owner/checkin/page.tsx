@@ -37,6 +37,7 @@ import {
   getOwnerBookingDetail,
   getOwnerBookings,
   scanOwnerBookingQr,
+  verifyOwnerBookingQr,
   type OwnerBookingDetail,
 } from "@/features/bookings/services/owner-checkin";
 
@@ -117,8 +118,20 @@ function getBookingRef(booking: OwnerBookingDetail) {
 function getPaymentMethodLabel(
   method: OwnerBookingDetail["requested_payment_method"]
 ) {
-  if (method === "BANK_TRANSFER") return "Chuyển khoản ngân hàng";
-  return "Thanh toán tại sân";
+  switch (String(method || "")) {
+    case "BANK_TRANSFER":
+      return "Chuyển khoản ngân hàng";
+    case "ONSITE":
+      return "Thanh toán tại sân";
+    case "VNPAY":
+      return "VNPay";
+    case "MOMO":
+      return "MoMo";
+    case "ZALOPAY":
+      return "ZaloPay";
+    default:
+      return "Không xác định";
+  }
 }
 
 function getStatusLabel(status: string) {
@@ -157,7 +170,9 @@ function canCheckIn(booking: OwnerBookingDetail | null) {
     return false;
   }
 
-  if (booking.requested_payment_method === "BANK_TRANSFER") {
+  const onlinePaymentMethods = ["BANK_TRANSFER", "VNPAY", "MOMO", "ZALOPAY"];
+
+  if (onlinePaymentMethods.includes(String(booking.requested_payment_method))) {
     return booking.status === "PAID";
   }
 
@@ -173,6 +188,20 @@ function isToday(value: string) {
     target.getMonth() === now.getMonth() &&
     target.getDate() === now.getDate()
   );
+}
+
+function extractOwnerBookingItems(response: Awaited<ReturnType<typeof getOwnerBookings>>) {
+  const data = response.data;
+
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (Array.isArray(data?.items)) {
+    return data.items;
+  }
+
+  return [];
 }
 
 export default function OwnerCheckinPage() {
@@ -215,13 +244,22 @@ export default function OwnerCheckinPage() {
         limit: 50,
       });
 
-      const items = res.data.items.filter((item) =>
+      const items = extractOwnerBookingItems(res).filter((item) =>
         isToday(item.start_datetime)
       );
 
       setTodayBookings(items);
-    } catch {
+    } catch (error) {
       setTodayBookings([]);
+
+      toast({
+        title: "Không thể tải đơn hôm nay",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Vui lòng thử lại sau.",
+        variant: "destructive",
+      });
     }
   }
 
@@ -239,6 +277,7 @@ export default function OwnerCheckinPage() {
       setIsLoading(true);
 
       const res = await getOwnerBookingDetail(bookingId);
+      setQrToken("");
       setFoundBooking(res.data);
 
       if (res.data.status === "CHECKED_IN") {
@@ -278,8 +317,10 @@ export default function OwnerCheckinPage() {
       toast({
         title: "Không thể check-in",
         description:
-          foundBooking.requested_payment_method === "BANK_TRANSFER"
-            ? "Booking chuyển khoản phải thanh toán thành công trước khi check-in."
+          ["BANK_TRANSFER", "VNPAY", "MOMO", "ZALOPAY"].includes(
+            String(foundBooking.requested_payment_method)
+          )
+            ? "Booking thanh toán online phải thanh toán thành công trước khi check-in."
             : "Booking thanh toán tại sân phải được xác nhận trước khi check-in.",
         variant: "destructive",
       });
@@ -289,7 +330,10 @@ export default function OwnerCheckinPage() {
     try {
       setIsSubmitting(true);
 
-      const res = await checkInOwnerBooking(foundBooking.id);
+      const res = qrToken
+        ? await scanOwnerBookingQr(qrToken)
+        : await checkInOwnerBooking(foundBooking.id);
+
       setFoundBooking(res.data);
       setCheckinResult("success");
 
@@ -355,33 +399,26 @@ export default function OwnerCheckinPage() {
     }
 
     try {
-      setIsSubmitting(true);
+      setIsLoading(true);
 
-      const res = await scanOwnerBookingQr(qrTokenValue);
+      const res = await verifyOwnerBookingQr(qrTokenValue);
 
-      setFoundBooking(res.data);
-      setCheckinResult("success");
-      setShowResultDialog(true);
       setQrToken(qrTokenValue);
+      setFoundBooking(res.data);
 
-      setCheckinHistory((prev) => [
-        {
-          bookingRef: getBookingRef(res.data),
-          customerName: getCustomerName(res.data),
-          time: new Date().toLocaleTimeString("vi-VN", {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-          fieldName: getFieldName(res.data),
-        },
-        ...prev.slice(0, 4),
-      ]);
+      if (res.data.status === "CHECKED_IN") {
+        setCheckinResult("already");
+      } else if (res.data.status === "COMPLETED") {
+        setCheckinResult("completed");
+      } else {
+        setCheckinResult(null);
+      }
 
-      await loadTodayBookings();
+      setShowResultDialog(true);
 
       toast({
         title: "Quét QR thành công",
-        description: `${getCustomerName(res.data)} đã được check-in.`,
+        description: "Đã đọc mã QR. Vui lòng kiểm tra thông tin trước khi xác nhận check-in.",
       });
     } catch (error) {
       toast({
@@ -389,11 +426,11 @@ export default function OwnerCheckinPage() {
         description:
           error instanceof Error
             ? error.message
-            : "QR không hợp lệ hoặc đã hết hạn",
+            : "QR không hợp lệ, đã hết hạn hoặc không thuộc sân của bạn.",
         variant: "destructive",
       });
     } finally {
-      setIsSubmitting(false);
+      setIsLoading(false);
     }
   };
 
@@ -588,6 +625,7 @@ export default function OwnerCheckinPage() {
               <Button
                 className="w-full"
                 size="lg"
+                disabled={isSubmitting || isLoading}
                 onClick={
                   scanning
                     ? () => void stopCameraScanning()
@@ -618,7 +656,7 @@ export default function OwnerCheckinPage() {
                     className="flex-1"
                   />
 
-                  <Button onClick={handleScanQr} disabled={isSubmitting}>
+                  <Button onClick={handleScanQr} disabled={isLoading || isSubmitting || !qrToken.trim()}>
                     Xác nhận QR
                   </Button>
                 </div>
@@ -636,9 +674,12 @@ export default function OwnerCheckinPage() {
                     placeholder="VD: 36 hoặc BK-36"
                     value={manualCode}
                     onChange={(event) => setManualCode(event.target.value)}
-                    onKeyDown={(event) =>
-                      event.key === "Enter" && handleManualSearch()
-                    }
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        void handleManualSearch();
+                      }
+                    }}
                     className="flex-1"
                   />
 
@@ -667,6 +708,7 @@ export default function OwnerCheckinPage() {
                           key={booking.id}
                           className="flex items-center justify-between p-3 bg-muted rounded-lg cursor-pointer hover:bg-muted/80 transition"
                           onClick={() => {
+                            setQrToken("");
                             setFoundBooking(booking);
                             setCheckinResult(null);
                             setShowResultDialog(true);
@@ -742,7 +784,18 @@ export default function OwnerCheckinPage() {
         </Card>
       </div>
 
-      <Dialog open={showResultDialog} onOpenChange={setShowResultDialog}>
+      <Dialog
+        open={showResultDialog}
+        onOpenChange={(open) => {
+          setShowResultDialog(open);
+
+          if (!open) {
+            setFoundBooking(null);
+            setCheckinResult(null);
+            setQrToken("");
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>

@@ -11,13 +11,47 @@ import { ownerBookingsRepository } from "./owner.bookings.repository.js";
 
 const CHECKIN_EARLY_MINUTES = 30;
 const CHECKIN_LATE_MINUTES = 60;
+function decodeCheckInQrToken(qrToken) {
+  const secret = process.env.CHECKIN_QR_SECRET;
+
+  if (!secret) {
+    throw new AppError("CHECKIN_QR_SECRET chưa được cấu hình", {
+      statusCode: 500,
+      code: "CONFIG_ERROR",
+    });
+  }
+
+  let decoded;
+
+  try {
+    decoded = jwt.verify(qrToken, secret);
+  } catch {
+    throw new AuthError("QR token không hợp lệ hoặc đã hết hạn");
+  }
+
+  if (decoded?.type !== "BOOKING_CHECKIN") {
+    throw new ValidationError("QR token không đúng loại");
+  }
+
+  const bookingId = Number(decoded.bookingId);
+
+  if (Number.isNaN(bookingId) || bookingId <= 0) {
+    throw new ValidationError("QR token không hợp lệ");
+  }
+
+  return bookingId;
+}
 
 function assertCheckInWindow(startDatetime) {
   const now = new Date();
   const start = new Date(startDatetime);
 
-  const openWindow = new Date(start.getTime() - CHECKIN_EARLY_MINUTES * 60 * 1000);
-  const closeWindow = new Date(start.getTime() + CHECKIN_LATE_MINUTES * 60 * 1000);
+  const openWindow = new Date(
+    start.getTime() - CHECKIN_EARLY_MINUTES * 60 * 1000,
+  );
+  const closeWindow = new Date(
+    start.getTime() + CHECKIN_LATE_MINUTES * 60 * 1000,
+  );
 
   if (now < openWindow) {
     throw new ForbiddenError("Chưa tới thời gian cho phép check-in");
@@ -52,7 +86,7 @@ export const ownerBookingsService = {
   async getOwnerBookingDetail(ownerId, bookingId) {
     const booking = await ownerBookingsRepository.findOwnerBookingById(
       ownerId,
-      bookingId
+      bookingId,
     );
 
     if (!booking) {
@@ -65,7 +99,7 @@ export const ownerBookingsService = {
   async approveOwnerBooking(ownerId, bookingId) {
     const booking = await ownerBookingsRepository.findOwnerBookingById(
       ownerId,
-      bookingId
+      bookingId,
     );
 
     if (!booking) {
@@ -82,7 +116,7 @@ export const ownerBookingsService = {
   async rejectOwnerBooking(ownerId, bookingId, payload) {
     const booking = await ownerBookingsRepository.findOwnerBookingById(
       ownerId,
-      bookingId
+      bookingId,
     );
 
     if (!booking) {
@@ -90,16 +124,22 @@ export const ownerBookingsService = {
     }
 
     if (booking.status !== "PENDING_CONFIRM") {
-      throw new ForbiddenError("Chỉ booking đang chờ xác nhận mới được từ chối");
+      throw new ForbiddenError(
+        "Chỉ booking đang chờ xác nhận mới được từ chối",
+      );
     }
 
-    return ownerBookingsRepository.rejectOwnerBooking(ownerId, bookingId, payload.note);
+    return ownerBookingsRepository.rejectOwnerBooking(
+      ownerId,
+      bookingId,
+      payload.note,
+    );
   },
 
   async checkInOwnerBooking(ownerId, bookingId, payload) {
     const booking = await ownerBookingsRepository.findOwnerBookingById(
       ownerId,
-      bookingId
+      bookingId,
     );
 
     if (!booking) {
@@ -112,40 +152,15 @@ export const ownerBookingsService = {
       ownerId,
       bookingId,
       "MANUAL",
-      payload.note
+      payload.note,
     );
   },
-
   async scanOwnerBookingQr(ownerId, payload) {
-    const secret = process.env.CHECKIN_QR_SECRET;
-
-    if (!secret) {
-      throw new AppError("CHECKIN_QR_SECRET chưa được cấu hình", {
-        statusCode: 500,
-        code: "CONFIG_ERROR",
-      });
-    }
-
-    let decoded;
-    try {
-      decoded = jwt.verify(payload.qr_token, secret);
-    } catch {
-      throw new AuthError("QR token không hợp lệ hoặc đã hết hạn");
-    }
-
-    if (decoded?.type !== "BOOKING_CHECKIN") {
-      throw new ValidationError("QR token không đúng loại");
-    }
-
-    const bookingId = Number(decoded.bookingId);
-
-    if (Number.isNaN(bookingId) || bookingId <= 0) {
-      throw new ValidationError("QR token không hợp lệ");
-    }
+    const bookingId = decodeCheckInQrToken(payload.qr_token);
 
     const booking = await ownerBookingsRepository.findOwnerBookingById(
       ownerId,
-      bookingId
+      bookingId,
     );
 
     if (!booking) {
@@ -158,14 +173,14 @@ export const ownerBookingsService = {
       ownerId,
       bookingId,
       "QR",
-      "Checked in by owner via QR"
+      "Checked in by owner via QR",
     );
   },
 
   async completeOwnerBooking(ownerId, bookingId, payload) {
     const booking = await ownerBookingsRepository.findOwnerBookingById(
       ownerId,
-      bookingId
+      bookingId,
     );
 
     if (!booking) {
@@ -173,13 +188,29 @@ export const ownerBookingsService = {
     }
 
     if (booking.status !== "CHECKED_IN") {
-      throw new ForbiddenError("Chỉ booking đã CHECKED_IN mới được chuyển COMPLETED");
+      throw new ForbiddenError(
+        "Chỉ booking đã CHECKED_IN mới được chuyển COMPLETED",
+      );
     }
 
     return ownerBookingsRepository.completeOwnerBooking(
       ownerId,
       bookingId,
-      payload.note
+      payload.note,
     );
+  },
+  async verifyOwnerBookingQr(ownerId, payload) {
+    const bookingId = decodeCheckInQrToken(payload.qr_token);
+
+    const booking = await ownerBookingsRepository.findOwnerBookingById(
+      ownerId,
+      bookingId,
+    );
+
+    if (!booking) {
+      throw new NotFoundError("Không tìm thấy booking thuộc owner này");
+    }
+
+    return booking;
   },
 };

@@ -104,6 +104,20 @@ export const ownerBookingsController = {
 
     return successResponse(res, mapOwnerBooking(item), "Check-in booking thành công");
   }),
+  verifyOwnerBookingQr: asyncHandler(async (req, res) => {
+  const payload = req.validated?.body ?? req.body;
+
+  const item = await ownerBookingsService.verifyOwnerBookingQr(
+    req.user.id,
+    payload
+  );
+
+  return successResponse(
+    res,
+    mapOwnerBooking(item),
+    "Xác thực QR booking thành công"
+  );
+}),
 
   scanOwnerBookingQr: asyncHandler(async (req, res) => {
     const payload = req.validated?.body ?? req.body;
