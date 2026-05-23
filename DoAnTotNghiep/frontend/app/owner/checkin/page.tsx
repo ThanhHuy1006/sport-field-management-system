@@ -416,9 +416,6 @@ export default function OwnerCheckinPage() {
     }
   };
 
-  const handleScanQr = async () => {
-    await handleScanQrToken(qrToken);
-  };
 
   const startCameraScanning = async () => {
     try {
@@ -627,25 +624,9 @@ export default function OwnerCheckinPage() {
                 )}
               </Button>
 
-              <div>
-                <Label htmlFor="qrToken">QR token</Label>
-                <div className="flex gap-2 mt-1">
-                  <Input
-                    id="qrToken"
-                    placeholder="Dán qr_token từ mã QR của khách"
-                    value={qrToken}
-                    onChange={(event) => setQrToken(event.target.value)}
-                    className="flex-1"
-                  />
-
-                  <Button
-                    onClick={handleScanQr}
-                    disabled={isSubmitting || !qrToken.trim()}
-                  >
-                    Xác nhận QR
-                  </Button>
-                </div>
-              </div>
+              <p className="text-sm text-muted-foreground text-center">
+                Quét mã QR của khách để hiển thị thông tin đặt sân. Chủ sân sẽ xác nhận check-in ở bước tiếp theo.
+              </p>
             </div>
           )}
 
