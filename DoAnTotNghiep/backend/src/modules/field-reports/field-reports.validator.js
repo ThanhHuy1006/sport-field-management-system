@@ -9,13 +9,26 @@ const FIELD_REPORT_REASONS = [
   "OTHER",
 ];
 
-const FIELD_REPORT_STATUSES = [
-  "PENDING",
-  "REVIEWING",
-  "RESOLVED",
-  "REJECTED",
-];
+const FIELD_REPORT_STATUSES = ["PENDING", "REVIEWING", "RESOLVED", "REJECTED"];
+function toBoolean(value, fieldName) {
+  if (value === undefined || value === null || value === "") {
+    return false;
+  }
 
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (value === "true") {
+    return true;
+  }
+
+  if (value === "false") {
+    return false;
+  }
+
+  throw new ValidationError(`${fieldName} phải là boolean`);
+}
 function toPositiveInt(value, fieldName) {
   const number = Number(value);
 
@@ -49,6 +62,10 @@ export function validateCreateFieldReportPayload(payload) {
 
   if (description && description.length > 500) {
     throw new ValidationError("description không được vượt quá 500 ký tự");
+  }
+
+  if (reason === "OTHER" && !description) {
+    throw new ValidationError("Vui lòng nhập mô tả khi chọn lý do khác");
   }
 
   return {
@@ -112,6 +129,6 @@ export function validateUpdateFieldReportStatusPayload(payload) {
   return {
     status,
     admin_note: admin_note || null,
-    hide_field: Boolean(payload.hide_field),
+    hide_field: toBoolean(payload.hide_field, "hide_field"),
   };
 }

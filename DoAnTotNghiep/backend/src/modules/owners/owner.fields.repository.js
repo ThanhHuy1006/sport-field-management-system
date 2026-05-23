@@ -245,14 +245,15 @@ async setOwnerFieldPrimaryImage(fieldId, imageId) {
   //     include: OWNER_FIELD_INCLUDE,
   //   });
   // },
+  updateOwnerFieldStatus(fieldId, data) {
+  return prisma.fields.update({
+    where: { id: Number(fieldId) },
+    data,
+    include: OWNER_FIELD_INCLUDE,
+  });
+},
 
-  updateOwnerFieldStatus(fieldId, status) {
-    return prisma.fields.update({
-      where: { id: fieldId },
-      data: { status },
-      include: OWNER_FIELD_INCLUDE,
-    });
-  },
+
   async deleteOwnerFieldImage(fieldId, imageId) {
   return prisma.$transaction(async (tx) => {
     const image = await tx.field_images.findFirst({

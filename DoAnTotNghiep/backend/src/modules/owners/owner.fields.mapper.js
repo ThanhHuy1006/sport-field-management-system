@@ -58,5 +58,8 @@ export function toOwnerFieldResponse(item) {
       is_primary: img.is_primary,
       order_no: img.order_no,
     })),
+    hidden_by_role: item.hidden_by_role ?? null,
+    hidden_reason: item.hidden_reason ?? null,
+    hidden_at: item.hidden_at ?? null,
   };
 }

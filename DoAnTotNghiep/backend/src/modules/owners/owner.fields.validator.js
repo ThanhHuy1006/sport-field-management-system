@@ -1,7 +1,7 @@
 import { ValidationError } from "../../core/errors/index.js";
 
 // const ALLOWED_FIELD_STATUSES = ["pending", "active", "hidden", "maintenance"];
-const ALLOWED_OWNER_FIELD_STATUSES = ["inactive", "maintenance"];
+const ALLOWED_OWNER_FIELD_STATUSES = ["active", "hidden", "maintenance"];
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 const ALLOWED_APPROVAL_MODES = ["MANUAL", "AUTO"];
 
@@ -504,11 +504,19 @@ export function validateOwnerFieldStatusPayload(payload) {
 
   if (!ALLOWED_OWNER_FIELD_STATUSES.includes(status)) {
     throw new ValidationError(
-      "Owner chỉ được chuyển sân sang inactive hoặc maintenance",
+      "Owner chỉ được chuyển sân sang active, hidden hoặc maintenance",
     );
   }
 
-  return { status };
+  const reason =
+    payload.reason === undefined || payload.reason === null
+      ? null
+      : String(payload.reason).trim() || null;
+
+  return {
+    status,
+    reason,
+  };
 }
 export function validateFieldImageParams(params) {
   const fieldId = Number(params.fieldId);

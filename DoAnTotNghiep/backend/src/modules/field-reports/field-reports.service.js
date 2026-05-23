@@ -9,6 +9,14 @@ import {
   UPLOAD_PUBLIC_PATH,
 } from "../uploads/uploads.constants.js";
 
+const REASONS_REQUIRE_BOOKING = ["BAD_QUALITY", "OWNER_ATTITUDE"];
+
+const VALID_REPORT_BOOKING_STATUSES = [
+  "PAID",
+  "CHECKED_IN",
+  "COMPLETED",
+];
+
 function toFieldReportAttachments(files = []) {
   return files.map((file) => ({
     image_url: `${UPLOAD_PUBLIC_PATH}/${UPLOAD_FOLDERS.FIELD_REPORTS}/${file.filename}`,
@@ -26,6 +34,20 @@ export const fieldReportsService = {
       throw new NotFoundError("Không tìm thấy sân");
     }
 
+    if (field.status === "hidden") {
+      throw new ForbiddenError("Sân này đã bị ẩn, không thể gửi báo cáo mới");
+    }
+
+    const isReasonRequireBooking = REASONS_REQUIRE_BOOKING.includes(
+      payload.reason
+    );
+
+    if (isReasonRequireBooking && !payload.booking_id) {
+      throw new ForbiddenError(
+        "Bạn cần có đơn đặt sân liên quan để báo cáo lý do này"
+      );
+    }
+
     if (payload.booking_id) {
       const booking = await fieldReportsRepository.findBookingForReport(
         userId,
@@ -36,6 +58,12 @@ export const fieldReportsService = {
       if (!booking) {
         throw new ForbiddenError(
           "Booking không tồn tại hoặc không thuộc về bạn"
+        );
+      }
+
+      if (!VALID_REPORT_BOOKING_STATUSES.includes(booking.status)) {
+        throw new ForbiddenError(
+          "Chỉ có thể báo cáo sân khi đơn đặt sân đã được thanh toán, check-in hoặc hoàn tất"
         );
       }
     }
@@ -101,7 +129,8 @@ export const fieldReportsService = {
     }
 
     return fieldReportsRepository.processFieldReportStatus(reportId, data, {
-      hide_field: payload.hide_field,
+      hide_field: payload.status === "RESOLVED" && payload.hide_field === true,
+      hidden_reason: payload.admin_note,
     });
   },
 };

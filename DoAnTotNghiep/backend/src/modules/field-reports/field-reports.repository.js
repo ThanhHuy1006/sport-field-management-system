@@ -17,6 +17,10 @@ const FIELD_REPORT_INCLUDE = {
       address: true,
       status: true,
       owner_id: true,
+
+      hidden_by_role: true,
+      hidden_reason: true,
+      hidden_at: true,
     },
   },
   booking: {
@@ -159,27 +163,36 @@ export const fieldReportsRepository = {
   },
 
   processFieldReportStatus(reportId, data, options = {}) {
-    return prisma.$transaction(async (tx) => {
-      const report = await tx.field_reports.update({
-        where: { id: reportId },
-        data,
-        include: FIELD_REPORT_INCLUDE,
-      });
-
-      if (options.hide_field) {
-        await tx.fields.update({
-          where: { id: report.field_id },
-          data: {
-            status: "hidden",
-            updated_at: new Date(),
-          },
-        });
-      }
-
-      return tx.field_reports.findUnique({
-        where: { id: report.id },
-        include: FIELD_REPORT_INCLUDE,
-      });
+  return prisma.$transaction(async (tx) => {
+    const report = await tx.field_reports.update({
+      where: { id: reportId },
+      data,
+      include: FIELD_REPORT_INCLUDE,
     });
-  },
+
+    const shouldHideField =
+      data.status === "RESOLVED" && options.hide_field === true;
+
+    if (shouldHideField) {
+      await tx.fields.update({
+        where: { id: report.field_id },
+        data: {
+          status: "hidden",
+          hidden_by_role: "ADMIN",
+          hidden_reason:
+            options.hidden_reason ||
+            data.admin_note ||
+            "Sân bị quản trị viên ẩn do báo cáo vi phạm",
+          hidden_at: new Date(),
+          updated_at: new Date(),
+        },
+      });
+    }
+
+    return tx.field_reports.findUnique({
+      where: { id: report.id },
+      include: FIELD_REPORT_INCLUDE,
+    });
+  });
+},
 };

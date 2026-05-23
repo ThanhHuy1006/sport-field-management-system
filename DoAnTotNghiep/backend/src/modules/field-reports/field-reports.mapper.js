@@ -31,6 +31,10 @@ export function toFieldReportResponse(report) {
           sport_type: report.field.sport_type,
           address: report.field.address,
           status: report.field.status,
+
+          hidden_by_role: report.field.hidden_by_role ?? null,
+          hidden_reason: report.field.hidden_reason ?? null,
+          hidden_at: report.field.hidden_at ?? null,
         }
       : null,
 
