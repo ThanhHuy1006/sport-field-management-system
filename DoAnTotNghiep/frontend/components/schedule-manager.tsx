@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
+import { Pagination } from "@/components/pagination"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -81,6 +82,7 @@ interface ScheduleManagerProps {
   isAdmin?: boolean
   onApprove?: (id: number) => void
   onReject?: (id: number, reason: string) => void
+  actionLoadingId?: number | null
   onApproveReschedule?: (id: number) => void
   onRejectReschedule?: (id: number, reason: string) => void
 }
@@ -88,6 +90,7 @@ interface ScheduleManagerProps {
 const START_HOUR = 6
 const END_HOUR = 23
 const HOUR_HEIGHT = 80
+const ITEMS_PER_PAGE = 8
 
 export function ScheduleManager({
   bookings: initialBookings,
@@ -96,6 +99,7 @@ export function ScheduleManager({
   isAdmin = false,
   onApprove,
   onReject,
+  actionLoadingId = null,
   onApproveReschedule,
   onRejectReschedule,
 }: ScheduleManagerProps) {
@@ -106,6 +110,7 @@ export function ScheduleManager({
   }, [initialBookings])
 
   const [viewMode, setViewMode] = useState<"list" | "timeline">("list")
+  const [currentPage, setCurrentPage] = useState(1)
   const [selectedDate, setSelectedDate] = useState(() => new Date())
   const [selectedField, setSelectedField] = useState<string>("all")
   const [selectedOwner, setSelectedOwner] = useState<string>("all")
@@ -123,7 +128,11 @@ export function ScheduleManager({
   }
 
   const formatDateISO = (date: Date) => {
-    return date.toISOString().split("T")[0]
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, "0")
+    const day = String(date.getDate()).padStart(2, "0")
+
+    return `${year}-${month}-${day}`
   }
 
   const formatCurrency = (amount: number) => {
@@ -143,7 +152,14 @@ export function ScheduleManager({
   }
 
   const canShowPendingActions = (booking: Booking) => {
-    return booking.status === "pending" && !isExpiredPendingBooking(booking)
+    if (isAdmin) return false
+    if (isExpiredPendingBooking(booking)) return false
+
+    if (booking.rawStatus) {
+      return booking.rawStatus === "PENDING_CONFIRM"
+    }
+
+    return booking.status === "pending"
   }
 
   const isConfirmedLikeBooking = (booking: Booking) => {
@@ -218,13 +234,40 @@ export function ScheduleManager({
     revenue: filteredBookings.filter(isRevenueBooking).reduce((sum, b) => sum + b.price, 0),
   }
 
+  const totalItems = filteredBookings.length
+  const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE))
+
+  const paginatedBookings = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+    const endIndex = startIndex + ITEMS_PER_PAGE
+
+    return filteredBookings.slice(startIndex, endIndex)
+  }, [filteredBookings, currentPage])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [viewMode, selectedDate, selectedField, selectedOwner, selectedStatus, searchQuery])
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [currentPage, totalPages])
+
   const getBookingStyle = (booking: Booking) => {
-    const startHour = Number.parseInt(booking.startTime.split(":")[0])
-    const endHour = Number.parseInt(booking.endTime.split(":")[0])
-    const duration = endHour - startHour
-    const top = (startHour - START_HOUR) * HOUR_HEIGHT
-    const height = duration * HOUR_HEIGHT - 4
-    return { top, height }
+    const [startHour = "0", startMinute = "0"] = booking.startTime.split(":")
+    const [endHour = "0", endMinute = "0"] = booking.endTime.split(":")
+
+    const startTotalMinutes = Number(startHour) * 60 + Number(startMinute)
+    const endTotalMinutes = Number(endHour) * 60 + Number(endMinute)
+
+    const top = ((startTotalMinutes - START_HOUR * 60) / 60) * HOUR_HEIGHT
+    const height = ((endTotalMinutes - startTotalMinutes) / 60) * HOUR_HEIGHT - 4
+
+    return {
+      top: Math.max(0, top),
+      height: Math.max(36, height),
+    }
   }
 
   const getStatusColor = (status: string) => {
@@ -431,6 +474,7 @@ export function ScheduleManager({
   }
 
   const exportToExcel = () => {
+    const escapeCsvValue = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`
     const headers = ["ID", "Sân", "Khách hàng", "SĐT", "Ngày", "Giờ", "Thời lượng", "Giá", "Trạng thái"]
     const rows = filteredBookings.map((b) => [
       b.id,
@@ -443,13 +487,17 @@ export function ScheduleManager({
       b.price,
       getDisplayStatusText(b),
     ])
-    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n")
-    const blob = new Blob([csv], { type: "text/csv" })
+    const csv = [
+      headers.map(escapeCsvValue).join(","),
+      ...rows.map((row) => row.map(escapeCsvValue).join(",")),
+    ].join("\n")
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
     a.download = `bookings-${formatDateISO(new Date())}.csv`
     a.click()
+    URL.revokeObjectURL(url)
   }
 
   const fieldsToShow =
@@ -595,13 +643,22 @@ export function ScheduleManager({
               <Input
                 placeholder="Tìm theo tên, SĐT, sân..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value)
+                  setCurrentPage(1)
+                }}
                 className="pl-10"
               />
             </div>
 
             {isAdmin && owners.length > 0 && (
-              <Select value={selectedOwner} onValueChange={setSelectedOwner}>
+              <Select
+                value={selectedOwner}
+                onValueChange={(value) => {
+                  setSelectedOwner(value)
+                  setCurrentPage(1)
+                }}
+              >
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="Chủ sân" />
                 </SelectTrigger>
@@ -616,7 +673,13 @@ export function ScheduleManager({
               </Select>
             )}
 
-            <Select value={selectedField} onValueChange={setSelectedField}>
+            <Select
+              value={selectedField}
+              onValueChange={(value) => {
+                setSelectedField(value)
+                setCurrentPage(1)
+              }}
+            >
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Chọn sân" />
               </SelectTrigger>
@@ -630,7 +693,13 @@ export function ScheduleManager({
               </SelectContent>
             </Select>
 
-            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+            <Select
+              value={selectedStatus}
+              onValueChange={(value) => {
+                setSelectedStatus(value)
+                setCurrentPage(1)
+              }}
+            >
               <SelectTrigger className="w-[170px]">
                 <SelectValue placeholder="Trạng thái" />
               </SelectTrigger>
@@ -655,7 +724,7 @@ export function ScheduleManager({
               <p className="text-muted-foreground text-lg">Không có đơn đặt sân nào</p>
             </Card>
           ) : (
-            filteredBookings.map((booking) => (
+            paginatedBookings.map((booking) => (
               <Card key={booking.id} className="p-6">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div className="flex-1">
@@ -764,6 +833,7 @@ export function ScheduleManager({
                         <div className="flex gap-2">
                           <Button
                             size="sm"
+                            disabled={actionLoadingId === booking.id}
                             onClick={() => handleApprove(booking.id)}
                             className="bg-green-600 hover:bg-green-700"
                           >
@@ -773,6 +843,7 @@ export function ScheduleManager({
                           <Button
                             size="sm"
                             variant="outline"
+                            disabled={actionLoadingId === booking.id}
                             className="text-destructive bg-transparent"
                             onClick={() => setRejectDialog(booking.id)}
                           >
@@ -792,6 +863,18 @@ export function ScheduleManager({
                 </div>
               </Card>
             ))
+          )}
+
+          {totalItems > ITEMS_PER_PAGE && (
+            <div className="pt-2">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                itemsPerPage={ITEMS_PER_PAGE}
+                totalItems={totalItems}
+              />
+            </div>
           )}
         </div>
       )}
@@ -884,7 +967,16 @@ export function ScheduleManager({
         </Card>
       )}
 
-      <Dialog open={showDetails} onOpenChange={setShowDetails}>
+      <Dialog
+        open={showDetails}
+        onOpenChange={(open) => {
+          setShowDetails(open)
+
+          if (!open) {
+            setSelectedBooking(null)
+          }
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Chi tiết đặt sân</DialogTitle>
@@ -947,6 +1039,7 @@ export function ScheduleManager({
                 <div className="flex gap-2 pt-4 border-t">
                   <Button
                     className="flex-1 bg-green-600 hover:bg-green-700"
+                    disabled={actionLoadingId === selectedBooking.id}
                     onClick={() => handleApprove(selectedBooking.id)}
                   >
                     <Check className="w-4 h-4 mr-2" />
@@ -955,6 +1048,7 @@ export function ScheduleManager({
                   <Button
                     variant="outline"
                     className="flex-1 text-destructive bg-transparent"
+                    disabled={actionLoadingId === selectedBooking.id}
                     onClick={() => {
                       setShowDetails(false)
                       setRejectDialog(selectedBooking.id)
@@ -1024,7 +1118,11 @@ export function ScheduleManager({
             >
               Hủy
             </Button>
-            <Button variant="destructive" onClick={() => rejectDialog && handleReject(rejectDialog)}>
+            <Button
+              variant="destructive"
+              disabled={!rejectReason.trim() || actionLoadingId === rejectDialog}
+              onClick={() => rejectDialog && handleReject(rejectDialog)}
+            >
               Xác nhận từ chối
             </Button>
           </DialogFooter>
@@ -1076,6 +1174,7 @@ export function ScheduleManager({
             </Button>
             <Button
               variant={rescheduleAction === "approve" ? "default" : "destructive"}
+              disabled={rescheduleAction === "reject" && !rejectReason.trim()}
               className={rescheduleAction === "approve" ? "bg-green-600" : ""}
               onClick={() => {
                 if (rescheduleDialog) {
