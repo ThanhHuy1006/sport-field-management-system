@@ -5,20 +5,37 @@ import {
   NotFoundError,
 } from "../../core/errors/index.js";
 
+function parseLocalDate(dateStr) {
+  const [year, month, day] = String(dateStr).split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+// DB quy ước:
+// 1 = Thứ hai
+// 2 = Thứ ba
+// ...
+// 6 = Thứ bảy
+// 7 = Chủ nhật
 function getDayOfWeek(dateStr) {
-  return new Date(`${dateStr}T00:00:00`).getDay();
+  const date = parseLocalDate(dateStr);
+  const jsDay = date.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  return jsDay === 0 ? 7 : jsDay;
 }
 
 function startOfDay(dateStr) {
-  return new Date(`${dateStr}T00:00:00`);
+  const date = parseLocalDate(dateStr);
+  date.setHours(0, 0, 0, 0);
+  return date;
 }
 
 function endOfDay(dateStr) {
-  return new Date(`${dateStr}T23:59:59`);
+  const date = parseLocalDate(dateStr);
+  date.setHours(23, 59, 59, 999);
+  return date;
 }
 
 function combineDateAndTime(dateStr, timeStr) {
-  return new Date(`${dateStr}T${timeStr}`);
+  return new Date(`${dateStr}T${timeStr}:00`);
 }
 
 function addMinutes(date, minutes) {
@@ -31,6 +48,14 @@ function formatTime(date) {
 
 function overlaps(startA, endA, startB, endB) {
   return startA < endB && startB < endA;
+}
+
+function isOperatingHourClosed(operatingHour) {
+  return (
+    !operatingHour ||
+    !operatingHour.open_time ||
+    !operatingHour.close_time
+  );
 }
 
 async function ensureManageableField(fieldId, user) {
@@ -81,10 +106,11 @@ export const schedulesService = {
     }
 
     const dayOfWeek = getDayOfWeek(date);
+
     const operatingHour =
       await schedulesRepository.findOperatingHourByFieldAndDay(id, dayOfWeek);
 
-    if (!operatingHour) {
+    if (isOperatingHourClosed(operatingHour)) {
       return {
         fieldId: id,
         date,
@@ -95,6 +121,7 @@ export const schedulesService = {
     }
 
     const slotDuration = field.min_duration_minutes || 60;
+
     const bookings = await schedulesRepository.findBookingsByFieldAndDate(
       id,
       dayStart,
@@ -113,7 +140,12 @@ export const schedulesService = {
       if (slotEnd > closeTime) break;
 
       const conflict = bookings.find((booking) =>
-        overlaps(slotStart, slotEnd, booking.start_datetime, booking.end_datetime)
+        overlaps(
+          slotStart,
+          slotEnd,
+          booking.start_datetime,
+          booking.end_datetime
+        )
       );
 
       slots.push({
@@ -145,13 +177,16 @@ export const schedulesService = {
     const existing = await schedulesRepository.findOperatingHoursByField(id);
     const byDay = new Map(existing.map((item) => [item.day_of_week, item]));
 
-    return Array.from({ length: 7 }, (_, day) => {
+    return Array.from({ length: 7 }, (_, index) => {
+      const day = index + 1;
       const item = byDay.get(day);
 
       if (item) {
+        const isClosed = !item.open_time || !item.close_time;
+
         return {
           ...item,
-          is_closed: false,
+          is_closed: isClosed,
         };
       }
 
@@ -223,6 +258,7 @@ export const schedulesService = {
     const id = blackoutDateId;
 
     const blackoutDate = await schedulesRepository.findBlackoutDateById(id);
+
     if (!blackoutDate) {
       throw new NotFoundError("Không tìm thấy ngày khóa");
     }

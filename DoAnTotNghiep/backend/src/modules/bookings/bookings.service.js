@@ -31,9 +31,12 @@ function diffMinutes(start, end) {
 }
 
 function getDayOfWeek(date) {
-  return date.getDay();
-}
+  const jsDay = date.getDay();
 
+  // JavaScript: Sunday = 0
+  // DB operating_hours: Monday = 1 ... Sunday = 7
+  return jsDay === 0 ? 7 : jsDay;
+}
 function pad2(n) {
   return String(n).padStart(2, "0");
 }

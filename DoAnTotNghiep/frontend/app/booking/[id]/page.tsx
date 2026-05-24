@@ -30,6 +30,12 @@ import {
 } from "@/features/auth/lib/auth-storage";
 import { getImageUrl } from "@/lib/image-url";
 
+type OperatingHourUi = {
+  day_of_week: number;
+  open_time: string | null;
+  close_time: string | null;
+};
+
 type FieldUi = {
   id: number;
   ownerId: number | null;
@@ -39,6 +45,7 @@ type FieldUi = {
   pricePerHour: number;
   openTime: string | null;
   closeTime: string | null;
+  operatingHours: OperatingHourUi[];
 };
 
 type SlotUi = {
@@ -78,6 +85,31 @@ function mapFieldDetailToUi(data: FieldDetailResponse["data"]): FieldUi {
       id?: number | null;
       user_id?: number | null;
     } | null;
+
+    openTime?: string | null;
+    closeTime?: string | null;
+    open_time?: string | null;
+    close_time?: string | null;
+
+    operating_hours?: Array<{
+      id?: number;
+      day_of_week?: number;
+      dayOfWeek?: number;
+      open_time?: string | null;
+      openTime?: string | null;
+      close_time?: string | null;
+      closeTime?: string | null;
+    }>;
+
+    operatingHours?: Array<{
+      id?: number;
+      day_of_week?: number;
+      dayOfWeek?: number;
+      open_time?: string | null;
+      openTime?: string | null;
+      close_time?: string | null;
+      closeTime?: string | null;
+    }>;
   };
 
   const ownerId =
@@ -87,6 +119,16 @@ function mapFieldDetailToUi(data: FieldDetailResponse["data"]): FieldUi {
     source.owner?.user_id ??
     null;
 
+  const operatingHoursRaw = source.operating_hours ?? source.operatingHours ?? [];
+
+  const operatingHours = operatingHoursRaw
+    .map((item) => ({
+      day_of_week: Number(item.day_of_week ?? item.dayOfWeek),
+      open_time: item.open_time ?? item.openTime ?? null,
+      close_time: item.close_time ?? item.closeTime ?? null,
+    }))
+    .filter((item) => Number.isFinite(item.day_of_week));
+
   return {
     id: data.id,
     ownerId,
@@ -94,8 +136,9 @@ function mapFieldDetailToUi(data: FieldDetailResponse["data"]): FieldUi {
     location: data.address ?? "Chưa cập nhật địa chỉ",
     image: getImageUrl(data.images?.[0]?.url ?? null),
     pricePerHour: Number(data.base_price_per_hour ?? 0),
-    openTime: data.openTime ?? null,
-    closeTime: data.closeTime ?? null,
+    openTime: source.openTime ?? source.open_time ?? null,
+    closeTime: source.closeTime ?? source.close_time ?? null,
+    operatingHours,
   };
 }
 
@@ -136,6 +179,26 @@ function getTodayLocalDate() {
   const day = String(now.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
+}
+
+function getDayOfWeekCandidatesForDb(date: string) {
+  if (!date) return [];
+
+  const jsDay = new Date(`${date}T00:00:00`).getDay();
+
+  // Hỗ trợ cả 2 kiểu lưu phổ biến:
+  // - JavaScript style: Chủ nhật = 0, Thứ 2 = 1, ..., Thứ 7 = 6
+  // - Business style: Thứ 2 = 1, ..., Thứ 7 = 6, Chủ nhật = 7
+  if (jsDay === 0) {
+    return [0, 7];
+  }
+
+  return [jsDay];
+}
+
+function formatOperatingTime(value?: string | null) {
+  if (!value) return "--:--";
+  return value.slice(0, 5);
 }
 
 function formatDateDisplay(value?: string | null) {
@@ -283,6 +346,7 @@ export default function BookingPage() {
     setAuthChecked(true);
   }, [fieldId, router]);
   useEffect(() => {
+    if (!authChecked) return;
     if (!fieldId || Number.isNaN(fieldId)) return;
 
     let cancelled = false;
@@ -295,9 +359,14 @@ export default function BookingPage() {
         const result = await getFieldDetail(fieldId);
 
         if (cancelled) return;
-        console.log("FIELD DETAIL RESPONSE:", result.data);
 
-        setField(mapFieldDetailToUi(result.data));
+        const mappedField = mapFieldDetailToUi(result.data);
+
+        console.log("FIELD DETAIL RESPONSE:", result.data);
+        console.log("MAPPED FIELD:", mappedField);
+        console.log("MAPPED OPERATING HOURS:", mappedField.operatingHours);
+
+        setField(mappedField);
       } catch (err) {
         if (cancelled) return;
         setError(
@@ -393,6 +462,18 @@ export default function BookingPage() {
   }, [authChecked, fieldId, bookingData.date, bookingData.durationHours]);
 
   const selectedEndTime = bookingData.selectedSlot?.end_time ?? "";
+
+  const selectedOperatingHour = useMemo(() => {
+    if (!field || !bookingData.date) return null;
+
+    const dayCandidates = getDayOfWeekCandidatesForDb(bookingData.date);
+
+    return (
+      field.operatingHours.find((item) =>
+        dayCandidates.includes(Number(item.day_of_week)),
+      ) ?? null
+    );
+  }, [field, bookingData.date]);
   const subtotal = useMemo(() => {
     if (!field) return 0;
     return field.pricePerHour * bookingData.durationHours;
@@ -1254,7 +1335,19 @@ export default function BookingPage() {
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Giờ hoạt động</span>
                     <span className="font-medium">
-                      {field.openTime ?? "--:--"} - {field.closeTime ?? "--:--"}
+                      {selectedOperatingHour
+                        ? `${formatOperatingTime(
+                            selectedOperatingHour.open_time,
+                          )} - ${formatOperatingTime(
+                            selectedOperatingHour.close_time,
+                          )}`
+                        : field.openTime && field.closeTime
+                          ? `${formatOperatingTime(
+                              field.openTime,
+                            )} - ${formatOperatingTime(field.closeTime)}`
+                          : bookingData.date
+                            ? "Không hoạt động ngày này"
+                            : "Chưa chọn ngày"}
                     </span>
                   </div>
 

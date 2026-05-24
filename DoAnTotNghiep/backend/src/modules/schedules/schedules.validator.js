@@ -8,6 +8,11 @@ function isValidTimeString(value) {
   return /^\d{2}:\d{2}$/.test(value);
 }
 
+function parseLocalDate(dateStr) {
+  const [year, month, day] = String(dateStr).split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
 export function validateFieldIdParams(params) {
   const fieldId = Number(params.fieldId);
 
@@ -39,7 +44,8 @@ export function validateAvailabilityQuery(query) {
     throw new ValidationError("date không hợp lệ");
   }
 
-  const parsed = new Date(`${date}T00:00:00`);
+  const parsed = parseLocalDate(date);
+
   if (Number.isNaN(parsed.getTime())) {
     throw new ValidationError("date không hợp lệ");
   }
@@ -53,13 +59,15 @@ export function validateOperatingHoursPayload(payload) {
   const open_time = payload.open_time ? String(payload.open_time).trim() : null;
   const close_time = payload.close_time ? String(payload.close_time).trim() : null;
 
-  if (Number.isNaN(day_of_week) || day_of_week < 0 || day_of_week > 6) {
-    throw new ValidationError("day_of_week phải từ 0 đến 6");
+  if (Number.isNaN(day_of_week) || day_of_week < 1 || day_of_week > 7) {
+    throw new ValidationError("day_of_week phải từ 1 đến 7");
   }
 
   if (!is_closed) {
     if (!open_time || !close_time) {
-      throw new ValidationError("open_time và close_time là bắt buộc khi không đóng cửa");
+      throw new ValidationError(
+        "open_time và close_time là bắt buộc khi không đóng cửa"
+      );
     }
 
     if (!isValidTimeString(open_time) || !isValidTimeString(close_time)) {
@@ -91,7 +99,8 @@ export function validateBlackoutDatePayload(payload) {
     throw new ValidationError("date không hợp lệ");
   }
 
-  const parsed = new Date(`${date}T00:00:00`);
+  const parsed = parseLocalDate(date);
+
   if (Number.isNaN(parsed.getTime())) {
     throw new ValidationError("date không hợp lệ");
   }
