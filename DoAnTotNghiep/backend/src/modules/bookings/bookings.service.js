@@ -13,6 +13,7 @@ import { notificationsService } from "../notifications/notifications.service.js"
 const CHECKIN_EARLY_MINUTES = 30;
 const CHECKIN_LATE_MINUTES = 60;
 const PAYMENT_EXPIRE_MINUTES = 30;
+const MAX_ACTIVE_BOOKINGS_PER_USER_PER_DAY = 3;
 
 // Nếu tạo booking thành công nhưng tạo notification lỗi
 // → Không nên làm booking fail
@@ -57,6 +58,18 @@ function startOfLocalDay(dateString) {
 
 function startOfNextLocalDay(dateString) {
   const start = startOfLocalDay(dateString);
+  start.setDate(start.getDate() + 1);
+  return start;
+}
+
+function startOfLocalDayFromDate(date) {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
+
+function startOfNextLocalDayFromDate(date) {
+  const start = startOfLocalDayFromDate(date);
   start.setDate(start.getDate() + 1);
   return start;
 }
@@ -166,11 +179,10 @@ async function assertBookableField(valid) {
 
   const dayOfWeek = getDayOfWeek(valid.start_datetime);
 
-  const operatingHour =
-    await bookingsRepository.findOperatingHourByFieldAndDay(
-      field.id,
-      dayOfWeek,
-    );
+  const operatingHour = await bookingsRepository.findOperatingHourByFieldAndDay(
+    field.id,
+    dayOfWeek,
+  );
 
   if (!operatingHour) {
     throw new ForbiddenError("Sân không hoạt động vào ngày này");
@@ -227,6 +239,22 @@ async function assertRescheduleSlotAvailable(
   }
 
   return field;
+}
+
+function assertSameBookingDuration(booking, payload) {
+  const oldDuration = diffMinutes(
+    new Date(booking.start_datetime),
+    new Date(booking.end_datetime),
+  );
+
+  const newDuration = diffMinutes(
+    new Date(payload.start_datetime),
+    new Date(payload.end_datetime),
+  );
+
+  if (oldDuration !== newDuration) {
+    throw new ValidationError("Không được thay đổi thời lượng khi đổi lịch");
+  }
 }
 
 export const bookingsService = {
@@ -403,7 +431,25 @@ export const bookingsService = {
       throw new ForbiddenError("Chỉ khách hàng mới được đặt sân");
     }
 
+    await syncBookingLifecycle();
+
     const userId = currentUser.id;
+
+    const bookingDayStart = startOfLocalDayFromDate(payload.start_datetime);
+    const bookingDayEnd = startOfNextLocalDayFromDate(payload.start_datetime);
+
+    const totalBookingsToday =
+      await bookingsRepository.countUserActiveBookingsByDate(
+        userId,
+        bookingDayStart,
+        bookingDayEnd,
+      );
+
+    if (totalBookingsToday >= MAX_ACTIVE_BOOKINGS_PER_USER_PER_DAY) {
+      throw new ForbiddenError(
+        `Mỗi người dùng chỉ được đặt tối đa ${MAX_ACTIVE_BOOKINGS_PER_USER_PER_DAY} lịch trong một ngày`,
+      );
+    }
 
     const availability = await this.checkAvailability(payload);
 
@@ -573,6 +619,8 @@ export const bookingsService = {
   },
 
   async getMyBookingCheckInQr(userId, bookingId) {
+    await syncBookingLifecycle();
+
     const booking = await bookingsRepository.findMyBookingById(
       userId,
       bookingId,
@@ -866,6 +914,8 @@ export const bookingsService = {
       throw new ValidationError("Không thể đổi sang thời điểm đã qua");
     }
 
+    assertSameBookingDuration(booking, payload);
+
     const existedPending =
       await bookingsRepository.findPendingRescheduleRequestByBookingId(
         booking.id,
@@ -887,6 +937,7 @@ export const bookingsService = {
     if (approvalMode === "AUTO") {
       const request = await bookingsRepository.autoApproveRescheduleRequest({
         booking_id: booking.id,
+        field_id: booking.field_id,
         requested_by: userId,
         old_start_datetime: booking.start_datetime,
         old_end_datetime: booking.end_datetime,
@@ -960,6 +1011,20 @@ export const bookingsService = {
       throw new ForbiddenError("Booking đã check-in, không thể đổi lịch");
     }
 
+    const oldDuration = diffMinutes(
+      new Date(booking.start_datetime),
+      new Date(booking.end_datetime),
+    );
+
+    const newDuration = diffMinutes(
+      new Date(request.new_start_datetime),
+      new Date(request.new_end_datetime),
+    );
+
+    if (oldDuration !== newDuration) {
+      throw new ValidationError("Không được thay đổi thời lượng khi đổi lịch");
+    }
+
     await assertRescheduleSlotAvailable(
       booking.field_id,
       request.new_start_datetime,
@@ -1013,7 +1078,8 @@ export const bookingsService = {
     await safeCreateNotification({
       user_id: request.bookings.user_id,
       title: "Yêu cầu đổi lịch bị từ chối",
-      body: payload.owner_note || "Chủ sân đã từ chối yêu cầu đổi lịch của bạn.",
+      body:
+        payload.owner_note || "Chủ sân đã từ chối yêu cầu đổi lịch của bạn.",
       type: "BOOKING",
     });
 

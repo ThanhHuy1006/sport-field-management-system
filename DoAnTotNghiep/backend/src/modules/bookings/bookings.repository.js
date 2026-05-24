@@ -154,6 +154,48 @@ async function findConflictingBookingsTx(tx, fieldId, start, end) {
     },
   });
 }
+async function lockFieldTx(tx, fieldId) {
+  const rows = await tx.$queryRaw`
+    SELECT id FROM fields
+    WHERE id = ${fieldId}
+    FOR UPDATE
+  `;
+
+  if (!rows || rows.length === 0) {
+    return null;
+  }
+
+  return rows[0];
+}
+
+async function findConflictingBookingsExceptSelfTx(
+  tx,
+  fieldId,
+  start,
+  end,
+  bookingId,
+) {
+  return tx.bookings.findMany({
+    where: {
+      id: {
+        not: bookingId,
+      },
+      field_id: fieldId,
+      start_datetime: { lt: end },
+      end_datetime: { gt: start },
+      status: {
+        in: ACTIVE_BOOKING_STATUSES,
+      },
+    },
+    orderBy: { start_datetime: "asc" },
+    select: {
+      id: true,
+      start_datetime: true,
+      end_datetime: true,
+      status: true,
+    },
+  });
+}
 
 export const bookingsRepository = {
   findFieldById(fieldId) {
@@ -275,6 +317,17 @@ export const bookingsRepository = {
 
   createBookingWithHistory(data) {
     return prisma.$transaction(async (tx) => {
+      /*
+      Chống trùng lịch chuẩn:
+      Lock dòng field trước khi kiểm tra conflict.
+      Mọi request đặt cùng một sân sẽ phải chạy tuần tự trong transaction.
+    */
+      const lockedField = await lockFieldTx(tx, data.field_id);
+
+      if (!lockedField) {
+        throw new ConflictError("Không tìm thấy sân để đặt lịch");
+      }
+
       const conflicts = await findConflictingBookingsTx(
         tx,
         data.field_id,
@@ -322,7 +375,6 @@ export const bookingsRepository = {
       return hydrateMemberBooking(tx, booking.id);
     });
   },
-
   findMyBookings(userId, filters) {
     const where = buildListWhere({ user_id: userId }, filters.status);
 
@@ -655,6 +707,27 @@ export const bookingsRepository = {
 
   autoApproveRescheduleRequest(data) {
     return prisma.$transaction(async (tx) => {
+      /*
+      Lock field trước khi đổi lịch để tránh 2 booking cùng đổi vào một slot.
+    */
+      const lockedField = await lockFieldTx(tx, data.field_id);
+
+      if (!lockedField) {
+        throw new ConflictError("Không tìm thấy sân để đổi lịch");
+      }
+
+      const conflicts = await findConflictingBookingsExceptSelfTx(
+        tx,
+        data.field_id,
+        data.new_start_datetime,
+        data.new_end_datetime,
+        data.booking_id,
+      );
+
+      if (conflicts.length > 0) {
+        throw new ConflictError("Khung giờ mới đã được đặt");
+      }
+
       const request = await tx.booking_reschedule_requests.create({
         data: {
           booking_id: data.booking_id,
@@ -763,6 +836,28 @@ export const bookingsRepository = {
       });
 
       if (!request) return null;
+
+      /*
+      Lock field trước khi owner duyệt đổi lịch.
+      Nếu có request khác đang đặt/đổi cùng sân, transaction này sẽ phải chờ.
+    */
+      const lockedField = await lockFieldTx(tx, request.bookings.field_id);
+
+      if (!lockedField) {
+        throw new ConflictError("Không tìm thấy sân để đổi lịch");
+      }
+
+      const conflicts = await findConflictingBookingsExceptSelfTx(
+        tx,
+        request.bookings.field_id,
+        request.new_start_datetime,
+        request.new_end_datetime,
+        request.booking_id,
+      );
+
+      if (conflicts.length > 0) {
+        throw new ConflictError("Khung giờ mới đã được đặt");
+      }
 
       await tx.bookings.update({
         where: {
@@ -1029,4 +1124,18 @@ export const bookingsRepository = {
       };
     });
   },
+  countUserActiveBookingsByDate(userId, dayStart, dayEnd) {
+  return prisma.bookings.count({
+    where: {
+      user_id: userId,
+      start_datetime: {
+        gte: dayStart,
+        lt: dayEnd,
+      },
+      status: {
+        in: ACTIVE_BOOKING_STATUSES,
+      },
+    },
+  });
+},
 };
