@@ -71,6 +71,7 @@ function normalizeAmenities(value) {
 
   return [...new Set(names)];
 }
+
 function normalizeOperatingHours(value, { required = false } = {}) {
   if (value === undefined || value === null) {
     if (required) {
@@ -148,6 +149,7 @@ function normalizeOperatingHours(value, { required = false } = {}) {
 
   return items.sort((a, b) => a.day_of_week - b.day_of_week);
 }
+
 function normalizeApprovalMode(value) {
   if (value === undefined) return undefined;
 
@@ -202,9 +204,10 @@ export function validateCreateOwnerFieldPayload(payload) {
     payload.weekend_price !== undefined
       ? toPositiveMoney(payload.weekend_price, "weekend_price")
       : weekday_price;
+
   const operatingHours = normalizeOperatingHours(payload.operating_hours, {
-  required: true,
-});
+    required: true,
+  });
 
   if (weekday_price < 50000) {
     throw new ValidationError("weekday_price tối thiểu 50,000 VND");
@@ -213,13 +216,6 @@ export function validateCreateOwnerFieldPayload(payload) {
   if (weekend_price < 50000) {
     throw new ValidationError("weekend_price tối thiểu 50,000 VND");
   }
-
-  // const open_time = validateTime(payload.open_time ?? "06:00", "open_time");
-  // const close_time = validateTime(payload.close_time ?? "22:00", "close_time");
-
-  // if (open_time >= close_time) {
-  //   throw new ValidationError("open_time phải trước close_time");
-  // }
 
   const latitude = toNullableNumber(payload.latitude, "latitude");
   const longitude = toNullableNumber(payload.longitude, "longitude");
@@ -275,7 +271,8 @@ export function validateCreateOwnerFieldPayload(payload) {
       min_duration_minutes,
       max_players,
     },
-      operatingHours,
+
+    operatingHours,
 
     pricingRules: [
       {
@@ -298,12 +295,6 @@ export function validateCreateOwnerFieldPayload(payload) {
       },
     ],
 
-    // operatingHours: Array.from({ length: 7 }, (_, index) => ({
-    //   day_of_week: index + 1,
-    //   open_time,
-    //   close_time,
-    // })),
-
     amenities,
   };
 }
@@ -312,6 +303,7 @@ export function validateUpdateOwnerFieldPayload(payload) {
   const fieldData = {};
   const pricingRules = [];
   let amenities;
+  let operatingHours;
 
   if (payload.field_name !== undefined) {
     const value = String(payload.field_name || "").trim();
@@ -472,10 +464,15 @@ export function validateUpdateOwnerFieldPayload(payload) {
     amenities = normalizeAmenities(payload.amenities);
   }
 
+  if (payload.operating_hours !== undefined) {
+    operatingHours = normalizeOperatingHours(payload.operating_hours);
+  }
+
   if (
     Object.keys(fieldData).length === 0 &&
     pricingRules.length === 0 &&
-    amenities === undefined
+    amenities === undefined &&
+    operatingHours === undefined
   ) {
     throw new ValidationError("Không có dữ liệu hợp lệ để cập nhật");
   }
@@ -484,19 +481,10 @@ export function validateUpdateOwnerFieldPayload(payload) {
     fieldData,
     pricingRules,
     amenities,
+    operatingHours,
   };
 }
 
-// export function validateOwnerFieldStatusPayload(payload) {
-//   const status = String(payload.status || "").trim().toLowerCase();
-
-//   if (!ALLOWED_FIELD_STATUSES.includes(status)) {
-//     throw new ValidationError("status không hợp lệ");
-//   }
-
-//   return { status };
-
-// }
 export function validateOwnerFieldStatusPayload(payload) {
   const status = String(payload.status || "")
     .trim()
@@ -518,6 +506,7 @@ export function validateOwnerFieldStatusPayload(payload) {
     reason,
   };
 }
+
 export function validateFieldImageParams(params) {
   const fieldId = Number(params.fieldId);
   const imageId = Number(params.imageId);

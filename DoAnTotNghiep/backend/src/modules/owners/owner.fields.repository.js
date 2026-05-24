@@ -167,13 +167,14 @@ updateOwnerFieldWithDetails(fieldId, payload) {
   const {
     fieldData = {},
     pricingRules = [],
+    operatingHours,
     amenities,
   } = payload;
 
   return prisma.$transaction(async (tx) => {
     if (Object.keys(fieldData).length > 0) {
       await tx.fields.update({
-        where: { id: fieldId },
+        where: { id: Number(fieldId) },
         data: fieldData,
       });
     }
@@ -182,9 +183,24 @@ updateOwnerFieldWithDetails(fieldId, payload) {
       await upsertFieldPricingRule(tx, fieldId, rule);
     }
 
+    if (operatingHours !== undefined) {
+      await tx.operating_hours.deleteMany({
+        where: { field_id: Number(fieldId) },
+      });
+
+      await tx.operating_hours.createMany({
+        data: operatingHours.map((item) => ({
+          field_id: Number(fieldId),
+          day_of_week: item.day_of_week,
+          open_time: item.open_time,
+          close_time: item.close_time,
+        })),
+      });
+    }
+
     if (amenities !== undefined) {
       await tx.field_facilities.deleteMany({
-        where: { field_id: fieldId },
+        where: { field_id: Number(fieldId) },
       });
 
       for (const amenityName of amenities) {
@@ -196,7 +212,7 @@ updateOwnerFieldWithDetails(fieldId, payload) {
 
         await tx.field_facilities.create({
           data: {
-            field_id: fieldId,
+            field_id: Number(fieldId),
             facility_id: facility.id,
           },
         });
@@ -204,7 +220,7 @@ updateOwnerFieldWithDetails(fieldId, payload) {
     }
 
     return tx.fields.findUnique({
-      where: { id: fieldId },
+      where: { id: Number(fieldId) },
       include: OWNER_FIELD_INCLUDE,
     });
   });

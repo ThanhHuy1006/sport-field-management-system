@@ -61,6 +61,13 @@ function mapFieldToFormData(field: OwnerFieldApi): FieldData {
         url: toAssetUrl(image.url),
         isPrimary: Boolean(image.is_primary),
       })) || [],
+      operating_hours:
+  field.operating_hours?.map((item) => ({
+    day_of_week: Number(item.day_of_week),
+    open_time: item.open_time,
+    close_time: item.close_time,
+    is_closed: !item.open_time || !item.close_time,
+  })) || [],
   }
 }
 
