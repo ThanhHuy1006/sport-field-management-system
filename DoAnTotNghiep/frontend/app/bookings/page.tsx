@@ -57,6 +57,7 @@ import {
 } from "@/features/bookings/services/get-my-bookings";
 import { cancelMyBooking } from "@/features/bookings/services/cancel-my-booking";
 import { getMyBookingCheckInQr } from "@/features/bookings/services/get-my-booking-checkin-qr";
+import { createMyRescheduleRequest } from "@/features/bookings/services/create-my-reschedule-request";
 import { createReview } from "@/features/reviews/services/create-review";
 import {
   getStoredAccessToken,
@@ -120,6 +121,7 @@ export default function BookingsPage() {
   const [showQRDialog, setShowQRDialog] = useState(false);
   const [newDate, setNewDate] = useState("");
   const [newTime, setNewTime] = useState("");
+  const [rescheduleReason, setRescheduleReason] = useState("");
   const [rating, setRating] = useState(0);
   const [fieldQuality, setFieldQuality] = useState(0);
   const [service, setService] = useState(0);
@@ -132,6 +134,7 @@ export default function BookingsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [isSubmittingReschedule, setIsSubmittingReschedule] = useState(false);
   const [qrToken, setQrToken] = useState<string | null>(null);
   const [qrExpiresAt, setQrExpiresAt] = useState<string | null>(null);
   const itemsPerPage = 5;
@@ -327,7 +330,14 @@ export default function BookingsPage() {
     }
   };
 
-  const handleReschedule = () => {
+  const resetRescheduleForm = () => {
+    setNewDate("");
+    setNewTime("");
+    setRescheduleReason("");
+    setSelectedBooking(null);
+  };
+
+  const handleReschedule = async () => {
     if (!newDate || !newTime || !selectedBooking) {
       toast({
         title: "Thiếu thông tin",
@@ -337,9 +347,7 @@ export default function BookingsPage() {
       return;
     }
 
-    const bookingDateTime = new Date(
-      `${selectedBooking.date}T${getBookingStartTime(selectedBooking.time)}`,
-    );
+    const bookingDateTime = new Date(selectedBooking.startDateTime);
     const now = new Date();
     const hoursUntilBooking =
       (bookingDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
@@ -353,52 +361,49 @@ export default function BookingsPage() {
       return;
     }
 
-    const conflict = bookings.find(
-      (b) =>
-        b.id !== selectedBooking.id &&
-        b.status === "APPROVED" &&
-        b.fieldName === selectedBooking.fieldName &&
-        b.date === newDate &&
-        b.time === newTime,
-    );
+    try {
+      setIsSubmittingReschedule(true);
 
-    if (conflict) {
+      const oldStart = new Date(selectedBooking.startDateTime);
+      const oldEnd = new Date(selectedBooking.endDateTime);
+      const durationMs = oldEnd.getTime() - oldStart.getTime();
+
+      const newStart = new Date(`${newDate}T${newTime}:00`);
+      const newEnd = new Date(newStart.getTime() + durationMs);
+
+      const res = await createMyRescheduleRequest(selectedBooking.id, {
+        start_datetime: newStart.toISOString(),
+        end_datetime: newEnd.toISOString(),
+        reason: rescheduleReason.trim() || null,
+      });
+
+      const requestStatus = String(res?.data?.status || "").toUpperCase();
+
       toast({
-        title: "Khung giờ không khả dụng",
-        description: "Khung giờ này đã được đặt. Vui lòng chọn thời gian khác.",
+        title:
+          requestStatus === "APPROVED"
+            ? "Đổi lịch thành công"
+            : "Đã gửi yêu cầu đổi lịch",
+        description:
+          requestStatus === "APPROVED"
+            ? `Lịch đặt sân đã được đổi sang ${newDate} lúc ${newTime}.`
+            : "Yêu cầu đổi lịch đang chờ chủ sân xác nhận.",
+      });
+
+      setShowRescheduleDialog(false);
+      resetRescheduleForm();
+
+      await loadBookings();
+    } catch (error) {
+      toast({
+        title: "Gửi yêu cầu đổi lịch thất bại",
+        description:
+          error instanceof Error ? error.message : "Đã có lỗi xảy ra",
         variant: "destructive",
       });
-      return;
+    } finally {
+      setIsSubmittingReschedule(false);
     }
-
-    setBookings(
-      bookings.map((b) =>
-        b.id === selectedBooking.id
-          ? {
-              ...b,
-              status: "pending_reschedule",
-              rescheduleRequest: {
-                newDate,
-                newTime,
-                requestedAt: new Date().toISOString(),
-                oldDate: b.date,
-                oldTime: b.time,
-              },
-              notification: "Chờ duyệt đổi lịch từ chủ sân",
-            }
-          : b,
-      ),
-    );
-
-    toast({
-      title: "Yêu cầu đổi lịch đã gửi",
-      description: `Yêu cầu đổi sang ${newDate} lúc ${newTime} đang chờ chủ sân xác nhận.`,
-    });
-
-    setNewDate("");
-    setNewTime("");
-    setSelectedBooking(null);
-    setShowRescheduleDialog(false);
   };
 
   const handleCancelBooking = (bookingId: number) => {
@@ -822,9 +827,21 @@ export default function BookingsPage() {
           ) : (
             paginatedBookings.map((booking) => {
               const statusDisplay = getStatusDisplay(booking.status);
+              const paymentMethod = booking.requestedPaymentMethod || "ONSITE";
               const canPay =
                 booking.status === "AWAITING_PAYMENT" &&
-                booking.requestedPaymentMethod === "BANK_TRANSFER";
+                paymentMethod === "BANK_TRANSFER";
+              const canShowCheckIn =
+                booking.status === "PAID" ||
+                (booking.status === "APPROVED" && paymentMethod === "ONSITE");
+              const canReschedule =
+                ["APPROVED", "PAID"].includes(booking.status) &&
+                !booking.checkedInAt &&
+                isFutureBooking(booking);
+              const canCancel =
+                ["PENDING_CONFIRM", "APPROVED", "AWAITING_PAYMENT"].includes(
+                  booking.status,
+                ) && isFutureBooking(booking);
 
               return (
                 <Card
@@ -962,8 +979,7 @@ export default function BookingsPage() {
                       </div>
 
                       <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border">
-                        {(booking.status === "APPROVED" ||
-                          booking.status === "PAID") && (
+                        {canShowCheckIn && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -984,21 +1000,26 @@ export default function BookingsPage() {
                           </Link>
                         )}
 
-                        {(booking.status === "APPROVED" ||
-                          booking.status === "AWAITING_PAYMENT") && (
+                        {(canReschedule || canCancel) && (
                           <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setSelectedBooking(booking);
-                                setShowRescheduleDialog(true);
-                              }}
-                            >
-                              Đổi lịch
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
+                            {canReschedule && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedBooking(booking);
+                                  setNewDate("");
+                                  setNewTime("");
+                                  setRescheduleReason("");
+                                  setShowRescheduleDialog(true);
+                                }}
+                              >
+                                Đổi lịch
+                              </Button>
+                            )}
+                            {canCancel && (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -1058,10 +1079,12 @@ export default function BookingsPage() {
                                       : "Xác nhận hủy"}
                                   </AlertDialogAction>
                                 </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
                           </>
                         )}
+
 
                         {booking.status === "COMPLETED" && !booking.rating && (
                           <Button
@@ -1334,7 +1357,12 @@ export default function BookingsPage() {
 
       <Dialog
         open={showRescheduleDialog}
-        onOpenChange={setShowRescheduleDialog}
+        onOpenChange={(open) => {
+          setShowRescheduleDialog(open);
+          if (!open) {
+            resetRescheduleForm();
+          }
+        }}
       >
         <DialogContent>
           <DialogHeader>
@@ -1388,6 +1416,17 @@ export default function BookingsPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label htmlFor="rescheduleReason">Lý do đổi lịch (tùy chọn)</Label>
+              <Textarea
+                id="rescheduleReason"
+                placeholder="Ví dụ: Tôi muốn đổi sang khung giờ khác"
+                value={rescheduleReason}
+                onChange={(e) => setRescheduleReason(e.target.value)}
+                rows={3}
+                className="mt-1"
+              />
+            </div>
             <div className="p-3 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900 rounded-lg">
               <p className="text-sm text-yellow-800 dark:text-yellow-200">
                 <AlertCircle className="w-4 h-4 inline mr-1" />
@@ -1399,11 +1438,20 @@ export default function BookingsPage() {
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setShowRescheduleDialog(false)}
+              onClick={() => {
+                setShowRescheduleDialog(false);
+                resetRescheduleForm();
+              }}
+              disabled={isSubmittingReschedule}
             >
               Hủy
             </Button>
-            <Button onClick={handleReschedule}>Gửi yêu cầu</Button>
+            <Button
+              onClick={handleReschedule}
+              disabled={isSubmittingReschedule}
+            >
+              {isSubmittingReschedule ? "Đang gửi..." : "Gửi yêu cầu"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

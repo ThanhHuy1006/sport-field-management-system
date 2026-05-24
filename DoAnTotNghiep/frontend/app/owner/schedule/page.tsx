@@ -4,7 +4,12 @@ import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { RefreshCw } from "lucide-react"
 
-import { ScheduleManager, type Booking, type Field } from "@/components/schedule-manager"
+import {
+  ScheduleManager,
+  type Booking,
+  type Field,
+  type OwnerRescheduleRequest,
+} from "@/components/schedule-manager"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import {
@@ -13,6 +18,31 @@ import {
 } from "@/features/bookings/services/get-owner-bookings"
 import { approveOwnerBooking } from "@/features/bookings/services/approve-owner-booking"
 import { rejectOwnerBooking } from "@/features/bookings/services/reject-owner-booking"
+import { getOwnerRescheduleRequests } from "@/features/bookings/services/get-owner-reschedule-requests"
+import { approveOwnerRescheduleRequest } from "@/features/bookings/services/approve-owner-reschedule-request"
+import { rejectOwnerRescheduleRequest } from "@/features/bookings/services/reject-owner-reschedule-request"
+
+type OwnerRescheduleRequestsApiResponse = {
+  data?:
+    | OwnerRescheduleRequest[]
+    | {
+        items?: OwnerRescheduleRequest[]
+      }
+}
+
+function extractRescheduleRequestItems(
+  response: OwnerRescheduleRequestsApiResponse,
+) {
+  if (Array.isArray(response?.data)) {
+    return response.data
+  }
+
+  if (Array.isArray(response?.data?.items)) {
+    return response.data.items
+  }
+
+  return []
+}
 
 type OwnerBookingsApiResponse = {
   data?:
@@ -162,6 +192,12 @@ export default function OwnerSchedulePage() {
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null)
+  const [rescheduleRequests, setRescheduleRequests] = useState<
+    OwnerRescheduleRequest[]
+  >([])
+  const [rescheduleActionLoadingId, setRescheduleActionLoadingId] = useState<
+    number | null
+  >(null)
 
   const loadOwnerBookings = async () => {
     try {
@@ -193,8 +229,31 @@ export default function OwnerSchedulePage() {
     }
   }
 
+  const loadOwnerRescheduleRequests = async () => {
+    try {
+      const response = await getOwnerRescheduleRequests({
+        page: 1,
+        limit: 50,
+        status: "PENDING",
+      })
+
+      const items = extractRescheduleRequestItems(
+        response as OwnerRescheduleRequestsApiResponse,
+      )
+
+      setRescheduleRequests(items)
+    } catch (error) {
+      toast({
+        title: "Không tải được yêu cầu đổi lịch",
+        description: error instanceof Error ? error.message : "Đã có lỗi xảy ra",
+        variant: "destructive",
+      })
+    }
+  }
+
   useEffect(() => {
     void loadOwnerBookings()
+    void loadOwnerRescheduleRequests()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -217,6 +276,18 @@ export default function OwnerSchedulePage() {
     return Array.from(map.values())
   }, [bookings])
 
+  const pendingRescheduleByBookingId = useMemo(() => {
+    const map = new Map<number, OwnerRescheduleRequest>()
+
+    rescheduleRequests.forEach((request) => {
+      if (request.booking_id && request.status === "PENDING") {
+        map.set(request.booking_id, request)
+      }
+    })
+
+    return map
+  }, [rescheduleRequests])
+
   const handleApprove = async (id: number) => {
     if (actionLoadingId) return
 
@@ -229,7 +300,7 @@ export default function OwnerSchedulePage() {
         title: "Duyệt booking thành công",
       })
 
-      await loadOwnerBookings()
+      await Promise.all([loadOwnerBookings(), loadOwnerRescheduleRequests()])
     } catch (error) {
       toast({
         title: "Duyệt booking thất bại",
@@ -253,7 +324,7 @@ export default function OwnerSchedulePage() {
         title: "Từ chối booking thành công",
       })
 
-      await loadOwnerBookings()
+      await Promise.all([loadOwnerBookings(), loadOwnerRescheduleRequests()])
     } catch (error) {
       toast({
         title: "Từ chối booking thất bại",
@@ -262,6 +333,54 @@ export default function OwnerSchedulePage() {
       })
     } finally {
       setActionLoadingId(null)
+    }
+  }
+
+  const handleApproveReschedule = async (requestId: number) => {
+    if (rescheduleActionLoadingId) return
+
+    try {
+      setRescheduleActionLoadingId(requestId)
+
+      await approveOwnerRescheduleRequest(requestId)
+
+      toast({
+        title: "Duyệt yêu cầu đổi lịch thành công",
+      })
+
+      await Promise.all([loadOwnerBookings(), loadOwnerRescheduleRequests()])
+    } catch (error) {
+      toast({
+        title: "Duyệt yêu cầu đổi lịch thất bại",
+        description: error instanceof Error ? error.message : "Đã có lỗi xảy ra",
+        variant: "destructive",
+      })
+    } finally {
+      setRescheduleActionLoadingId(null)
+    }
+  }
+
+  const handleRejectReschedule = async (requestId: number, reason: string) => {
+    if (rescheduleActionLoadingId) return
+
+    try {
+      setRescheduleActionLoadingId(requestId)
+
+      await rejectOwnerRescheduleRequest(requestId, reason)
+
+      toast({
+        title: "Từ chối yêu cầu đổi lịch thành công",
+      })
+
+      await Promise.all([loadOwnerBookings(), loadOwnerRescheduleRequests()])
+    } catch (error) {
+      toast({
+        title: "Từ chối yêu cầu đổi lịch thất bại",
+        description: error instanceof Error ? error.message : "Đã có lỗi xảy ra",
+        variant: "destructive",
+      })
+    } finally {
+      setRescheduleActionLoadingId(null)
     }
   }
 
@@ -305,7 +424,10 @@ export default function OwnerSchedulePage() {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => void loadOwnerBookings()}
+                onClick={() => {
+                  void loadOwnerBookings()
+                  void loadOwnerRescheduleRequests()
+                }}
               >
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Thử lại
@@ -328,8 +450,12 @@ export default function OwnerSchedulePage() {
               fields={ownerFields}
               isAdmin={false}
               actionLoadingId={actionLoadingId}
+              rescheduleActionLoadingId={rescheduleActionLoadingId}
+              pendingRescheduleByBookingId={pendingRescheduleByBookingId}
               onApprove={handleApprove}
               onReject={handleReject}
+              onApproveReschedule={handleApproveReschedule}
+              onRejectReschedule={handleRejectReschedule}
             />
           </div>
         )}

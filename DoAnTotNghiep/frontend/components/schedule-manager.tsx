@@ -75,6 +75,18 @@ export interface Owner {
   fieldCount: number
 }
 
+export interface OwnerRescheduleRequest {
+  id: number
+  booking_id: number
+  old_start_datetime: string
+  old_end_datetime: string
+  new_start_datetime: string
+  new_end_datetime: string
+  status: "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED" | string
+  reason?: string | null
+  owner_note?: string | null
+}
+
 interface ScheduleManagerProps {
   bookings: Booking[]
   fields: Field[]
@@ -83,8 +95,10 @@ interface ScheduleManagerProps {
   onApprove?: (id: number) => void
   onReject?: (id: number, reason: string) => void
   actionLoadingId?: number | null
-  onApproveReschedule?: (id: number) => void
-  onRejectReschedule?: (id: number, reason: string) => void
+  pendingRescheduleByBookingId?: Map<number, OwnerRescheduleRequest>
+  rescheduleActionLoadingId?: number | null
+  onApproveReschedule?: (requestId: number) => void
+  onRejectReschedule?: (requestId: number, reason: string) => void
 }
 
 const START_HOUR = 6
@@ -100,6 +114,8 @@ export function ScheduleManager({
   onApprove,
   onReject,
   actionLoadingId = null,
+  pendingRescheduleByBookingId,
+  rescheduleActionLoadingId = null,
   onApproveReschedule,
   onRejectReschedule,
 }: ScheduleManagerProps) {
@@ -137,6 +153,25 @@ export function ScheduleManager({
 
   const formatCurrency = (amount: number) => {
     return amount.toLocaleString("vi-VN") + " VND"
+  }
+
+  const formatDateTimeText = (value: string) => {
+    return new Date(value).toLocaleDateString("vi-VN", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
+  }
+
+  const formatTimeText = (value: string) => {
+    return new Date(value).toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+
+  const formatTimeRangeText = (start: string, end: string) => {
+    return `${formatTimeText(start)} - ${formatTimeText(end)}`
   }
 
   const getBookingStartDateTime = (booking: Booking) => {
@@ -428,48 +463,24 @@ export function ScheduleManager({
     setRejectReason("")
   }
 
-  const handleApproveReschedule = (id: number) => {
-    const booking = bookings.find((b) => b.id === id)
-    if (!booking || !booking.rescheduleRequest) return
-
+  const handleApproveReschedule = (requestId: number) => {
     if (onApproveReschedule) {
-      onApproveReschedule(id)
-    } else {
-      setBookings(
-        bookings.map((b) =>
-          b.id === id
-            ? {
-                ...b,
-                date: b.rescheduleRequest!.newDate,
-                startTime: b.rescheduleRequest!.newTime,
-                status: "confirmed" as const,
-                rescheduleRequest: undefined,
-              }
-            : b,
-        ),
-      )
+      onApproveReschedule(requestId)
     }
+
     setRescheduleDialog(null)
+    setRescheduleAction(null)
   }
 
-  const handleRejectReschedule = (id: number) => {
+  const handleRejectReschedule = (requestId: number) => {
     if (!rejectReason.trim()) return
+
     if (onRejectReschedule) {
-      onRejectReschedule(id, rejectReason)
-    } else {
-      setBookings(
-        bookings.map((b) =>
-          b.id === id
-            ? {
-                ...b,
-                status: "confirmed" as const,
-                rescheduleRequest: undefined,
-              }
-            : b,
-        ),
-      )
+      onRejectReschedule(requestId, rejectReason)
     }
+
     setRescheduleDialog(null)
+    setRescheduleAction(null)
     setRejectReason("")
   }
 
@@ -724,13 +735,24 @@ export function ScheduleManager({
               <p className="text-muted-foreground text-lg">Không có đơn đặt sân nào</p>
             </Card>
           ) : (
-            paginatedBookings.map((booking) => (
-              <Card key={booking.id} className="p-6">
+            paginatedBookings.map((booking) => {
+              const pendingReschedule = pendingRescheduleByBookingId?.get(booking.id)
+
+              return (
+                <Card key={booking.id} className="p-6">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-lg font-bold text-foreground">{booking.customerName}</h3>
-                      <Badge className={getDisplayStatusColor(booking)}>{getDisplayStatusText(booking)}</Badge>
+                      <Badge
+                        className={
+                          pendingReschedule
+                            ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                            : getDisplayStatusColor(booking)
+                        }
+                      >
+                        {pendingReschedule ? "Chờ duyệt đổi lịch" : getDisplayStatusText(booking)}
+                      </Badge>
                     </div>
 
                     <p className="text-sm text-muted-foreground mb-3">
@@ -738,26 +760,42 @@ export function ScheduleManager({
                       {isAdmin && booking.ownerName && ` • ${booking.ownerName}`}
                     </p>
 
-                    {booking.status === "pending_reschedule" && booking.rescheduleRequest && (
+                    {pendingReschedule && (
                       <div className="mb-4 p-4 bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900 rounded-lg">
                         <div className="flex items-center gap-2 mb-2">
                           <RefreshCw className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                           <p className="font-medium text-purple-800 dark:text-purple-200">Yêu cầu đổi lịch</p>
                         </div>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                           <div>
-                            <p className="text-purple-700 dark:text-purple-300 font-medium">Lịch cũ:</p>
+                            <p className="text-purple-700 dark:text-purple-300 font-medium">Lịch hiện tại:</p>
                             <p className="text-purple-800 dark:text-purple-200">
-                              {booking.rescheduleRequest.oldDate} lúc {booking.rescheduleRequest.oldTime}
+                              {formatDateTimeText(pendingReschedule.old_start_datetime)} lúc{" "}
+                              {formatTimeRangeText(
+                                pendingReschedule.old_start_datetime,
+                                pendingReschedule.old_end_datetime,
+                              )}
                             </p>
                           </div>
+
                           <div>
-                            <p className="text-purple-700 dark:text-purple-300 font-medium">Lịch mới:</p>
+                            <p className="text-purple-700 dark:text-purple-300 font-medium">Muốn đổi sang:</p>
                             <p className="text-purple-800 dark:text-purple-200">
-                              {booking.rescheduleRequest.newDate} lúc {booking.rescheduleRequest.newTime}
+                              {formatDateTimeText(pendingReschedule.new_start_datetime)} lúc{" "}
+                              {formatTimeRangeText(
+                                pendingReschedule.new_start_datetime,
+                                pendingReschedule.new_end_datetime,
+                              )}
                             </p>
                           </div>
                         </div>
+
+                        {pendingReschedule.reason && (
+                          <p className="mt-3 text-sm text-purple-800 dark:text-purple-200">
+                            <strong>Lý do:</strong> {pendingReschedule.reason}
+                          </p>
+                        )}
                       </div>
                     )}
 
@@ -801,12 +839,13 @@ export function ScheduleManager({
 
                   {!isAdmin && (
                     <>
-                      {booking.status === "pending_reschedule" && (
+                      {pendingReschedule && (
                         <div className="flex gap-2">
                           <Button
                             size="sm"
+                            disabled={rescheduleActionLoadingId === pendingReschedule.id}
                             onClick={() => {
-                              setRescheduleDialog(booking.id)
+                              setRescheduleDialog(pendingReschedule.id)
                               setRescheduleAction("approve")
                             }}
                             className="bg-green-600 hover:bg-green-700"
@@ -817,9 +856,10 @@ export function ScheduleManager({
                           <Button
                             size="sm"
                             variant="outline"
+                            disabled={rescheduleActionLoadingId === pendingReschedule.id}
                             className="text-destructive bg-transparent"
                             onClick={() => {
-                              setRescheduleDialog(booking.id)
+                              setRescheduleDialog(pendingReschedule.id)
                               setRescheduleAction("reject")
                             }}
                           >
@@ -861,8 +901,9 @@ export function ScheduleManager({
                     </>
                   )}
                 </div>
-              </Card>
-            ))
+                </Card>
+              )
+            })
           )}
 
           {totalItems > ITEMS_PER_PAGE && (
@@ -1174,7 +1215,11 @@ export function ScheduleManager({
             </Button>
             <Button
               variant={rescheduleAction === "approve" ? "default" : "destructive"}
-              disabled={rescheduleAction === "reject" && !rejectReason.trim()}
+              disabled={
+                rescheduleDialog === null ||
+                rescheduleActionLoadingId === rescheduleDialog ||
+                (rescheduleAction === "reject" && !rejectReason.trim())
+              }
               className={rescheduleAction === "approve" ? "bg-green-600" : ""}
               onClick={() => {
                 if (rescheduleDialog) {
