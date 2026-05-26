@@ -170,9 +170,11 @@ model fields {
   max_players          Int?
   created_at           DateTime?           @default(now()) @db.DateTime(0)
   updated_at           DateTime?           @default(now()) @db.DateTime(0)
-  hidden_by_role String?   // OWNER | ADMIN | SYSTEM
-hidden_reason  String?
-hidden_at      DateTime?
+  hidden_by_role       String? // OWNER | ADMIN | SYSTEM
+  hidden_reason        String?
+  hidden_at            DateTime?
+  slot_step_minutes    Int?                @default(30)
+  advance_booking_days Int?                @default(30)
 
   blackout_dates      blackout_dates[]
   bookings            bookings[]
@@ -205,14 +207,19 @@ model notifications {
 }
 
 model operating_hours {
-  id          Int     @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   field_id    Int
-  day_of_week Int     @db.TinyInt
-  open_time   String? @db.VarChar(10)
-  close_time  String? @db.VarChar(10)
-  fields      fields  @relation(fields: [field_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_operating_field")
+  day_of_week Int       @db.TinyInt
+  open_time   String    @db.VarChar(5)
+  close_time  String    @db.VarChar(5)
+  is_active   Boolean?  @default(true)
+  created_at  DateTime? @default(now()) @db.DateTime(0)
+  updated_at  DateTime? @default(now()) @db.DateTime(0)
+
+  fields fields @relation(fields: [field_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_operating_field")
 
   @@index([field_id], map: "fk_operating_field")
+  @@index([field_id, day_of_week], map: "idx_operating_field_day")
 }
 
 model owner_profiles {
