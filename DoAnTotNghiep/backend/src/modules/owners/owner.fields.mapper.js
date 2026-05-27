@@ -1,3 +1,24 @@
+function mapOperatingHours(operatingHours = []) {
+  const days = [1, 2, 3, 4, 5, 6, 7];
+
+  return days.map((day) => {
+    const windows = operatingHours
+      .filter((hour) => hour.day_of_week === day && hour.is_active !== false)
+      .sort((a, b) => String(a.open_time).localeCompare(String(b.open_time)))
+      .map((hour) => ({
+        id: hour.id,
+        start_time: hour.open_time,
+        end_time: hour.close_time,
+      }));
+
+    return {
+      day_of_week: day,
+      is_closed: windows.length === 0,
+      windows,
+    };
+  });
+}
+
 export function toOwnerFieldResponse(item) {
   if (!item) return null;
 
@@ -16,14 +37,19 @@ export function toOwnerFieldResponse(item) {
 
     latitude: item.latitude ? Number(item.latitude) : null,
     longitude: item.longitude ? Number(item.longitude) : null,
+
     base_price_per_hour: item.base_price_per_hour
       ? Number(item.base_price_per_hour)
       : 0,
     currency: item.currency,
     status: item.status,
     approval_mode: item.approval_mode,
+
     min_duration_minutes: item.min_duration_minutes,
+    slot_step_minutes: item.slot_step_minutes,
+    advance_booking_days: item.advance_booking_days,
     max_players: item.max_players,
+
     created_at: item.created_at,
     updated_at: item.updated_at,
 
@@ -38,12 +64,7 @@ export function toOwnerFieldResponse(item) {
       active: rule.active,
     })),
 
-    operating_hours: (item.operating_hours || []).map((hour) => ({
-      id: hour.id,
-      day_of_week: hour.day_of_week,
-      open_time: hour.open_time,
-      close_time: hour.close_time,
-    })),
+    operating_hours: mapOperatingHours(item.operating_hours || []),
 
     amenities: (item.field_facilities || []).map((item) => ({
       id: item.facility_id,
@@ -58,6 +79,7 @@ export function toOwnerFieldResponse(item) {
       is_primary: img.is_primary,
       order_no: img.order_no,
     })),
+
     hidden_by_role: item.hidden_by_role ?? null,
     hidden_reason: item.hidden_reason ?? null,
     hidden_at: item.hidden_at ?? null,

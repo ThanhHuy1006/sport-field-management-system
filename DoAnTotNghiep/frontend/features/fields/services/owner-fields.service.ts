@@ -3,11 +3,46 @@ import { apiRequest } from "@/lib/api-client"
 export type OwnerFieldStatus = "pending" | "active" | "hidden" | "maintenance"
 export type OwnerApprovalMode = "MANUAL" | "AUTO"
 
+export type OwnerOperatingWindowPayload = {
+  start_time: string
+  end_time: string
+}
+
 export type OwnerOperatingHourPayload = {
   day_of_week: number
-  open_time: string | null
-  close_time: string | null
   is_closed: boolean
+
+  /**
+   * Format mới:
+   * Một ngày có thể có nhiều ca mở cửa.
+   */
+  windows?: OwnerOperatingWindowPayload[]
+
+  /**
+   * Optional để không làm vỡ code cũ nếu chỗ nào còn gửi open_time/close_time.
+   */
+  open_time?: string | null
+  close_time?: string | null
+}
+
+export type OwnerOperatingWindowApi = {
+  id?: number | string | null
+  start_time: string
+  end_time: string
+}
+
+export type OwnerOperatingHourApi = {
+  day_of_week: number
+  is_closed: boolean
+  windows: OwnerOperatingWindowApi[]
+
+  /**
+   * Optional fallback cho response cũ nếu còn page nào dùng.
+   */
+  id?: number | null
+  field_id?: number
+  open_time?: string | null
+  close_time?: string | null
 }
 
 export type OwnerFieldApi = {
@@ -29,8 +64,12 @@ export type OwnerFieldApi = {
   currency: string | null
   status: OwnerFieldStatus
   approval_mode?: OwnerApprovalMode | string | null
+
   min_duration_minutes: number | null
+  slot_step_minutes?: number | null
+  advance_booking_days?: number | null
   max_players: number | null
+
   created_at?: string | null
   updated_at?: string | null
 
@@ -45,14 +84,7 @@ export type OwnerFieldApi = {
     active: boolean | null
   }>
 
-  operating_hours?: Array<{
-    id: number | null
-    field_id?: number
-    day_of_week: number
-    open_time: string | null
-    close_time: string | null
-    is_closed?: boolean
-  }>
+  operating_hours?: OwnerOperatingHourApi[]
 
   amenities?: Array<{
     id: number
@@ -67,6 +99,10 @@ export type OwnerFieldApi = {
     is_primary: boolean | null
     order_no: number | null
   }>
+
+  hidden_by_role?: string | null
+  hidden_reason?: string | null
+  hidden_at?: string | null
 }
 
 export type CreateOwnerFieldPayload = {
@@ -89,15 +125,17 @@ export type CreateOwnerFieldPayload = {
 
   currency?: string
   min_duration_minutes?: number
+  slot_step_minutes?: number
+  advance_booking_days?: number
   max_players?: number | null
 
   approval_mode?: OwnerApprovalMode
   amenities?: string[]
 
   /**
-   * Cách 2:
-   * Bắt buộc cấu hình lịch hoạt động 7 ngày ngay lúc tạo sân.
-   * BE sẽ validate đủ day_of_week 1-7.
+   * Format mới:
+   * operating_hours gồm 7 ngày.
+   * Mỗi ngày có thể đóng cửa hoặc có nhiều windows.
    */
   operating_hours: OwnerOperatingHourPayload[]
 }
@@ -105,10 +143,6 @@ export type CreateOwnerFieldPayload = {
 export type UpdateOwnerFieldPayload = Partial<
   Omit<CreateOwnerFieldPayload, "operating_hours">
 > & {
-  /**
-   * Cho phép dùng lại type này nếu sau này edit field cũng cập nhật operating_hours.
-   * Hiện tại nếu edit chưa gửi lịch thì không ảnh hưởng.
-   */
   operating_hours?: OwnerOperatingHourPayload[]
 }
 
@@ -151,34 +185,30 @@ export function updateOwnerFieldStatus(
   fieldId: number | string,
   status: OwnerFieldStatus,
 ) {
-  return apiRequest<ApiResponse<OwnerFieldApi>>(`/owner/fields/${fieldId}/status`, {
-    method: "PATCH",
-    body: JSON.stringify({ status }),
-  })
+  return apiRequest<ApiResponse<OwnerFieldApi>>(
+    `/owner/fields/${fieldId}/status`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    },
+  )
 }
 
 /**
- * API này vẫn giữ lại để trang edit/schedule cũ không bị lỗi import.
- * Nhưng với flow tạo sân mới, không gọi hàm này nữa.
- * Tạo sân sẽ gửi operating_hours trực tiếp trong createOwnerField(payload).
+ * API này giữ lại để các page cũ không bị lỗi import.
+ * Nếu sau này có route riêng để cập nhật giờ hoạt động thì payload cũng nên dùng windows[].
  */
 export function updateOwnerOperatingHour(
   fieldId: number | string,
   payload: OwnerOperatingHourPayload,
 ) {
-  return apiRequest<
-    ApiResponse<{
-      id: number | null
-      field_id: number
-      day_of_week: number
-      open_time: string | null
-      close_time: string | null
-      is_closed: boolean
-    }>
-  >(`/owner/fields/${fieldId}/operating-hours`, {
-    method: "PUT",
-    body: JSON.stringify(payload),
-  })
+  return apiRequest<ApiResponse<OwnerOperatingHourApi>>(
+    `/owner/fields/${fieldId}/operating-hours`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    },
+  )
 }
 
 export function setOwnerFieldPrimaryImage(
@@ -200,11 +230,15 @@ export function uploadOwnerFieldImages(fieldId: number | string, files: File[]) 
     formData.append("images", file)
   })
 
-  return apiRequest<ApiResponse<OwnerFieldApi>>(`/owner/fields/${fieldId}/images`, {
-    method: "POST",
-    body: formData,
-  })
+  return apiRequest<ApiResponse<OwnerFieldApi>>(
+    `/owner/fields/${fieldId}/images`,
+    {
+      method: "POST",
+      body: formData,
+    },
+  )
 }
+
 export function deleteOwnerFieldImage(
   fieldId: number | string,
   imageId: number | string,

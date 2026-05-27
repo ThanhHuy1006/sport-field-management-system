@@ -30,9 +30,41 @@ function mapSportType(type?: string | null) {
 }
 
 function mapFieldToFormData(field: OwnerFieldApi): FieldData {
-  const weekdayRule = field.pricing_rules?.find((item) => item.day_type === "WEEKDAY")
-  const weekendRule = field.pricing_rules?.find((item) => item.day_type === "WEEKEND")
-  const activeHour = field.operating_hours?.find((item) => item.open_time && item.close_time)
+  const weekdayRule = field.pricing_rules?.find(
+    (item) => item.day_type === "WEEKDAY",
+  )
+  const weekendRule = field.pricing_rules?.find(
+    (item) => item.day_type === "WEEKEND",
+  )
+
+  const operatingHours =
+    (field.operating_hours as any[] | undefined)?.map((item) => {
+      const windows = Array.isArray(item.windows)
+        ? item.windows.map((window: any) => ({
+            id: window.id,
+            start_time: window.start_time,
+            end_time: window.end_time,
+          }))
+        : item.open_time && item.close_time
+          ? [
+              {
+                id: item.id,
+                start_time: item.open_time,
+                end_time: item.close_time,
+              },
+            ]
+          : []
+
+      return {
+        day_of_week: Number(item.day_of_week),
+        is_closed: Boolean(item.is_closed) || windows.length === 0,
+        windows,
+      }
+    }) || []
+
+  const firstOpenWindow = operatingHours
+    .find((day) => !day.is_closed && day.windows.length > 0)
+    ?.windows?.[0]
 
   return {
     name: field.field_name || "",
@@ -51,8 +83,8 @@ function mapFieldToFormData(field: OwnerFieldApi): FieldData {
     status: field.status || "pending",
     amenities: field.amenities?.map((item) => item.name || "").filter(Boolean) || [],
 
-    openTime: activeHour?.open_time || "06:00",
-    closeTime: activeHour?.close_time || "22:00",
+    openTime: firstOpenWindow?.start_time || "06:00",
+    closeTime: firstOpenWindow?.end_time || "22:00",
     approvalMode: field.approval_mode || "MANUAL",
 
     existingImages:
@@ -61,13 +93,8 @@ function mapFieldToFormData(field: OwnerFieldApi): FieldData {
         url: toAssetUrl(image.url),
         isPrimary: Boolean(image.is_primary),
       })) || [],
-      operating_hours:
-  field.operating_hours?.map((item) => ({
-    day_of_week: Number(item.day_of_week),
-    open_time: item.open_time,
-    close_time: item.close_time,
-    is_closed: !item.open_time || !item.close_time,
-  })) || [],
+
+    operating_hours: operatingHours,
   }
 }
 

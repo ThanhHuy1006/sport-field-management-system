@@ -111,36 +111,75 @@ function normalizeOperatingHours(value, { required = false } = {}) {
     if (is_closed) {
       return {
         day_of_week,
-        open_time: null,
-        close_time: null,
+        is_closed: true,
+        windows: [],
       };
     }
 
-    const open_time = validateTime(
-      item.open_time,
-      `operating_hours[${index}].open_time`,
-    );
+    const rawWindows = Array.isArray(item.windows)
+      ? item.windows
+      : item.open_time && item.close_time
+        ? [
+            {
+              start_time: item.open_time,
+              end_time: item.close_time,
+            },
+          ]
+        : [];
 
-    const close_time = validateTime(
-      item.close_time,
-      `operating_hours[${index}].close_time`,
-    );
-
-    if (open_time >= close_time) {
+    if (rawWindows.length === 0) {
       throw new ValidationError(
-        `Ngày ${day_of_week}: giờ mở cửa phải trước giờ đóng cửa`,
+        `Ngày ${day_of_week}: ngày mở cửa phải có ít nhất 1 khung giờ`,
       );
+    }
+
+    const windows = rawWindows.map((window, windowIndex) => {
+      const start_time = validateTime(
+        window.start_time,
+        `operating_hours[${index}].windows[${windowIndex}].start_time`,
+      );
+
+      const end_time = validateTime(
+        window.end_time,
+        `operating_hours[${index}].windows[${windowIndex}].end_time`,
+      );
+
+      if (start_time >= end_time) {
+        throw new ValidationError(
+          `Ngày ${day_of_week}: giờ bắt đầu phải trước giờ kết thúc`,
+        );
+      }
+
+      return {
+        start_time,
+        end_time,
+      };
+    });
+
+    const sortedWindows = [...windows].sort((a, b) =>
+      a.start_time.localeCompare(b.start_time),
+    );
+
+    for (let i = 1; i < sortedWindows.length; i++) {
+      const previous = sortedWindows[i - 1];
+      const current = sortedWindows[i];
+
+      if (previous.end_time > current.start_time) {
+        throw new ValidationError(
+          `Ngày ${day_of_week}: các khung giờ mở cửa không được chồng lên nhau`,
+        );
+      }
     }
 
     return {
       day_of_week,
-      open_time,
-      close_time,
+      is_closed: false,
+      windows: sortedWindows,
     };
   });
 
   const openDaysCount = items.filter(
-    (item) => item.open_time && item.close_time,
+    (item) => !item.is_closed && item.windows.length > 0,
   ).length;
 
   if (openDaysCount === 0) {
