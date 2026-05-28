@@ -50,12 +50,32 @@ function overlaps(startA, endA, startB, endB) {
   return startA < endB && startB < endA;
 }
 
-function isOperatingHourClosed(operatingHour) {
-  return (
-    !operatingHour ||
-    !operatingHour.open_time ||
-    !operatingHour.close_time
-  );
+function isOperatingWindowValid(window) {
+  return Boolean(window?.open_time && window?.close_time);
+}
+
+function mapOperatingRowsToDaySchedule(fieldId, dayOfWeek, rows = []) {
+  const windows = rows
+    .filter((item) => item.is_active !== false)
+    .filter(isOperatingWindowValid)
+    .sort((a, b) => String(a.open_time).localeCompare(String(b.open_time)))
+    .map((item) => ({
+      id: item.id,
+      start_time: item.open_time,
+      end_time: item.close_time,
+    }));
+
+  return {
+    id: rows[0]?.id ?? null,
+    field_id: Number(fieldId),
+    day_of_week: Number(dayOfWeek),
+    is_closed: windows.length === 0,
+    windows,
+
+    // Fallback cho mapper/API cũ nếu còn dùng.
+    open_time: windows[0]?.start_time ?? null,
+    close_time: windows[0]?.end_time ?? null,
+  };
 }
 
 async function ensureManageableField(fieldId, user) {
@@ -72,12 +92,59 @@ async function ensureManageableField(fieldId, user) {
   return field;
 }
 
+function buildSlotsFromOperatingWindow({
+  date,
+  operatingWindow,
+  slotDuration,
+  stepMinutes,
+  bookings,
+}) {
+  const slots = [];
+
+  if (!isOperatingWindowValid(operatingWindow)) {
+    return slots;
+  }
+
+  let cursor = combineDateAndTime(date, operatingWindow.open_time);
+  const closeTime = combineDateAndTime(date, operatingWindow.close_time);
+
+  while (cursor < closeTime) {
+    const slotStart = new Date(cursor);
+    const slotEnd = addMinutes(slotStart, slotDuration);
+
+    if (slotEnd > closeTime) break;
+
+    const conflict = bookings.find((booking) =>
+      overlaps(
+        slotStart,
+        slotEnd,
+        booking.start_datetime,
+        booking.end_datetime,
+      ),
+    );
+
+    slots.push({
+      start_time: formatTime(slotStart),
+      end_time: formatTime(slotEnd),
+      start_datetime: slotStart,
+      end_datetime: slotEnd,
+      status: conflict ? "booked" : "available",
+      booking_id: conflict?.id || null,
+    });
+
+    cursor = addMinutes(cursor, stepMinutes);
+  }
+
+  return slots;
+}
+
 export const schedulesService = {
   async getPublicAvailability(fieldId, query) {
-    const id = fieldId;
+    const id = Number(fieldId);
     const { date } = query;
 
     const field = await schedulesRepository.findFieldById(id);
+
     if (!field) {
       throw new NotFoundError("Không tìm thấy sân");
     }
@@ -92,7 +159,7 @@ export const schedulesService = {
     const blackout = await schedulesRepository.findBlackoutByFieldAndDate(
       id,
       dayStart,
-      dayEnd
+      dayEnd,
     );
 
     if (blackout) {
@@ -107,10 +174,17 @@ export const schedulesService = {
 
     const dayOfWeek = getDayOfWeek(date);
 
-    const operatingHour =
-      await schedulesRepository.findOperatingHourByFieldAndDay(id, dayOfWeek);
+    const operatingWindows =
+      await schedulesRepository.findOperatingHoursByFieldAndDay(
+        id,
+        dayOfWeek,
+      );
 
-    if (isOperatingHourClosed(operatingHour)) {
+    const validOperatingWindows = operatingWindows.filter(
+      isOperatingWindowValid,
+    );
+
+    if (validOperatingWindows.length === 0) {
       return {
         fieldId: id,
         date,
@@ -121,44 +195,23 @@ export const schedulesService = {
     }
 
     const slotDuration = field.min_duration_minutes || 60;
+    const stepMinutes = field.slot_step_minutes || slotDuration;
 
     const bookings = await schedulesRepository.findBookingsByFieldAndDate(
       id,
       dayStart,
-      dayEnd
+      dayEnd,
     );
 
-    let cursor = combineDateAndTime(date, operatingHour.open_time);
-    const closeTime = combineDateAndTime(date, operatingHour.close_time);
-
-    const slots = [];
-
-    while (cursor < closeTime) {
-      const slotStart = new Date(cursor);
-      const slotEnd = addMinutes(slotStart, slotDuration);
-
-      if (slotEnd > closeTime) break;
-
-      const conflict = bookings.find((booking) =>
-        overlaps(
-          slotStart,
-          slotEnd,
-          booking.start_datetime,
-          booking.end_datetime
-        )
-      );
-
-      slots.push({
-        start_time: formatTime(slotStart),
-        end_time: formatTime(slotEnd),
-        start_datetime: slotStart,
-        end_datetime: slotEnd,
-        status: conflict ? "booked" : "available",
-        booking_id: conflict?.id || null,
-      });
-
-      cursor = slotEnd;
-    }
+    const slots = validOperatingWindows.flatMap((operatingWindow) =>
+      buildSlotsFromOperatingWindow({
+        date,
+        operatingWindow,
+        slotDuration,
+        stepMinutes,
+        bookings,
+      }),
+    );
 
     return {
       fieldId: id,
@@ -170,81 +223,45 @@ export const schedulesService = {
   },
 
   async getOwnerOperatingHours(fieldId, user) {
-    const id = fieldId;
+    const id = Number(fieldId);
 
     await ensureManageableField(id, user);
 
     const existing = await schedulesRepository.findOperatingHoursByField(id);
-    const byDay = new Map(existing.map((item) => [item.day_of_week, item]));
 
     return Array.from({ length: 7 }, (_, index) => {
-      const day = index + 1;
-      const item = byDay.get(day);
+      const dayOfWeek = index + 1;
 
-      if (item) {
-        const isClosed = !item.open_time || !item.close_time;
+      const rows = existing.filter(
+        (item) => Number(item.day_of_week) === dayOfWeek,
+      );
 
-        return {
-          ...item,
-          is_closed: isClosed,
-        };
-      }
-
-      return {
-        id: null,
-        field_id: id,
-        day_of_week: day,
-        open_time: null,
-        close_time: null,
-        is_closed: true,
-      };
+      return mapOperatingRowsToDaySchedule(id, dayOfWeek, rows);
     });
   },
 
   async upsertOwnerOperatingHours(fieldId, payload, user) {
-    const id = fieldId;
+    const id = Number(fieldId);
 
     await ensureManageableField(id, user);
 
-    const existed = await schedulesRepository.findOperatingHourByFieldAndDay(
+    const rows = await schedulesRepository.replaceOperatingHoursByDay(
       id,
-      payload.day_of_week
+      payload,
     );
 
-    if (payload.is_closed) {
-      if (existed) {
-        await schedulesRepository.deleteOperatingHour(existed.id);
-      }
-
-      return {
-        id: existed?.id ?? null,
-        field_id: id,
-        day_of_week: payload.day_of_week,
-        open_time: null,
-        close_time: null,
-        is_closed: true,
-      };
-    }
-
-    const item = existed
-      ? await schedulesRepository.updateOperatingHour(existed.id, payload)
-      : await schedulesRepository.createOperatingHour(id, payload);
-
-    return {
-      ...item,
-      is_closed: false,
-    };
+    return mapOperatingRowsToDaySchedule(id, payload.day_of_week, rows);
   },
 
   async createBlackoutDate(fieldId, payload, user) {
-    const id = fieldId;
+    const id = Number(fieldId);
 
     await ensureManageableField(id, user);
 
     const existed = await schedulesRepository.findBlackoutByFieldAndDate(
       id,
       startOfDay(payload.date),
-      endOfDay(payload.date)
+      endOfDay(payload.date),
     );
 
     if (existed) {
@@ -255,7 +272,7 @@ export const schedulesService = {
   },
 
   async deleteBlackoutDate(blackoutDateId, user) {
-    const id = blackoutDateId;
+    const id = Number(blackoutDateId);
 
     const blackoutDate = await schedulesRepository.findBlackoutDateById(id);
 
