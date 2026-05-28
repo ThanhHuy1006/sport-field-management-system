@@ -140,87 +140,108 @@ function buildSlotsFromOperatingWindow({
 
 export const schedulesService = {
   async getPublicAvailability(fieldId, query) {
-    const id = Number(fieldId);
-    const { date } = query;
+  const id = Number(fieldId);
+  const { date } = query;
 
-    const field = await schedulesRepository.findFieldById(id);
+  const field = await schedulesRepository.findFieldById(id);
 
-    if (!field) {
-      throw new NotFoundError("Không tìm thấy sân");
-    }
+  if (!field) {
+    throw new NotFoundError("Không tìm thấy sân");
+  }
 
-    if (field.status !== "active") {
-      throw new ForbiddenError("Sân hiện không khả dụng");
-    }
+  if (field.status !== "active") {
+    throw new ForbiddenError("Sân hiện không khả dụng");
+  }
 
-    const dayStart = startOfDay(date);
-    const dayEnd = endOfDay(date);
+  const dayStart = startOfDay(date);
+  const dayEnd = endOfDay(date);
 
-    const blackout = await schedulesRepository.findBlackoutByFieldAndDate(
+  const blackout = await schedulesRepository.findBlackoutByFieldAndDate(
+    id,
+    dayStart,
+    dayEnd,
+  );
+
+  if (blackout) {
+    return {
+      fieldId: id,
+      date,
+      isBlackout: true,
+      blackoutReason: blackout.reason,
+      slots: [],
+    };
+  }
+
+  const dayOfWeek = getDayOfWeek(date);
+
+  const operatingWindows =
+    await schedulesRepository.findOperatingHoursByFieldAndDay(
       id,
-      dayStart,
-      dayEnd,
+      dayOfWeek,
     );
 
-    if (blackout) {
-      return {
-        fieldId: id,
-        date,
-        isBlackout: true,
-        blackoutReason: blackout.reason,
-        slots: [],
-      };
-    }
+  const validOperatingWindows = operatingWindows.filter(
+    isOperatingWindowValid,
+  );
 
-    const dayOfWeek = getDayOfWeek(date);
-
-    const operatingWindows =
-      await schedulesRepository.findOperatingHoursByFieldAndDay(
-        id,
-        dayOfWeek,
-      );
-
-    const validOperatingWindows = operatingWindows.filter(
-      isOperatingWindowValid,
-    );
-
-    if (validOperatingWindows.length === 0) {
-      return {
-        fieldId: id,
-        date,
-        isBlackout: false,
-        blackoutReason: null,
-        slots: [],
-      };
-    }
-
-    const slotDuration = field.min_duration_minutes || 60;
-    const stepMinutes = field.slot_step_minutes || slotDuration;
-
-    const bookings = await schedulesRepository.findBookingsByFieldAndDate(
-      id,
-      dayStart,
-      dayEnd,
-    );
-
-    const slots = validOperatingWindows.flatMap((operatingWindow) =>
-      buildSlotsFromOperatingWindow({
-        date,
-        operatingWindow,
-        slotDuration,
-        stepMinutes,
-        bookings,
-      }),
-    );
-
+  if (validOperatingWindows.length === 0) {
     return {
       fieldId: id,
       date,
       isBlackout: false,
       blackoutReason: null,
-      slots,
+      slots: [],
     };
-  },
+  }
+
+  const minDuration = field.min_duration_minutes || 60;
+
+  const requestedDuration =
+    query.duration_minutes !== undefined && query.duration_minutes !== null
+      ? Number(query.duration_minutes)
+      : minDuration;
+
+  if (
+    Number.isNaN(requestedDuration) ||
+    requestedDuration <= 0 ||
+    requestedDuration % 30 !== 0
+  ) {
+    throw new ForbiddenError("Thời lượng đặt sân không hợp lệ");
+  }
+
+  if (requestedDuration < minDuration) {
+    throw new ForbiddenError(
+      `Thời lượng đặt sân tối thiểu là ${minDuration} phút`,
+    );
+  }
+
+  const slotDuration = requestedDuration;
+  const stepMinutes = field.slot_step_minutes || 30;
+
+  const bookings = await schedulesRepository.findBookingsByFieldAndDate(
+    id,
+    dayStart,
+    dayEnd,
+  );
+
+  const slots = validOperatingWindows.flatMap((operatingWindow) =>
+    buildSlotsFromOperatingWindow({
+      date,
+      operatingWindow,
+      slotDuration,
+      stepMinutes,
+      bookings,
+    }),
+  );
+
+  return {
+    fieldId: id,
+    date,
+    isBlackout: false,
+    blackoutReason: null,
+    slots,
+  };
+},
 
   async getOwnerOperatingHours(fieldId, user) {
     const id = Number(fieldId);

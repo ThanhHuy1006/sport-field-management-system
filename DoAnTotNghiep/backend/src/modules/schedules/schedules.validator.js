@@ -127,7 +127,27 @@ export function validateAvailabilityQuery(query) {
     throw new ValidationError("date không hợp lệ");
   }
 
-  return { date };
+  const duration_minutes =
+    query.duration_minutes !== undefined && query.duration_minutes !== null
+      ? Number(query.duration_minutes)
+      : undefined;
+
+  if (duration_minutes !== undefined) {
+    if (
+      Number.isNaN(duration_minutes) ||
+      duration_minutes <= 0 ||
+      duration_minutes % 30 !== 0
+    ) {
+      throw new ValidationError(
+        "duration_minutes phải là số dương và chia hết cho 30",
+      );
+    }
+  }
+
+  return {
+    date,
+    duration_minutes,
+  };
 }
 
 export function validateOperatingHoursPayload(payload) {
