@@ -35,7 +35,10 @@ function endOfDay(dateStr) {
 }
 
 function combineDateAndTime(dateStr, timeStr) {
-  return new Date(`${dateStr}T${timeStr}:00`);
+  const [year, month, day] = String(dateStr).split("-").map(Number);
+  const [hour, minute] = String(timeStr).split(":").map(Number);
+
+  return new Date(year, month - 1, day, hour, minute, 0, 0);
 }
 
 function addMinutes(date, minutes) {
@@ -98,6 +101,7 @@ function buildSlotsFromOperatingWindow({
   slotDuration,
   stepMinutes,
   bookings,
+  now = new Date(),
 }) {
   const slots = [];
 
@@ -123,12 +127,28 @@ function buildSlotsFromOperatingWindow({
       ),
     );
 
+    const isPast = slotStart <= now;
+
+    let status = "available";
+    let reason = null;
+
+    if (isPast) {
+      status = "past";
+      reason = "Đã qua";
+    } else if (conflict) {
+      status = "booked";
+      reason = "Đã có người đặt";
+    }
+
     slots.push({
       start_time: formatTime(slotStart),
       end_time: formatTime(slotEnd),
       start_datetime: slotStart,
       end_datetime: slotEnd,
-      status: conflict ? "booked" : "available",
+      status,
+      available: status === "available",
+      is_past: isPast,
+      reason,
       booking_id: conflict?.id || null,
     });
 
@@ -140,108 +160,108 @@ function buildSlotsFromOperatingWindow({
 
 export const schedulesService = {
   async getPublicAvailability(fieldId, query) {
-  const id = Number(fieldId);
-  const { date } = query;
+    const id = Number(fieldId);
+    const { date } = query;
 
-  const field = await schedulesRepository.findFieldById(id);
+    const field = await schedulesRepository.findFieldById(id);
 
-  if (!field) {
-    throw new NotFoundError("Không tìm thấy sân");
-  }
+    if (!field) {
+      throw new NotFoundError("Không tìm thấy sân");
+    }
 
-  if (field.status !== "active") {
-    throw new ForbiddenError("Sân hiện không khả dụng");
-  }
+    if (field.status !== "active") {
+      throw new ForbiddenError("Sân hiện không khả dụng");
+    }
 
-  const dayStart = startOfDay(date);
-  const dayEnd = endOfDay(date);
+    const dayStart = startOfDay(date);
+    const dayEnd = endOfDay(date);
 
-  const blackout = await schedulesRepository.findBlackoutByFieldAndDate(
-    id,
-    dayStart,
-    dayEnd,
-  );
-
-  if (blackout) {
-    return {
-      fieldId: id,
-      date,
-      isBlackout: true,
-      blackoutReason: blackout.reason,
-      slots: [],
-    };
-  }
-
-  const dayOfWeek = getDayOfWeek(date);
-
-  const operatingWindows =
-    await schedulesRepository.findOperatingHoursByFieldAndDay(
+    const blackout = await schedulesRepository.findBlackoutByFieldAndDate(
       id,
-      dayOfWeek,
+      dayStart,
+      dayEnd,
     );
 
-  const validOperatingWindows = operatingWindows.filter(
-    isOperatingWindowValid,
-  );
+    if (blackout) {
+      return {
+        fieldId: id,
+        date,
+        isBlackout: true,
+        blackoutReason: blackout.reason,
+        slots: [],
+      };
+    }
 
-  if (validOperatingWindows.length === 0) {
+    const dayOfWeek = getDayOfWeek(date);
+
+    const operatingWindows =
+      await schedulesRepository.findOperatingHoursByFieldAndDay(id, dayOfWeek);
+
+    const validOperatingWindows = operatingWindows.filter(
+      isOperatingWindowValid,
+    );
+
+    if (validOperatingWindows.length === 0) {
+      return {
+        fieldId: id,
+        date,
+        isBlackout: false,
+        blackoutReason: null,
+        slots: [],
+      };
+    }
+
+    const minDuration = field.min_duration_minutes || 60;
+
+    const requestedDuration =
+      query.duration_minutes !== undefined && query.duration_minutes !== null
+        ? Number(query.duration_minutes)
+        : minDuration;
+
+    if (
+      Number.isNaN(requestedDuration) ||
+      requestedDuration <= 0 ||
+      requestedDuration % 30 !== 0
+    ) {
+      throw new ForbiddenError("Thời lượng đặt sân không hợp lệ");
+    }
+
+    if (requestedDuration < minDuration) {
+      throw new ForbiddenError(
+        `Thời lượng đặt sân tối thiểu là ${minDuration} phút`,
+      );
+    }
+
+    const slotDuration = requestedDuration;
+    const stepMinutes = field.slot_step_minutes || 30;
+
+    const bookings = await schedulesRepository.findBookingsByFieldAndDate(
+      id,
+      dayStart,
+      dayEnd,
+    );
+
+    const now = new Date();
+
+    const slots = validOperatingWindows.flatMap((operatingWindow) =>
+      buildSlotsFromOperatingWindow({
+        date,
+        operatingWindow,
+        slotDuration,
+        stepMinutes,
+        bookings,
+        now,
+      }),
+    );
+
     return {
       fieldId: id,
       date,
       isBlackout: false,
       blackoutReason: null,
-      slots: [],
+      slots,
     };
-  }
-
-  const minDuration = field.min_duration_minutes || 60;
-
-  const requestedDuration =
-    query.duration_minutes !== undefined && query.duration_minutes !== null
-      ? Number(query.duration_minutes)
-      : minDuration;
-
-  if (
-    Number.isNaN(requestedDuration) ||
-    requestedDuration <= 0 ||
-    requestedDuration % 30 !== 0
-  ) {
-    throw new ForbiddenError("Thời lượng đặt sân không hợp lệ");
-  }
-
-  if (requestedDuration < minDuration) {
-    throw new ForbiddenError(
-      `Thời lượng đặt sân tối thiểu là ${minDuration} phút`,
-    );
-  }
-
-  const slotDuration = requestedDuration;
-  const stepMinutes = field.slot_step_minutes || 30;
-
-  const bookings = await schedulesRepository.findBookingsByFieldAndDate(
-    id,
-    dayStart,
-    dayEnd,
-  );
-
-  const slots = validOperatingWindows.flatMap((operatingWindow) =>
-    buildSlotsFromOperatingWindow({
-      date,
-      operatingWindow,
-      slotDuration,
-      stepMinutes,
-      bookings,
-    }),
-  );
-
-  return {
-    fieldId: id,
-    date,
-    isBlackout: false,
-    blackoutReason: null,
-    slots,
-  };
-},
+  },
 
   async getOwnerOperatingHours(fieldId, user) {
     const id = Number(fieldId);

@@ -28,7 +28,8 @@ export type BookingAvailabilitySlotsResponse = {
       available: boolean;
       reason: string | null;
       booking_status: string | null;
-      status?: "available" | "booked" | string;
+      status?: "available" | "booked" | "past" | string;
+      is_past?: boolean;
       booking_id?: number | null;
     }>;
   };
@@ -47,7 +48,10 @@ type FieldAvailabilityResponse = {
       end_time: string;
       start_datetime: string;
       end_datetime: string;
-      status: "available" | "booked" | string;
+      status: "available" | "booked" | "past" | string;
+      available?: boolean;
+      is_past?: boolean;
+      reason?: string | null;
       booking_id: number | null;
     }>;
   };
@@ -93,17 +97,33 @@ export async function getBookingAvailabilitySlots(params: Params) {
       close_time: slots.length > 0 ? slots[slots.length - 1].end_time : null,
       slot_step_minutes: 30,
       duration_minutes: params.duration_minutes ?? 60,
-      slots: slots.map((slot) => ({
-        start_datetime: slot.start_datetime,
-        end_datetime: slot.end_datetime,
-        start_time: slot.start_time,
-        end_time: slot.end_time,
-        available: slot.status === "available",
-        reason: slot.status === "booked" ? "Đã có người đặt" : null,
-        booking_status: slot.status === "booked" ? "booked" : null,
-        status: slot.status,
-        booking_id: slot.booking_id,
-      })),
+      slots: slots.map((slot) => {
+        const available =
+          typeof slot.available === "boolean"
+            ? slot.available
+            : slot.status === "available" && !slot.is_past;
+
+        const reason =
+          slot.reason ??
+          (slot.is_past || slot.status === "past"
+            ? "Đã qua"
+            : slot.status === "booked"
+              ? "Đã có người đặt"
+              : null);
+
+        return {
+          start_datetime: slot.start_datetime,
+          end_datetime: slot.end_datetime,
+          start_time: slot.start_time,
+          end_time: slot.end_time,
+          available,
+          reason,
+          booking_status: slot.status === "booked" ? "booked" : null,
+          status: slot.status,
+          is_past: slot.is_past,
+          booking_id: slot.booking_id,
+        };
+      }),
     },
   } satisfies BookingAvailabilitySlotsResponse;
 }
