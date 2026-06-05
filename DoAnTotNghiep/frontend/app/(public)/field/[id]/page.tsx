@@ -24,6 +24,10 @@ import {
 } from "@/features/fields/services/get-field-detail";
 import { getFieldOwnerInfo } from "@/features/fields/services/get-field-owner-info";
 import { getFieldReviews } from "@/features/fields/services/get-field-reviews";
+import {
+  getBookingAvailabilitySlots,
+  type BookingAvailabilitySlotsResponse,
+} from "@/features/bookings/services/get-booking-availability-slots";
 import { ReportFieldDialog } from "@/components/report-field-dialog";
 import { getImageUrl } from "@/lib/image-url";
 import { getStoredUser } from "@/features/auth/lib/auth-storage";
@@ -60,6 +64,78 @@ type DetailFieldUi = {
     date: string;
   }>;
 };
+
+type QuickAvailabilitySlot =
+  BookingAvailabilitySlotsResponse["data"]["slots"][number];
+
+function getTodayLocalDate() {
+  const now = new Date();
+
+  return (
+    now.getFullYear() +
+    "-" +
+    String(now.getMonth() + 1).padStart(2, "0") +
+    "-" +
+    String(now.getDate()).padStart(2, "0")
+  );
+}
+
+function addDaysToLocalDate(dateStr: string, days: number) {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+
+  date.setDate(date.getDate() + days);
+
+  return (
+    date.getFullYear() +
+    "-" +
+    String(date.getMonth() + 1).padStart(2, "0") +
+    "-" +
+    String(date.getDate()).padStart(2, "0")
+  );
+}
+
+function formatQuickDateLabel(dateStr: string) {
+  const today = getTodayLocalDate();
+  const tomorrow = addDaysToLocalDate(today, 1);
+
+  if (dateStr === today) return "Hôm nay";
+  if (dateStr === tomorrow) return "Ngày mai";
+
+  const [year, month, day] = dateStr.split("-").map(Number);
+
+  return new Date(year, month - 1, day).toLocaleDateString("vi-VN");
+}
+
+function getQuickSlotLabel(slot: QuickAvailabilitySlot) {
+  if (slot.available) return "Còn trống";
+
+  if (slot.reason) return slot.reason;
+
+  if (slot.status === "past" || slot.is_past) return "Đã qua";
+
+  if (slot.status === "booked" || slot.booking_status === "booked") {
+    return "Đã đặt";
+  }
+
+  return "Không khả dụng";
+}
+
+function getQuickSlotClassName(slot: QuickAvailabilitySlot) {
+  if (slot.available) {
+    return "border-primary/50 bg-primary/10 text-foreground hover:border-primary";
+  }
+
+  if (slot.status === "booked" || slot.booking_status === "booked") {
+    return "border-border bg-muted text-muted-foreground";
+  }
+
+  if (slot.status === "past" || slot.is_past) {
+    return "border-border bg-muted/70 text-muted-foreground opacity-60";
+  }
+
+  return "border-border bg-muted text-muted-foreground";
+}
 
 function formatDate(value: string | null | undefined) {
   if (!value) return "";
@@ -159,6 +235,12 @@ export default function FieldDetailsPage() {
   const [error, setError] = useState("");
   const [isReportOpen, setIsReportOpen] = useState(false);
 
+  const [quickDate, setQuickDate] = useState(getTodayLocalDate());
+  const [quickSlots, setQuickSlots] = useState<QuickAvailabilitySlot[]>([]);
+  const [isQuickAvailabilityLoading, setIsQuickAvailabilityLoading] =
+    useState(false);
+  const [quickAvailabilityError, setQuickAvailabilityError] = useState("");
+
   const storedUser = getStoredUser();
   const currentRole = String(storedUser?.role ?? "").toUpperCase();
   const canBookField = !storedUser || currentRole === "USER";
@@ -212,11 +294,64 @@ export default function FieldDetailsPage() {
     };
   }, [fieldId]);
 
+  useEffect(() => {
+    if (!fieldId || !quickDate) return;
+
+    const numericFieldId = Number(fieldId);
+
+    if (Number.isNaN(numericFieldId)) return;
+
+    let cancelled = false;
+
+    async function fetchQuickAvailability() {
+      try {
+        setIsQuickAvailabilityLoading(true);
+        setQuickAvailabilityError("");
+
+        const result = await getBookingAvailabilitySlots({
+          field_id: numericFieldId,
+          date: quickDate,
+          duration_minutes: 60,
+        });
+
+        if (cancelled) return;
+
+        setQuickSlots(result.data.slots ?? []);
+      } catch (err) {
+        if (cancelled) return;
+
+        setQuickSlots([]);
+        setQuickAvailabilityError(
+          err instanceof Error ? err.message : "Không thể tải lịch trống nhanh"
+        );
+      } finally {
+        if (!cancelled) setIsQuickAvailabilityLoading(false);
+      }
+    }
+
+    fetchQuickAvailability();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fieldId, quickDate]);
+
   const displayImages = useMemo(() => {
     if (!field?.images?.length) return ["/placeholder.svg"];
 
     return field.images.map((image) => getImageUrl(image));
   }, [field]);
+
+  const visibleQuickSlots = useMemo(() => {
+    const futureOrAvailableSlots = quickSlots.filter(
+      (slot) => slot.available || (slot.status !== "past" && !slot.is_past)
+    );
+
+    const source =
+      futureOrAvailableSlots.length > 0 ? futureOrAvailableSlots : quickSlots;
+
+    return source.slice(0, 12);
+  }, [quickSlots]);
 
   const handleShare = async () => {
     const url = window.location.href;
@@ -402,12 +537,18 @@ export default function FieldDetailsPage() {
                   </h1>
 
                   <div className="flex flex-col sm:flex-row sm:items-center gap-4 text-muted-foreground">
-                    <div data-cy="field-detail-location" className="flex items-center gap-1">
+                    <div
+                      data-cy="field-detail-location"
+                      className="flex items-center gap-1"
+                    >
                       <MapPin className="w-4 h-4" />
                       {field.location}
                     </div>
 
-                    <div data-cy="field-detail-rating" className="flex items-center gap-1">
+                    <div
+                      data-cy="field-detail-rating"
+                      className="flex items-center gap-1"
+                    >
                       <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
                       {field.rating} ({field.reviewCount} đánh giá)
                     </div>
@@ -415,7 +556,10 @@ export default function FieldDetailsPage() {
                 </div>
 
                 <div className="text-right">
-                  <div data-cy="field-detail-price" className="text-3xl font-bold text-primary">
+                  <div
+                    data-cy="field-detail-price"
+                    className="text-3xl font-bold text-primary"
+                  >
                     {field.price.toLocaleString()} VND
                   </div>
                   <div className="text-sm text-muted-foreground">mỗi giờ</div>
@@ -425,7 +569,10 @@ export default function FieldDetailsPage() {
 
             <Card className="p-6 mb-8">
               <h2 className="text-2xl font-bold mb-4">Về sân này</h2>
-              <p data-cy="field-detail-description" className="text-muted-foreground mb-6">
+              <p
+                data-cy="field-detail-description"
+                className="text-muted-foreground mb-6"
+              >
                 {field.description}
               </p>
 
@@ -454,7 +601,115 @@ export default function FieldDetailsPage() {
                 <Clock className="w-5 h-5 text-primary" />
                 <h3 className="text-lg font-bold">Giờ hoạt động</h3>
               </div>
-              <p data-cy="field-detail-hours" className="text-foreground">{field.hours}</p>
+
+              <p data-cy="field-detail-hours" className="text-foreground mb-6">
+                {field.hours}
+              </p>
+
+              <div className="border-t border-border pt-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+                  <div>
+                    <h4 className="font-bold text-foreground">
+                      Lịch trống nhanh
+                    </h4>
+                    <p className="text-sm text-muted-foreground">
+                      Xem nhanh khung giờ còn trống, đã đặt hoặc đã qua.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setQuickDate(getTodayLocalDate())}
+                      className={`rounded-lg border px-3 py-2 text-sm transition ${
+                        quickDate === getTodayLocalDate()
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border hover:border-primary/60"
+                      }`}
+                    >
+                      Hôm nay
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setQuickDate(addDaysToLocalDate(getTodayLocalDate(), 1))
+                      }
+                      className={`rounded-lg border px-3 py-2 text-sm transition ${
+                        quickDate === addDaysToLocalDate(getTodayLocalDate(), 1)
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border hover:border-primary/60"
+                      }`}
+                    >
+                      Ngày mai
+                    </button>
+
+                    <input
+                      type="date"
+                      min={getTodayLocalDate()}
+                      value={quickDate}
+                      onChange={(event) => setQuickDate(event.target.value)}
+                      className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                    />
+                  </div>
+                </div>
+
+                <div className="mb-3 text-sm text-muted-foreground">
+                  Đang xem:{" "}
+                  <span className="font-medium text-foreground">
+                    {formatQuickDateLabel(quickDate)}
+                  </span>
+                </div>
+
+                {isQuickAvailabilityLoading ? (
+                  <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+                    Đang tải lịch trống nhanh...
+                  </div>
+                ) : quickAvailabilityError ? (
+                  <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+                    {quickAvailabilityError}
+                  </div>
+                ) : visibleQuickSlots.length === 0 ? (
+                  <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+                    Không có khung giờ khả dụng trong ngày này.
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                      {visibleQuickSlots.map((slot) => (
+                        <div
+                          key={`${slot.start_datetime}-${slot.end_datetime}`}
+                          className={`rounded-lg border px-3 py-3 text-center text-sm transition ${getQuickSlotClassName(
+                            slot
+                          )}`}
+                        >
+                          <div className="font-bold">
+                            {slot.start_time} - {slot.end_time}
+                          </div>
+
+                          <div className="mt-1 text-[11px]">
+                            {getQuickSlotLabel(slot)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                        <span>● Còn trống</span>
+                        <span>● Đã đặt</span>
+                        <span>● Đã qua</span>
+                      </div>
+
+                      <Link href={`/booking/${field.id}`}>
+                        <Button size="sm" variant="outline">
+                          Xem tất cả khung giờ
+                        </Button>
+                      </Link>
+                    </div>
+                  </>
+                )}
+              </div>
             </Card>
 
             <Card className="p-6 mb-8">
@@ -562,11 +817,20 @@ export default function FieldDetailsPage() {
               </div>
 
               {canBookField ? (
-                <Link data-cy="go-to-booking-link" href={`/booking/${field.id}`}>
-                  <Button data-cy="go-to-booking-button" className="w-full mb-3">Đặt sân ngay</Button>
+                <Link
+                  data-cy="go-to-booking-link"
+                  href={`/booking/${field.id}`}
+                >
+                  <Button data-cy="go-to-booking-button" className="w-full mb-3">
+                    Đặt sân ngay
+                  </Button>
                 </Link>
               ) : (
-                <Button data-cy="booking-disabled-button" className="w-full mb-3" disabled>
+                <Button
+                  data-cy="booking-disabled-button"
+                  className="w-full mb-3"
+                  disabled
+                >
                   Chỉ khách hàng mới được đặt sân
                 </Button>
               )}
