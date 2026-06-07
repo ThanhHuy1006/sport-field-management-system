@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
-import { Plus, Edit, Trash2, Copy, TicketPercent, Calendar, Users } from "lucide-react"
+import { Plus, Edit, PowerOff, Copy, TicketPercent, Calendar, Users } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import {
   createOwnerVoucher,
@@ -149,7 +149,7 @@ export default function OwnerVouchersPage() {
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isDisableDialogOpen, setIsDisableDialogOpen] = useState(false)
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [filterStatus, setFilterStatus] = useState("all")
@@ -220,26 +220,31 @@ export default function OwnerVouchersPage() {
     }
   }
 
-  const handleDelete = async () => {
+  const handleDisableVoucher = async () => {
     if (!selectedVoucher) return
 
     try {
       setIsSubmitting(true)
+
       await updateOwnerVoucherStatus(Number(selectedVoucher.id), "inactive")
-      setVouchers((prev) => prev.map((v) => (v.id === selectedVoucher.id ? { ...v, isActive: false } : v)))
+
+      setVouchers((prev) =>
+        prev.map((v) => (v.id === selectedVoucher.id ? { ...v, isActive: false } : v)),
+      )
+
       toast({
         title: "Đã tắt voucher",
-        description: "Voucher đã được chuyển sang trạng thái đã tắt",
+        description: "Voucher sẽ không còn được áp dụng cho đơn đặt sân mới",
       })
     } catch (error) {
       toast({
-        title: "Thao tác thất bại",
+        title: "Tắt voucher thất bại",
         description: error instanceof Error ? error.message : "Vui lòng thử lại sau",
         variant: "destructive",
       })
     } finally {
       setIsSubmitting(false)
-      setIsDeleteDialogOpen(false)
+      setIsDisableDialogOpen(false)
       setSelectedVoucher(null)
     }
   }
@@ -395,6 +400,7 @@ export default function OwnerVouchersPage() {
               </div>
             </div>
           </Card>
+
           <Card className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-orange-100 dark:bg-orange-950 rounded-lg">
@@ -408,6 +414,7 @@ export default function OwnerVouchersPage() {
               </div>
             </div>
           </Card>
+
           <Card className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-100 dark:bg-blue-950 rounded-lg">
@@ -419,6 +426,7 @@ export default function OwnerVouchersPage() {
               </div>
             </div>
           </Card>
+
           <Card className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-red-100 dark:bg-red-950 rounded-lg">
@@ -440,6 +448,7 @@ export default function OwnerVouchersPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="flex-1"
           />
+
           <Select value={filterStatus} onValueChange={setFilterStatus}>
             <SelectTrigger className="w-full sm:w-40">
               <SelectValue placeholder="Trạng thái" />
@@ -460,7 +469,8 @@ export default function OwnerVouchersPage() {
             </Card>
           ) : (
             filteredVouchers.map((voucher) => {
-              const usagePercent = voucher.usageLimit > 0 ? Math.min((voucher.usedCount / voucher.usageLimit) * 100, 100) : 0
+              const usagePercent =
+                voucher.usageLimit > 0 ? Math.min((voucher.usedCount / voucher.usageLimit) * 100, 100) : 0
 
               return (
                 <Card key={voucher.id} className="p-6">
@@ -489,12 +499,14 @@ export default function OwnerVouchersPage() {
                           <p className="text-muted-foreground">Giá trị</p>
                           <p className="font-semibold text-green-600">{getValueDisplay(voucher)}</p>
                         </div>
+
                         <div>
                           <p className="text-muted-foreground">Thời gian</p>
                           <p className="font-medium">
                             {voucher.startDate || "--"} - {voucher.endDate || "--"}
                           </p>
                         </div>
+
                         <div>
                           <p className="text-muted-foreground">Lượt sử dụng</p>
                           <div className="flex items-center gap-2">
@@ -506,6 +518,7 @@ export default function OwnerVouchersPage() {
                             </div>
                           </div>
                         </div>
+
                         <div>
                           <p className="text-muted-foreground">Đơn tối thiểu</p>
                           <p className="font-medium">{voucher.minAmount?.toLocaleString()}đ</p>
@@ -515,19 +528,23 @@ export default function OwnerVouchersPage() {
 
                     <div className="flex items-center gap-2">
                       <Switch checked={voucher.isActive} onCheckedChange={() => handleToggleActive(voucher.id)} />
+
                       <Button variant="outline" size="icon" onClick={() => handleOpenEditDialog(voucher)}>
                         <Edit className="w-4 h-4" />
                       </Button>
+
                       <Button
                         variant="outline"
                         size="icon"
                         className="text-destructive hover:text-destructive bg-transparent"
+                        disabled={!voucher.isActive}
+                        title="Tắt voucher"
                         onClick={() => {
                           setSelectedVoucher(voucher)
-                          setIsDeleteDialogOpen(true)
+                          setIsDisableDialogOpen(true)
                         }}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <PowerOff className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>
@@ -567,6 +584,7 @@ export default function OwnerVouchersPage() {
                   placeholder="VD: SUMMER2024"
                 />
               </div>
+
               <div>
                 <Label>Loại</Label>
                 <Select value={formData.type} onValueChange={(v: "percentage" | "fixed") => setFormData({ ...formData, type: v })}>
@@ -599,6 +617,7 @@ export default function OwnerVouchersPage() {
                   onChange={(e) => setFormData({ ...formData, value: Number(e.target.value) })}
                 />
               </div>
+
               <div>
                 <Label>Đơn tối thiểu</Label>
                 <Input
@@ -630,6 +649,7 @@ export default function OwnerVouchersPage() {
                   onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                 />
               </div>
+
               <div>
                 <Label>Ngày kết thúc</Label>
                 <Input
@@ -670,6 +690,7 @@ export default function OwnerVouchersPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -687,6 +708,7 @@ export default function OwnerVouchersPage() {
                   placeholder="VD: SUMMER2024"
                 />
               </div>
+
               <div>
                 <Label>Loại</Label>
                 <Select
@@ -722,6 +744,7 @@ export default function OwnerVouchersPage() {
                   onChange={(e) => setEditFormData({ ...editFormData, value: Number(e.target.value) })}
                 />
               </div>
+
               <div>
                 <Label>Đơn tối thiểu</Label>
                 <Input
@@ -753,6 +776,7 @@ export default function OwnerVouchersPage() {
                   onChange={(e) => setEditFormData({ ...editFormData, startDate: e.target.value })}
                 />
               </div>
+
               <div>
                 <Label>Ngày kết thúc</Label>
                 <Input
@@ -793,21 +817,23 @@ export default function OwnerVouchersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      {/* Disable Voucher Confirmation Dialog */}
+      <Dialog open={isDisableDialogOpen} onOpenChange={setIsDisableDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Xác nhận xóa</DialogTitle>
+            <DialogTitle>Xác nhận tắt voucher</DialogTitle>
             <DialogDescription>
-              Bạn có chắc chắn muốn xóa voucher "{selectedVoucher?.name}"? Hành động này không thể hoàn tác.
+              Bạn có chắc chắn muốn tắt voucher "{selectedVoucher?.name}"? Voucher sẽ không còn được áp dụng cho đơn đặt
+              sân mới.
             </DialogDescription>
           </DialogHeader>
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)} disabled={isSubmitting}>
+            <Button variant="outline" onClick={() => setIsDisableDialogOpen(false)} disabled={isSubmitting}>
               Hủy
             </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={isSubmitting}>
-              {isSubmitting ? "Đang xử lý..." : "Xóa"}
+            <Button variant="destructive" onClick={handleDisableVoucher} disabled={isSubmitting}>
+              {isSubmitting ? "Đang xử lý..." : "Tắt voucher"}
             </Button>
           </DialogFooter>
         </DialogContent>
