@@ -22,6 +22,7 @@ import {
 } from "./bookings.validator.js";
 
 const router = Router();
+// console.log("✅ owner.schedules.routes.js loaded");
 
 router.use(requireAuth, requireApprovedOwner());
 

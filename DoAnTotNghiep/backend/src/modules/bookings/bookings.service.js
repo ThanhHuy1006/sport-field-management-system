@@ -237,29 +237,32 @@ async function assertBookableField(valid) {
 
   const dayOfWeek = getDayOfWeek(valid.start_datetime);
 
-  const operatingHour = await bookingsRepository.findOperatingHourByFieldAndDay(
-    field.id,
-    dayOfWeek,
-  );
+  const operatingHours =
+    await bookingsRepository.findOperatingHoursByFieldAndDay(
+      field.id,
+      dayOfWeek,
+    );
 
-  if (!operatingHour) {
+  if (!operatingHours || operatingHours.length === 0) {
     throw new ForbiddenError("Sân không hoạt động vào ngày này");
   }
 
-  if (
-    !isWithinOperatingHours(
+  const matchedOperatingHour = operatingHours.find((operatingHour) =>
+    isWithinOperatingHours(
       valid.start_datetime,
       valid.end_datetime,
       operatingHour,
-    )
-  ) {
+    ),
+  );
+
+  if (!matchedOperatingHour) {
     throw new ForbiddenError("Khung giờ đặt nằm ngoài giờ hoạt động của sân");
   }
 
   return {
     field,
     minDuration,
-    operatingHour,
+    operatingHour: matchedOperatingHour,
   };
 }
 
@@ -340,19 +343,20 @@ export const bookingsService = {
     const dayEnd = startOfNextLocalDay(query.date);
     const dayOfWeek = getDayOfWeek(dayStart);
 
-    const operatingHour =
-      await bookingsRepository.findOperatingHourByFieldAndDay(
+    const operatingHours =
+      await bookingsRepository.findOperatingHoursByFieldAndDay(
         field.id,
         dayOfWeek,
       );
 
-    if (!operatingHour) {
+    if (!operatingHours || operatingHours.length === 0) {
       return {
         field,
         date: query.date,
         is_open: false,
         open_time: null,
         close_time: null,
+        windows: [],
         slot_step_minutes: minDuration,
         duration_minutes: durationMinutes,
         slots: [],
@@ -368,76 +372,83 @@ export const bookingsService = {
       bookingsRepository.findBookingsByFieldAndDate(field.id, dayStart, dayEnd),
     ]);
 
-    const open = combineDateStringAndTime(query.date, operatingHour.open_time);
-    const close = combineDateStringAndTime(
-      query.date,
-      operatingHour.close_time,
-    );
-
     const slots = [];
     const now = new Date();
 
-    for (
-      let cursor = new Date(open);
-      cursor.getTime() + durationMinutes * 60000 <= close.getTime();
-      cursor = new Date(cursor.getTime() + minDuration * 60000)
-    ) {
-      const slotStart = new Date(cursor);
-      const slotEnd = new Date(cursor.getTime() + durationMinutes * 60000);
-
-      const blackout = blackouts.find((item) =>
-        overlaps(
-          slotStart,
-          slotEnd,
-          new Date(item.start_datetime),
-          new Date(item.end_datetime),
-        ),
+    for (const operatingHour of operatingHours) {
+      const open = combineDateStringAndTime(query.date, operatingHour.open_time);
+      const close = combineDateStringAndTime(
+        query.date,
+        operatingHour.close_time,
       );
 
-      const conflict = bookings.find((item) =>
-        overlaps(
-          slotStart,
-          slotEnd,
-          new Date(item.start_datetime),
-          new Date(item.end_datetime),
-        ),
-      );
+      for (
+        let cursor = new Date(open);
+        cursor.getTime() + durationMinutes * 60000 <= close.getTime();
+        cursor = new Date(cursor.getTime() + minDuration * 60000)
+      ) {
+        const slotStart = new Date(cursor);
+        const slotEnd = new Date(cursor.getTime() + durationMinutes * 60000);
 
-      let available = true;
-      let reason = null;
-      let booking_status = null;
+        const blackout = blackouts.find((item) =>
+          overlaps(
+            slotStart,
+            slotEnd,
+            new Date(item.start_datetime),
+            new Date(item.end_datetime),
+          ),
+        );
 
-      if (slotStart <= now) {
-        available = false;
-        reason = "Khung giờ đã qua";
-      } else if (blackout) {
-        available = false;
-        reason = blackout.reason || "Khung giờ đang bị khóa";
-      } else if (conflict) {
-        available = false;
-        reason = "Khung giờ đã được đặt";
-        booking_status = conflict.status;
+        const conflict = bookings.find((item) =>
+          overlaps(
+            slotStart,
+            slotEnd,
+            new Date(item.start_datetime),
+            new Date(item.end_datetime),
+          ),
+        );
+
+        let available = true;
+        let reason = null;
+        let booking_status = null;
+
+        if (slotStart <= now) {
+          available = false;
+          reason = "Khung giờ đã qua";
+        } else if (blackout) {
+          available = false;
+          reason = blackout.reason || "Khung giờ đang bị khóa";
+        } else if (conflict) {
+          available = false;
+          reason = "Khung giờ đã được đặt";
+          booking_status = conflict.status;
+        }
+
+        slots.push({
+          start_datetime: slotStart.toISOString(),
+          end_datetime: slotEnd.toISOString(),
+          start_time: `${pad2(slotStart.getHours())}:${pad2(
+            slotStart.getMinutes(),
+          )}`,
+          end_time: `${pad2(slotEnd.getHours())}:${pad2(slotEnd.getMinutes())}`,
+          available,
+          reason,
+          booking_status,
+        });
       }
-
-      slots.push({
-        start_datetime: slotStart.toISOString(),
-        end_datetime: slotEnd.toISOString(),
-        start_time: `${pad2(slotStart.getHours())}:${pad2(
-          slotStart.getMinutes(),
-        )}`,
-        end_time: `${pad2(slotEnd.getHours())}:${pad2(slotEnd.getMinutes())}`,
-        available,
-        reason,
-        booking_status,
-      });
     }
 
     return {
       field,
       date: query.date,
       is_open: true,
-      open_time: operatingHour.open_time,
-      close_time: operatingHour.close_time,
+      open_time: operatingHours[0]?.open_time ?? null,
+      close_time: operatingHours[operatingHours.length - 1]?.close_time ?? null,
+      windows: operatingHours.map((item) => ({
+        id: item.id,
+        start_time: item.open_time,
+        end_time: item.close_time,
+      })),
       slot_step_minutes: minDuration,
       duration_minutes: durationMinutes,
       slots,

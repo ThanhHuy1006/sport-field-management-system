@@ -18,6 +18,7 @@ import {
 } from "../schedules/schedules.validator.js";
 
 const router = Router();
+console.log("✅ owner.schedules.routes.js loaded");
 
 const requireOwnerOrAdmin = [
   requireAuth,
