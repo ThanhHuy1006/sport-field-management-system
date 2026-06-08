@@ -192,6 +192,21 @@ async function findConflictingBookingsTx(tx, fieldId, start, end) {
     },
   });
 }
+async function findBlackoutByFieldAndRangeTx(tx, fieldId, start, end) {
+  return tx.blackout_dates.findFirst({
+    where: {
+      field_id: fieldId,
+      start_datetime: { lt: end },
+      end_datetime: { gt: start },
+    },
+    select: {
+      id: true,
+      start_datetime: true,
+      end_datetime: true,
+      reason: true,
+    },
+  });
+}
 async function lockFieldTx(tx, fieldId) {
   const rows = await tx.$queryRaw`
     SELECT id FROM fields
@@ -364,6 +379,21 @@ export const bookingsRepository = {
 
       if (!lockedField) {
         throw new ConflictError("Không tìm thấy sân để đặt lịch");
+      }
+
+      const blackout = await findBlackoutByFieldAndRangeTx(
+        tx,
+        data.field_id,
+        data.start_datetime,
+        data.end_datetime,
+      );
+
+      if (blackout) {
+        throw new ConflictError(
+          blackout.reason
+            ? `Sân đang đóng đột xuất: ${blackout.reason}`
+            : "Sân đang đóng đột xuất trong khung giờ này",
+        );
       }
 
       const conflicts = await findConflictingBookingsTx(
@@ -806,6 +836,21 @@ cancelMyBooking(userId, bookingId, data = {}) {
         throw new ConflictError("Không tìm thấy sân để đổi lịch");
       }
 
+      const blackout = await findBlackoutByFieldAndRangeTx(
+        tx,
+        data.field_id,
+        data.new_start_datetime,
+        data.new_end_datetime,
+      );
+
+      if (blackout) {
+        throw new ConflictError(
+          blackout.reason
+            ? `Khung giờ mới đang đóng đột xuất: ${blackout.reason}`
+            : "Khung giờ mới đang đóng đột xuất",
+        );
+      }
+
       const conflicts = await findConflictingBookingsExceptSelfTx(
         tx,
         data.field_id,
@@ -935,6 +980,21 @@ cancelMyBooking(userId, bookingId, data = {}) {
 
       if (!lockedField) {
         throw new ConflictError("Không tìm thấy sân để đổi lịch");
+      }
+
+      const blackout = await findBlackoutByFieldAndRangeTx(
+        tx,
+        request.bookings.field_id,
+        request.new_start_datetime,
+        request.new_end_datetime,
+      );
+
+      if (blackout) {
+        throw new ConflictError(
+          blackout.reason
+            ? `Khung giờ mới đang đóng đột xuất: ${blackout.reason}`
+            : "Khung giờ mới đang đóng đột xuất",
+        );
       }
 
       const conflicts = await findConflictingBookingsExceptSelfTx(

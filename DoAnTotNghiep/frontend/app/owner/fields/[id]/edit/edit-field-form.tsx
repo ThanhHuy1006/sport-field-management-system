@@ -51,6 +51,11 @@ import {
   type OwnerApprovalMode,
   type UpdateOwnerFieldPayload,
 } from "@/features/fields/services/owner-fields.service";
+import {
+  createOwnerFieldClosure,
+  previewOwnerFieldClosure,
+  type FieldClosureAction,
+} from "@/features/fields/services/owner-field-closures.service";
 
 type SelectedImage = {
   id?: number;
@@ -86,6 +91,15 @@ type OperatingHourItem = {
   short: string;
   is_closed: boolean;
   windows: OperatingWindow[];
+};
+
+type AffectedClosureBooking = {
+  id: number;
+  customer_name?: string | null;
+  start_datetime: string;
+  end_datetime: string;
+  status: string;
+  total_price?: number | string | null;
 };
 
 const MAX_IMAGES = 5;
@@ -406,6 +420,25 @@ export default function EditFieldForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isHiding, setIsHiding] = useState(false);
   const [imageActionId, setImageActionId] = useState<number | null>(null);
+
+  const [closureForm, setClosureForm] = useState<{
+    date: string;
+    start_time: string;
+    end_time: string;
+    reason: string;
+    action: FieldClosureAction;
+  }>({
+    date: "",
+    start_time: "",
+    end_time: "",
+    reason: "",
+    action: "NOTIFY_ONLY",
+  });
+  const [affectedBookings, setAffectedBookings] = useState<
+    AffectedClosureBooking[]
+  >([]);
+  const [isPreviewingClosure, setIsPreviewingClosure] = useState(false);
+  const [isCreatingClosure, setIsCreatingClosure] = useState(false);
 
   useEffect(() => {
     selectedImagesRef.current = selectedImages;
@@ -831,6 +864,115 @@ export default function EditFieldForm({
   })
 }
 
+  const validateClosureForm = (requireReason = false) => {
+    if (!closureForm.date || !closureForm.start_time || !closureForm.end_time) {
+      toast({
+        title: "Thiếu thông tin",
+        description: "Vui lòng chọn ngày, giờ bắt đầu và giờ kết thúc.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    if (closureForm.start_time >= closureForm.end_time) {
+      toast({
+        title: "Thời gian không hợp lệ",
+        description: "Giờ bắt đầu phải nhỏ hơn giờ kết thúc.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    if (requireReason && !closureForm.reason.trim()) {
+      toast({
+        title: "Thiếu lý do",
+        description: "Vui lòng nhập lý do đóng sân.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    return true;
+  };
+
+  const handlePreviewClosure = async () => {
+    if (!validateClosureForm(false)) return;
+
+    try {
+      setIsPreviewingClosure(true);
+
+      const res = await previewOwnerFieldClosure(fieldId, closureForm);
+      const data = res.data;
+      const bookings = data?.bookings || [];
+
+      setAffectedBookings(bookings);
+
+      toast({
+        title: "Đã kiểm tra đơn bị ảnh hưởng",
+        description: `Có ${data?.total_affected || bookings.length || 0} đơn đặt sân bị ảnh hưởng.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Không thể kiểm tra đơn bị ảnh hưởng",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Đã có lỗi xảy ra, vui lòng thử lại.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPreviewingClosure(false);
+    }
+  };
+
+  const handleCreateClosure = async () => {
+    if (!validateClosureForm(true)) return;
+
+    if (
+      affectedBookings.length > 0 &&
+      !window.confirm(
+        `Có ${affectedBookings.length} đơn đặt sân bị ảnh hưởng. Bạn có chắc muốn tiếp tục?`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setIsCreatingClosure(true);
+
+      await createOwnerFieldClosure(fieldId, {
+        ...closureForm,
+        reason: closureForm.reason.trim(),
+      });
+
+      toast({
+        title: "Đã tạo lịch đóng sân",
+        description: "Khung giờ này sẽ không còn cho khách đặt sân.",
+      });
+
+      setClosureForm({
+        date: "",
+        start_time: "",
+        end_time: "",
+        reason: "",
+        action: "NOTIFY_ONLY",
+      });
+      setAffectedBookings([]);
+      router.refresh();
+    } catch (error) {
+      toast({
+        title: "Không thể tạo lịch đóng sân",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Đã có lỗi xảy ra, vui lòng thử lại.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingClosure(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -1025,6 +1167,7 @@ export default function EditFieldForm({
               <TabsTrigger value="location">Vị trí</TabsTrigger>
               <TabsTrigger value="pricing">Giá & Lịch</TabsTrigger>
               <TabsTrigger value="images">Hình ảnh</TabsTrigger>
+              <TabsTrigger value="closures">Lịch đóng sân</TabsTrigger>
               <TabsTrigger value="settings">Cài đặt</TabsTrigger>
             </TabsList>
 
@@ -1642,6 +1785,177 @@ export default function EditFieldForm({
                       )}
                     </div>
                   )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="closures" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Lịch đóng sân</CardTitle>
+                  <CardDescription>
+                    Dùng khi sân cần đóng đột xuất theo ngày/giờ cụ thể như
+                    mưa lớn, mất điện, bảo trì khẩn cấp hoặc sự cố mặt sân.
+                  </CardDescription>
+                </CardHeader>
+
+                <CardContent className="space-y-4">
+                  <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm text-orange-800 dark:border-orange-900/60 dark:bg-orange-950/20 dark:text-orange-100">
+                    Trước khi xác nhận, hãy bấm “Xem đơn bị ảnh hưởng” để kiểm
+                    tra các booking nằm trong khoảng thời gian đóng sân.
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div>
+                      <Label htmlFor="closureDate">Ngày đóng sân</Label>
+                      <Input
+                        id="closureDate"
+                        type="date"
+                        value={closureForm.date}
+                        onChange={(e) => {
+                          setClosureForm((prev) => ({
+                            ...prev,
+                            date: e.target.value,
+                          }));
+                          setAffectedBookings([]);
+                        }}
+                        className="mt-1.5"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="closureStartTime">Từ giờ</Label>
+                      <Input
+                        id="closureStartTime"
+                        type="time"
+                        value={closureForm.start_time}
+                        onChange={(e) => {
+                          setClosureForm((prev) => ({
+                            ...prev,
+                            start_time: e.target.value,
+                          }));
+                          setAffectedBookings([]);
+                        }}
+                        className="mt-1.5"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="closureEndTime">Đến giờ</Label>
+                      <Input
+                        id="closureEndTime"
+                        type="time"
+                        value={closureForm.end_time}
+                        onChange={(e) => {
+                          setClosureForm((prev) => ({
+                            ...prev,
+                            end_time: e.target.value,
+                          }));
+                          setAffectedBookings([]);
+                        }}
+                        className="mt-1.5"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="closureReason">Lý do đóng sân</Label>
+                    <Textarea
+                      id="closureReason"
+                      value={closureForm.reason}
+                      onChange={(e) =>
+                        setClosureForm((prev) => ({
+                          ...prev,
+                          reason: e.target.value,
+                        }))
+                      }
+                      placeholder="Ví dụ: Mưa lớn, sân ngập nước, mất điện, bảo trì khẩn cấp..."
+                      rows={3}
+                      className="mt-1.5 resize-none"
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Cách xử lý đơn bị ảnh hưởng</Label>
+                    <Select
+                      value={closureForm.action}
+                      onValueChange={(value) =>
+                        setClosureForm((prev) => ({
+                          ...prev,
+                          action: value as FieldClosureAction,
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="mt-1.5">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="NOTIFY_ONLY">
+                          Chỉ thông báo / chờ xử lý
+                        </SelectItem>
+                        <SelectItem value="CANCEL_BOOKINGS">
+                          Hủy các đơn bị ảnh hưởng
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      Nếu chọn hủy, các booking bị ảnh hưởng sẽ được chuyển sang
+                      trạng thái đã hủy và khách hàng nhận thông báo.
+                    </p>
+                  </div>
+
+                  {affectedBookings.length > 0 && (
+                    <div className="rounded-lg border p-4">
+                      <p className="font-medium">
+                        Có {affectedBookings.length} đơn đặt sân bị ảnh hưởng
+                      </p>
+
+                      <div className="mt-3 space-y-2">
+                        {affectedBookings.map((booking) => (
+                          <div
+                            key={booking.id}
+                            className="flex flex-col gap-2 rounded-md bg-muted/50 px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
+                          >
+                            <div>
+                              <p className="font-medium">
+                                Booking #{booking.id} - {booking.customer_name || "Khách hàng"}
+                              </p>
+                              <p className="text-muted-foreground">
+                                {String(booking.start_datetime)} - {String(booking.end_datetime)}
+                              </p>
+                              <p className="text-muted-foreground">
+                                Tổng tiền: {Number(booking.total_price || 0).toLocaleString("vi-VN")}đ
+                              </p>
+                            </div>
+
+                            <Badge variant="outline">{booking.status}</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handlePreviewClosure}
+                      disabled={isPreviewingClosure || isCreatingClosure}
+                    >
+                      {isPreviewingClosure
+                        ? "Đang kiểm tra..."
+                        : "Xem đơn bị ảnh hưởng"}
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      onClick={handleCreateClosure}
+                      disabled={isCreatingClosure || isPreviewingClosure}
+                    >
+                      {isCreatingClosure ? "Đang đóng sân..." : "Xác nhận đóng sân"}
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
