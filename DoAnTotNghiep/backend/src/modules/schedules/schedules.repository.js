@@ -9,6 +9,13 @@ const ACTIVE_BOOKING_STATUSES = [
   "CHECKED_IN",
 ];
 
+const CANCELLABLE_BOOKING_STATUSES = [
+  "PENDING_CONFIRM",
+  "APPROVED",
+  "AWAITING_PAYMENT",
+  "PAID",
+];
+
 function buildOperatingHourRows(fieldId, payload) {
   if (!payload || payload.is_closed) {
     return [];
@@ -41,6 +48,7 @@ export const schedulesRepository = {
       select: {
         id: true,
         owner_id: true,
+        field_name: true,
         status: true,
         min_duration_minutes: true,
         slot_step_minutes: true,
@@ -153,18 +161,47 @@ export const schedulesRepository = {
     return prisma.blackout_dates.findFirst({
       where: {
         field_id: Number(fieldId),
-        start_datetime: { lte: endOfDay },
-        end_datetime: { gte: startOfDay },
+        start_datetime: { lt: endOfDay },
+        end_datetime: { gt: startOfDay },
       },
+      orderBy: { start_datetime: "asc" },
+    });
+  },
+
+  findBlackoutsByFieldAndRange(fieldId, rangeStart, rangeEnd) {
+    return prisma.blackout_dates.findMany({
+      where: {
+        field_id: Number(fieldId),
+        start_datetime: { lt: rangeEnd },
+        end_datetime: { gt: rangeStart },
+      },
+      orderBy: { start_datetime: "asc" },
+    });
+  },
+
+  findBlackoutsByField(fieldId) {
+    return prisma.blackout_dates.findMany({
+      where: {
+        field_id: Number(fieldId),
+      },
+      orderBy: { start_datetime: "desc" },
     });
   },
 
   createBlackoutDate(fieldId, payload) {
+    const startDateTime = payload.start_datetime
+      ? payload.start_datetime
+      : new Date(`${payload.date}T00:00:00`);
+
+    const endDateTime = payload.end_datetime
+      ? payload.end_datetime
+      : new Date(`${payload.date}T23:59:59`);
+
     return prisma.blackout_dates.create({
       data: {
         field_id: Number(fieldId),
-        start_datetime: new Date(`${payload.date}T00:00:00`),
-        end_datetime: new Date(`${payload.date}T23:59:59`),
+        start_datetime: startDateTime,
+        end_datetime: endDateTime,
         reason: payload.reason,
       },
     });
@@ -199,6 +236,159 @@ export const schedulesRepository = {
         end_datetime: true,
         status: true,
       },
+    });
+  },
+
+  findAffectedBookingsByRange(fieldId, rangeStart, rangeEnd) {
+    return prisma.bookings.findMany({
+      where: {
+        field_id: Number(fieldId),
+        start_datetime: { lt: rangeEnd },
+        end_datetime: { gt: rangeStart },
+        status: {
+          in: ACTIVE_BOOKING_STATUSES,
+        },
+      },
+      orderBy: { start_datetime: "asc" },
+      include: {
+        users: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+          },
+        },
+        payments: {
+          include: {
+            refunds: true,
+          },
+        },
+      },
+    });
+  },
+
+  createBlackoutWithBookingEffects({
+    fieldId,
+    startDateTime,
+    endDateTime,
+    reason,
+    action,
+    changedBy,
+  }) {
+    return prisma.$transaction(async (tx) => {
+      const blackout = await tx.blackout_dates.create({
+        data: {
+          field_id: Number(fieldId),
+          start_datetime: startDateTime,
+          end_datetime: endDateTime,
+          reason,
+        },
+      });
+
+      const affectedBookings = await tx.bookings.findMany({
+        where: {
+          field_id: Number(fieldId),
+          start_datetime: { lt: endDateTime },
+          end_datetime: { gt: startDateTime },
+          status: {
+            in: ACTIVE_BOOKING_STATUSES,
+          },
+        },
+        orderBy: { start_datetime: "asc" },
+        include: {
+          users: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+            },
+          },
+          payments: {
+            include: {
+              refunds: true,
+            },
+          },
+        },
+      });
+
+      let cancelledCount = 0;
+      let refundRequestedCount = 0;
+
+      for (const booking of affectedBookings) {
+        const shouldCancel =
+          action === "CANCEL_BOOKINGS" &&
+          CANCELLABLE_BOOKING_STATUSES.includes(booking.status);
+
+        if (shouldCancel) {
+          await tx.bookings.update({
+            where: { id: booking.id },
+            data: {
+              status: "CANCELLED",
+              updated_at: new Date(),
+            },
+          });
+
+          await tx.booking_status_history.create({
+            data: {
+              booking_id: booking.id,
+              from_status: booking.status,
+              to_status: "CANCELLED",
+              changed_by: changedBy ? Number(changedBy) : null,
+              reason: reason
+                ? `Sân đóng đột xuất: ${reason}`
+                : "Sân đóng đột xuất",
+            },
+          });
+
+          cancelledCount += 1;
+
+          if (
+            booking.status === "PAID" &&
+            booking.payments?.id &&
+            booking.payments.status === "success"
+          ) {
+            const hasExistingRequestedRefund = booking.payments.refunds?.some(
+              (refund) => refund.status === "requested",
+            );
+
+            if (!hasExistingRequestedRefund) {
+              await tx.refunds.create({
+                data: {
+                  payment_id: booking.payments.id,
+                  amount: booking.payments.amount ?? booking.total_price ?? 0,
+                  reason: reason
+                    ? `Sân đóng đột xuất: ${reason}`
+                    : "Sân đóng đột xuất",
+                  status: "requested",
+                },
+              });
+
+              refundRequestedCount += 1;
+            }
+          }
+        }
+
+        await tx.notifications.create({
+          data: {
+            user_id: booking.user_id,
+            title: "Lịch đặt sân bị ảnh hưởng",
+            body:
+              action === "CANCEL_BOOKINGS"
+                ? `Đơn đặt sân #${booking.id} đã bị hủy do sân đóng đột xuất${reason ? `: ${reason}` : ""}.`
+                : `Đơn đặt sân #${booking.id} bị ảnh hưởng do sân đóng đột xuất${reason ? `: ${reason}` : ""}. Chủ sân sẽ liên hệ hoặc xử lý tiếp.`,
+            type: "BOOKING",
+          },
+        });
+      }
+
+      return {
+        blackout,
+        affectedBookings,
+        cancelledCount,
+        refundRequestedCount,
+      };
     });
   },
 };

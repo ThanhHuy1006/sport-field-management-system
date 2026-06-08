@@ -1,6 +1,7 @@
 import { ValidationError } from "../../core/errors/index.js";
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+const ALLOWED_BLACKOUT_ACTIONS = ["NOTIFY_ONLY", "CANCEL_BOOKINGS"];
 
 function isValidDateString(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
@@ -13,6 +14,26 @@ function isValidTimeString(value) {
 function parseLocalDate(dateStr) {
   const [year, month, day] = String(dateStr).split("-").map(Number);
   return new Date(year, month - 1, day);
+}
+
+function validateDate(value, fieldName = "date") {
+  const date = String(value || "").trim();
+
+  if (!date) {
+    throw new ValidationError(`${fieldName} là bắt buộc`);
+  }
+
+  if (!isValidDateString(date)) {
+    throw new ValidationError(`${fieldName} không hợp lệ`);
+  }
+
+  const parsed = parseLocalDate(date);
+
+  if (Number.isNaN(parsed.getTime())) {
+    throw new ValidationError(`${fieldName} không hợp lệ`);
+  }
+
+  return date;
 }
 
 function validateTime(value, fieldName) {
@@ -90,6 +111,35 @@ function normalizeWindows(payload) {
   return sortedWindows;
 }
 
+function normalizeBlackoutTimeRange(payload, { requireTime = false } = {}) {
+  const date = validateDate(payload.date);
+
+  const hasStartTime = payload.start_time !== undefined && payload.start_time !== null;
+  const hasEndTime = payload.end_time !== undefined && payload.end_time !== null;
+
+  if (requireTime && (!hasStartTime || !hasEndTime)) {
+    throw new ValidationError("start_time và end_time là bắt buộc");
+  }
+
+  const start_time = hasStartTime
+    ? validateTime(payload.start_time, "start_time")
+    : "00:00";
+
+  const end_time = hasEndTime
+    ? validateTime(payload.end_time, "end_time")
+    : "23:59";
+
+  if (start_time >= end_time) {
+    throw new ValidationError("Giờ bắt đầu phải trước giờ kết thúc");
+  }
+
+  return {
+    date,
+    start_time,
+    end_time,
+  };
+}
+
 export function validateFieldIdParams(params) {
   const fieldId = Number(params.fieldId);
 
@@ -111,21 +161,7 @@ export function validateBlackoutDateIdParams(params) {
 }
 
 export function validateAvailabilityQuery(query) {
-  const date = String(query.date || "").trim();
-
-  if (!date) {
-    throw new ValidationError("date là bắt buộc, định dạng YYYY-MM-DD");
-  }
-
-  if (!isValidDateString(date)) {
-    throw new ValidationError("date không hợp lệ");
-  }
-
-  const parsed = parseLocalDate(date);
-
-  if (Number.isNaN(parsed.getTime())) {
-    throw new ValidationError("date không hợp lệ");
-  }
+  const date = validateDate(query.date, "date");
 
   const duration_minutes =
     query.duration_minutes !== undefined && query.duration_minutes !== null
@@ -179,25 +215,31 @@ export function validateOperatingHoursPayload(payload) {
 }
 
 export function validateBlackoutDatePayload(payload) {
-  const date = String(payload.date || "").trim();
+  const { date, start_time, end_time } = normalizeBlackoutTimeRange(payload, {
+    requireTime: false,
+  });
+
   const reason = payload.reason ? String(payload.reason).trim() : null;
 
-  if (!date) {
-    throw new ValidationError("date là bắt buộc");
-  }
+  const rawAction = payload.action === undefined || payload.action === null
+    ? "NOTIFY_ONLY"
+    : String(payload.action).trim().toUpperCase();
 
-  if (!isValidDateString(date)) {
-    throw new ValidationError("date không hợp lệ");
-  }
-
-  const parsed = parseLocalDate(date);
-
-  if (Number.isNaN(parsed.getTime())) {
-    throw new ValidationError("date không hợp lệ");
+  if (!ALLOWED_BLACKOUT_ACTIONS.includes(rawAction)) {
+    throw new ValidationError("action không hợp lệ");
   }
 
   return {
     date,
+    start_time,
+    end_time,
     reason,
+    action: rawAction,
   };
+}
+
+export function validateBlackoutPreviewPayload(payload) {
+  return normalizeBlackoutTimeRange(payload, {
+    requireTime: true,
+  });
 }

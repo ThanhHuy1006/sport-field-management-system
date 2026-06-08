@@ -66,6 +66,46 @@ export const schedulesController = {
     }
   },
 
+  async getOwnerBlackoutDates(req, res, next) {
+    try {
+      const { fieldId } = req.validated?.params ?? req.params;
+
+      const items = await schedulesService.getOwnerBlackoutDates(
+        fieldId,
+        req.user,
+      );
+
+      return successResponse(
+        res,
+        items,
+        "Lấy lịch đóng sân thành công",
+      );
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async previewBlackoutDate(req, res, next) {
+    try {
+      const { fieldId } = req.validated?.params ?? req.params;
+      const payload = req.validated?.body ?? req.body;
+
+      const data = await schedulesService.previewBlackoutDate(
+        fieldId,
+        payload,
+        req.user,
+      );
+
+      return successResponse(
+        res,
+        data,
+        "Lấy danh sách booking bị ảnh hưởng thành công",
+      );
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async createBlackoutDate(req, res, next) {
     try {
       const { fieldId } = req.validated?.params ?? req.params;
@@ -77,7 +117,7 @@ export const schedulesController = {
         req.user
       );
 
-      return createdResponse(res, item, "Tạo ngày khóa thành công");
+      return createdResponse(res, item, "Tạo lịch đóng sân thành công");
     } catch (error) {
       next(error);
     }
@@ -89,7 +129,7 @@ export const schedulesController = {
 
       await schedulesService.deleteBlackoutDate(blackoutDateId, req.user);
 
-      return successResponse(res, null, "Xóa ngày khóa thành công");
+      return successResponse(res, null, "Xóa lịch đóng sân thành công");
     } catch (error) {
       next(error);
     }

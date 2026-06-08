@@ -95,12 +95,17 @@ async function ensureManageableField(fieldId, user) {
   return field;
 }
 
+function isFullDayBlackout(blackout, dayStart, dayEnd) {
+  return blackout.start_datetime <= dayStart && blackout.end_datetime >= dayEnd;
+}
+
 function buildSlotsFromOperatingWindow({
   date,
   operatingWindow,
   slotDuration,
   stepMinutes,
   bookings,
+  blackouts = [],
   now = new Date(),
 }) {
   const slots = [];
@@ -117,6 +122,10 @@ function buildSlotsFromOperatingWindow({
     const slotEnd = addMinutes(slotStart, slotDuration);
 
     if (slotEnd > closeTime) break;
+
+    const blackout = blackouts.find((item) =>
+      overlaps(slotStart, slotEnd, item.start_datetime, item.end_datetime),
+    );
 
     const conflict = bookings.find((booking) =>
       overlaps(
@@ -135,6 +144,11 @@ function buildSlotsFromOperatingWindow({
     if (isPast) {
       status = "past";
       reason = "Đã qua";
+    } else if (blackout) {
+      status = "blackout";
+      reason = blackout.reason
+        ? `Sân đóng đột xuất: ${blackout.reason}`
+        : "Sân đóng đột xuất";
     } else if (conflict) {
       status = "booked";
       reason = "Đã có người đặt";
@@ -150,12 +164,31 @@ function buildSlotsFromOperatingWindow({
       is_past: isPast,
       reason,
       booking_id: conflict?.id || null,
+      blackout_id: blackout?.id || null,
     });
 
     cursor = addMinutes(cursor, stepMinutes);
   }
 
   return slots;
+}
+
+function mapAffectedBooking(booking) {
+  return {
+    id: booking.id,
+    customer_name:
+      booking.contact_name || booking.users?.name || "Khách hàng",
+    customer_email: booking.contact_email || booking.users?.email || null,
+    customer_phone: booking.contact_phone || booking.users?.phone || null,
+    start_datetime: booking.start_datetime,
+    end_datetime: booking.end_datetime,
+    status: booking.status,
+    total_price: booking.total_price ? Number(booking.total_price) : 0,
+    payment_status: booking.payments?.status || null,
+    payment_amount: booking.payments?.amount
+      ? Number(booking.payments.amount)
+      : null,
+  };
 }
 
 export const schedulesService = {
@@ -176,18 +209,22 @@ export const schedulesService = {
     const dayStart = startOfDay(date);
     const dayEnd = endOfDay(date);
 
-    const blackout = await schedulesRepository.findBlackoutByFieldAndDate(
+    const blackouts = await schedulesRepository.findBlackoutsByFieldAndRange(
       id,
       dayStart,
       dayEnd,
     );
 
-    if (blackout) {
+    const fullDayBlackout = blackouts.find((blackout) =>
+      isFullDayBlackout(blackout, dayStart, dayEnd),
+    );
+
+    if (fullDayBlackout) {
       return {
         fieldId: id,
         date,
         isBlackout: true,
-        blackoutReason: blackout.reason,
+        blackoutReason: fullDayBlackout.reason,
         slots: [],
       };
     }
@@ -250,6 +287,7 @@ export const schedulesService = {
         slotDuration,
         stepMinutes,
         bookings,
+        blackouts,
         now,
       }),
     );
@@ -294,22 +332,77 @@ export const schedulesService = {
     return mapOperatingRowsToDaySchedule(id, payload.day_of_week, rows);
   },
 
+  async getOwnerBlackoutDates(fieldId, user) {
+    const id = Number(fieldId);
+
+    await ensureManageableField(id, user);
+
+    return schedulesRepository.findBlackoutsByField(id);
+  },
+
+  async previewBlackoutDate(fieldId, payload, user) {
+    const id = Number(fieldId);
+
+    await ensureManageableField(id, user);
+
+    const startDateTime = combineDateAndTime(payload.date, payload.start_time);
+    const endDateTime = combineDateAndTime(payload.date, payload.end_time);
+
+    const affectedBookings =
+      await schedulesRepository.findAffectedBookingsByRange(
+        id,
+        startDateTime,
+        endDateTime,
+      );
+
+    const totalPaidAmount = affectedBookings
+      .filter((booking) => booking.status === "PAID")
+      .reduce((sum, booking) => sum + Number(booking.total_price || 0), 0);
+
+    return {
+      field_id: id,
+      start_datetime: startDateTime,
+      end_datetime: endDateTime,
+      total_affected: affectedBookings.length,
+      total_paid_amount: totalPaidAmount,
+      bookings: affectedBookings.map(mapAffectedBooking),
+    };
+  },
+
   async createBlackoutDate(fieldId, payload, user) {
     const id = Number(fieldId);
 
     await ensureManageableField(id, user);
 
-    const existed = await schedulesRepository.findBlackoutByFieldAndDate(
+    const startDateTime = combineDateAndTime(payload.date, payload.start_time);
+    const endDateTime = combineDateAndTime(payload.date, payload.end_time);
+
+    const existed = await schedulesRepository.findBlackoutsByFieldAndRange(
       id,
-      startOfDay(payload.date),
-      endOfDay(payload.date),
+      startDateTime,
+      endDateTime,
     );
 
-    if (existed) {
-      throw new ConflictError("Ngày này đã bị khóa trước đó");
+    if (existed.length > 0) {
+      throw new ConflictError("Khoảng thời gian này đã bị khóa trước đó");
     }
 
-    return schedulesRepository.createBlackoutDate(id, payload);
+    const result = await schedulesRepository.createBlackoutWithBookingEffects({
+      fieldId: id,
+      startDateTime,
+      endDateTime,
+      reason: payload.reason,
+      action: payload.action,
+      changedBy: user.id,
+    });
+
+    return {
+      ...result.blackout,
+      affected_bookings_count: result.affectedBookings.length,
+      cancelled_count: result.cancelledCount,
+      refund_requested_count: result.refundRequestedCount,
+      affected_bookings: result.affectedBookings.map(mapAffectedBooking),
+    };
   },
 
   async deleteBlackoutDate(blackoutDateId, user) {
