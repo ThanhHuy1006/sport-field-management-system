@@ -43,6 +43,7 @@ type FieldUi = {
   location: string;
   image: string | null;
   pricePerHour: number;
+  currency: string;
   openTime: string | null;
   closeTime: string | null;
   operatingHours: OperatingHourUi[];
@@ -55,6 +56,14 @@ type SlotUi = {
   end_time: string;
   available: boolean;
   reason: string | null;
+  booking_status?: string | null;
+
+  // Giá trả về từ API availability-slots
+  pricing_rule_id?: number | null;
+  pricing_day_type?: "WEEKDAY" | "WEEKEND" | "HOLIDAY" | "CUSTOM" | string | null;
+  price_per_hour?: number | string | null;
+  total_price?: number | string | null;
+  currency?: string | null;
 };
 
 type CreatedBookingUi = {
@@ -136,6 +145,7 @@ function mapFieldDetailToUi(data: FieldDetailResponse["data"]): FieldUi {
     location: data.address ?? "Chưa cập nhật địa chỉ",
     image: getImageUrl(data.images?.[0]?.url ?? null),
     pricePerHour: Number(data.base_price_per_hour ?? 0),
+    currency: data.currency ?? "VND",
     openTime: source.openTime ?? source.open_time ?? null,
     closeTime: source.closeTime ?? source.close_time ?? null,
     operatingHours,
@@ -264,6 +274,21 @@ function formatPaymentMethodLabel(
   return method === "BANK_TRANSFER"
     ? "Chuyển khoản ngân hàng"
     : "Thanh toán tại sân";
+}
+
+function formatPricingDayType(value?: string | null) {
+  switch (value) {
+    case "WEEKDAY":
+      return "Ngày thường";
+    case "WEEKEND":
+      return "Cuối tuần";
+    case "HOLIDAY":
+      return "Ngày lễ";
+    case "CUSTOM":
+      return "Giá tùy chỉnh";
+    default:
+      return null;
+  }
 }
 
 export default function BookingPage() {
@@ -439,7 +464,7 @@ export default function BookingPage() {
 
         if (cancelled) return;
 
-        setSlots(result.data.slots ?? []);
+        setSlots((result.data.slots ?? []) as SlotUi[]);
         ///debug
         console.log("AVAILABILITY RESPONSE:", result.data);
         console.log("SLOTS:", result.data.slots);
@@ -474,10 +499,46 @@ export default function BookingPage() {
       ) ?? null
     );
   }, [field, bookingData.date]);
+  const previewPricingSlot = useMemo(() => {
+    if (bookingData.selectedSlot) {
+      return bookingData.selectedSlot;
+    }
+
+    const firstAvailableSlot = slots.find((slot) => slot.available);
+
+    return firstAvailableSlot ?? null;
+  }, [bookingData.selectedSlot, slots]);
+
+  const selectedSlotPricePerHour = useMemo(() => {
+    if (!field) return 0;
+
+    const slotPrice = previewPricingSlot?.price_per_hour;
+
+    if (slotPrice !== undefined && slotPrice !== null) {
+      return Number(slotPrice);
+    }
+
+    return field.pricePerHour;
+  }, [field, previewPricingSlot]);
+
+  const selectedSlotCurrency =
+    previewPricingSlot?.currency || field?.currency || "VND";
+
+  const selectedPricingDayLabel = formatPricingDayType(
+    previewPricingSlot?.pricing_day_type,
+  );
+
   const subtotal = useMemo(() => {
     if (!field) return 0;
-    return field.pricePerHour * bookingData.durationHours;
-  }, [field, bookingData.durationHours]);
+
+    const slotTotal = previewPricingSlot?.total_price;
+
+    if (slotTotal !== undefined && slotTotal !== null) {
+      return Number(slotTotal);
+    }
+
+    return selectedSlotPricePerHour * bookingData.durationHours;
+  }, [field, previewPricingSlot, selectedSlotPricePerHour, bookingData.durationHours]);
 
   const voucherDiscount = appliedVoucher?.discount_amount ?? 0;
   const serviceFee = 0;
@@ -822,12 +883,15 @@ export default function BookingPage() {
                             data-cy={slot.available ? "booking-slot-available" : "booking-slot-unavailable"}
                             key={slot.start_datetime}
                             disabled={!slot.available}
-                            onClick={() =>
+                            onClick={() => {
                               setBookingData((prev) => ({
                                 ...prev,
                                 selectedSlot: slot,
-                              }))
-                            }
+                              }));
+                              setAppliedVoucher(null);
+                              setVoucherMessage("");
+                              setVoucherError("");
+                            }}
                             className={`rounded-lg border px-3 py-3 text-sm transition ${
                               isSelected
                                 ? "border-primary bg-primary/10 text-primary"
@@ -839,6 +903,12 @@ export default function BookingPage() {
                           >
                             <div className="font-medium">{slot.start_time}</div>
                             <div className="text-xs mt-1">{slot.end_time}</div>
+                            {slot.price_per_hour !== undefined &&
+                              slot.price_per_hour !== null && (
+                                <div className="text-[11px] mt-1 font-medium">
+                                  {formatCurrency(Number(slot.price_per_hour))} VND/giờ
+                                </div>
+                              )}
                             {!slot.available && (
                               <div className="text-[10px] mt-1">
                                 {slot.reason ?? "Không khả dụng"}
@@ -1377,21 +1447,30 @@ export default function BookingPage() {
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Giá / giờ</span>
                     <span className="font-medium">
-                      {formatCurrency(field.pricePerHour)} VND
+                      {formatCurrency(selectedSlotPricePerHour)} {selectedSlotCurrency}
                     </span>
                   </div>
+
+                  {selectedPricingDayLabel && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Loại giá</span>
+                      <span className="font-medium">
+                        {selectedPricingDayLabel}
+                      </span>
+                    </div>
+                  )}
 
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Tạm tính</span>
                     <span className="font-medium">
-                      {formatCurrency(subtotal)} VND
+                      {formatCurrency(subtotal)} {selectedSlotCurrency}
                     </span>
                   </div>
 
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Phí dịch vụ</span>
                     <span className="font-medium">
-                      {formatCurrency(serviceFee)} VND
+                      {formatCurrency(serviceFee)} {selectedSlotCurrency}
                     </span>
                   </div>
 
@@ -1399,7 +1478,7 @@ export default function BookingPage() {
                     <div className="flex justify-between text-green-600">
                       <span>Giảm giá ({appliedVoucher.voucher.code})</span>
                       <span className="font-medium">
-                        -{formatCurrency(voucherDiscount)} VND
+                        -{formatCurrency(voucherDiscount)} {selectedSlotCurrency}
                       </span>
                     </div>
                   )}
@@ -1407,7 +1486,7 @@ export default function BookingPage() {
                   <div className="flex justify-between border-t border-border pt-3 text-base">
                     <span className="font-semibold">Tổng cộng</span>
                     <span className="font-bold text-primary">
-                      {formatCurrency(finalAmount)} VND
+                      {formatCurrency(finalAmount)} {selectedSlotCurrency}
                     </span>
                   </div>
                 </div>

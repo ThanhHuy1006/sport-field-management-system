@@ -214,5 +214,11 @@ export function toAvailabilitySlot(item) {
     available: item.available,
     reason: item.reason ?? null,
     booking_status: item.booking_status ?? null,
+
+    pricing_rule_id: item.pricing_rule_id ?? null,
+    pricing_day_type: item.pricing_day_type ?? null,
+    price_per_hour: item.price_per_hour ?? null,
+    total_price: item.total_price ?? null,
+    currency: item.currency ?? "VND",
   };
 }

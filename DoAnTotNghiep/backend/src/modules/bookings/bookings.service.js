@@ -57,6 +57,45 @@ function pad2(n) {
   return String(n).padStart(2, "0");
 }
 
+function getPricingDayType(date) {
+  const jsDay = date.getDay();
+
+  // JavaScript: Sunday = 0, Saturday = 6
+  if (jsDay === 0 || jsDay === 6) {
+    return "WEEKEND";
+  }
+
+  return "WEEKDAY";
+}
+
+function formatLocalTime(date) {
+  return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+}
+
+function findMatchedPricingRule(rules, start, end) {
+  const startTime = formatLocalTime(start);
+  const endTime = formatLocalTime(end);
+
+  return rules.find(
+    (rule) => rule.start_time <= startTime && rule.end_time >= endTime,
+  );
+}
+
+function buildPriceInfo(field, start, end, pricingRule, dayType) {
+  const duration = diffMinutes(start, end);
+  const pricePerHour = Number(
+    pricingRule?.price ?? field.base_price_per_hour ?? 0,
+  );
+
+  return {
+    pricing_rule_id: pricingRule?.id ?? null,
+    pricing_day_type: dayType,
+    price_per_hour: pricePerHour,
+    total_price: (duration / 60) * pricePerHour,
+    currency: pricingRule?.currency || field.currency || "VND",
+  };
+}
+
 function formatLocalDate(date) {
   return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(
     date.getDate(),
@@ -363,13 +402,19 @@ export const bookingsService = {
       };
     }
 
-    const [blackouts, bookings] = await Promise.all([
+    const pricingDayType = getPricingDayType(dayStart);
+
+    const [blackouts, bookings, pricingRules] = await Promise.all([
       bookingsRepository.findBlackoutsByFieldAndDate(
         field.id,
         dayStart,
         dayEnd,
       ),
       bookingsRepository.findBookingsByFieldAndDate(field.id, dayStart, dayEnd),
+      bookingsRepository.findActivePricingRulesByFieldAndDay(
+        field.id,
+        pricingDayType,
+      ),
     ]);
 
     const slots = [];
@@ -424,6 +469,20 @@ export const bookingsService = {
           booking_status = conflict.status;
         }
 
+        const pricingRule = findMatchedPricingRule(
+          pricingRules,
+          slotStart,
+          slotEnd,
+        );
+
+        const priceInfo = buildPriceInfo(
+          field,
+          slotStart,
+          slotEnd,
+          pricingRule,
+          pricingDayType,
+        );
+
         slots.push({
           start_datetime: slotStart.toISOString(),
           end_datetime: slotEnd.toISOString(),
@@ -434,6 +493,12 @@ export const bookingsService = {
           available,
           reason,
           booking_status,
+
+          pricing_rule_id: priceInfo.pricing_rule_id,
+          pricing_day_type: priceInfo.pricing_day_type,
+          price_per_hour: priceInfo.price_per_hour,
+          total_price: priceInfo.total_price,
+          currency: priceInfo.currency,
         });
       }
     }
@@ -485,12 +550,32 @@ export const bookingsService = {
       };
     }
 
-    const duration = diffMinutes(payload.start_datetime, payload.end_datetime);
-    const total_price = (duration / 60) * Number(field.base_price_per_hour);
+    const pricingDayType = getPricingDayType(payload.start_datetime);
+    const startTime = formatLocalTime(payload.start_datetime);
+    const endTime = formatLocalTime(payload.end_datetime);
+
+    const pricingRule = await bookingsRepository.findActivePricingRuleForSlot(
+      field.id,
+      pricingDayType,
+      startTime,
+      endTime,
+    );
+
+    const priceInfo = buildPriceInfo(
+      field,
+      payload.start_datetime,
+      payload.end_datetime,
+      pricingRule,
+      pricingDayType,
+    );
 
     return {
       available: true,
-      total_price,
+      total_price: priceInfo.total_price,
+      price_per_hour: priceInfo.price_per_hour,
+      pricing_day_type: priceInfo.pricing_day_type,
+      pricing_rule_id: priceInfo.pricing_rule_id,
+      currency: priceInfo.currency,
       field,
     };
   },

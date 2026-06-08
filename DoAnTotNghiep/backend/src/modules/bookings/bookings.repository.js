@@ -366,6 +366,40 @@ export const bookingsRepository = {
     });
   },
 
+  findActivePricingRulesByFieldAndDay(fieldId, dayType) {
+    return prisma.field_pricing_rules.findMany({
+      where: {
+        field_id: fieldId,
+        day_type: dayType,
+        active: true,
+      },
+      orderBy: [
+        { priority: "desc" },
+        { id: "desc" },
+      ],
+    });
+  },
+
+  findActivePricingRuleForSlot(fieldId, dayType, startTime, endTime) {
+    return prisma.field_pricing_rules.findFirst({
+      where: {
+        field_id: fieldId,
+        day_type: dayType,
+        active: true,
+        start_time: {
+          lte: startTime,
+        },
+        end_time: {
+          gte: endTime,
+        },
+      },
+      orderBy: [
+        { priority: "desc" },
+        { id: "desc" },
+      ],
+    });
+  },
+
   createBookingWithHistory(data) {
     return prisma.$transaction(async (tx) => {
       /*
