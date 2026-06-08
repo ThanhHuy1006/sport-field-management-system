@@ -13,6 +13,7 @@ import {
   validateBookingListQuery,
   validateAvailabilitySlotsQuery,
   validateCreateRescheduleRequestPayload,
+  validateCancelBookingPayload,
 } from "./bookings.validator.js";
 import { requireRole } from "../../core/middlewares/role.middleware.js";
 import { APP_ROLES } from "../../config/constant.js";
@@ -53,10 +54,12 @@ router.get(
   bookingsController.getMyBookingDetail
 );
 
+
 router.patch(
   "/my/:bookingId/cancel",
   requireAuth,
   validateParams(validateBookingIdParams),
+  validateBody(validateCancelBookingPayload),
   bookingsController.cancelMyBooking
 );
 
@@ -66,13 +69,7 @@ router.get(
   validateParams(validateBookingIdParams),
   bookingsController.getMyBookingCheckInQr
 );
-router.post(
-  "/",
-  requireAuth,
-  requireRole(APP_ROLES.USER),
-  validateBody(validateCreateBookingPayload),
-  bookingsController.createBooking
-);
+
 router.post(
   "/my/:bookingId/reschedule-requests",
   requireAuth,

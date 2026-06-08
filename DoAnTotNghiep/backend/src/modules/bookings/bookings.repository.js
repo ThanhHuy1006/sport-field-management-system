@@ -134,7 +134,45 @@ async function hydrateOwnerBooking(tx, bookingId) {
     include: ownerBookingDetailInclude(),
   });
 }
+async function findSuccessPaymentByBookingIdTx(tx, bookingId) {
+  return tx.payments.findFirst({
+    where: {
+      booking_id: bookingId,
+      status: "success",
+    },
+    orderBy: {
+      paid_at: "desc",
+    },
+  });
+}
 
+async function createRefundRequestIfNeededTx(tx, payment, reason) {
+  if (!payment) {
+    return null;
+  }
+
+  const existedRefund = await tx.refunds.findFirst({
+    where: {
+      payment_id: payment.id,
+      status: {
+        in: ["requested", "processed"],
+      },
+    },
+  });
+
+  if (existedRefund) {
+    return existedRefund;
+  }
+
+  return tx.refunds.create({
+    data: {
+      payment_id: payment.id,
+      amount: payment.amount,
+      reason: reason || "Booking cancelled",
+      status: "requested",
+    },
+  });
+}
 async function findConflictingBookingsTx(tx, fieldId, start, end) {
   return tx.bookings.findMany({
     where: {
@@ -424,38 +462,47 @@ export const bookingsRepository = {
       include: memberBookingDetailInclude(),
     });
   },
-
-  cancelMyBooking(userId, bookingId) {
-    return prisma.$transaction(async (tx) => {
-      const booking = await tx.bookings.findFirst({
-        where: {
-          id: bookingId,
-          user_id: userId,
-        },
-      });
-
-      if (!booking) return null;
-
-      await tx.bookings.update({
-        where: { id: bookingId },
-        data: {
-          status: "CANCELLED",
-        },
-      });
-
-      await tx.booking_status_history.create({
-        data: {
-          booking_id: bookingId,
-          from_status: booking.status,
-          to_status: "CANCELLED",
-          reason: "Cancelled by member",
-        },
-      });
-
-      return hydrateMemberBooking(tx, bookingId);
+cancelMyBooking(userId, bookingId, data = {}) {
+  return prisma.$transaction(async (tx) => {
+    const booking = await tx.bookings.findFirst({
+      where: {
+        id: bookingId,
+        user_id: userId,
+      },
     });
-  },
 
+    if (!booking) return null;
+
+    await tx.bookings.update({
+      where: { id: bookingId },
+      data: {
+        status: "CANCELLED",
+        updated_at: new Date(),
+      },
+    });
+
+    await tx.booking_status_history.create({
+      data: {
+        booking_id: bookingId,
+        from_status: booking.status,
+        to_status: "CANCELLED",
+        changed_by: data.changed_by ?? userId,
+        reason: data.reason || "Cancelled by member",
+      },
+    });
+
+    if (data.create_refund_if_paid && booking.status === "PAID") {
+      const payment = await findSuccessPaymentByBookingIdTx(tx, bookingId);
+      await createRefundRequestIfNeededTx(
+        tx,
+        payment,
+        data.reason || "Cancelled by member",
+      );
+    }
+
+    return hydrateMemberBooking(tx, bookingId);
+  });
+},
   findOwnerBookings(ownerId, filters) {
     const where = buildListWhere(
       {
@@ -578,6 +625,49 @@ export const bookingsRepository = {
       return hydrateOwnerBooking(tx, bookingId);
     });
   },
+  cancelOwnerBooking(ownerId, bookingId, data = {}) {
+  return prisma.$transaction(async (tx) => {
+    const booking = await tx.bookings.findFirst({
+      where: {
+        id: bookingId,
+        fields: {
+          owner_id: ownerId,
+        },
+      },
+    });
+
+    if (!booking) return null;
+
+    await tx.bookings.update({
+      where: { id: bookingId },
+      data: {
+        status: "CANCELLED",
+        updated_at: new Date(),
+      },
+    });
+
+    await tx.booking_status_history.create({
+      data: {
+        booking_id: bookingId,
+        from_status: booking.status,
+        to_status: "CANCELLED",
+        changed_by: data.changed_by ?? ownerId,
+        reason: data.reason || "Cancelled by owner",
+      },
+    });
+
+    if (data.create_refund_if_paid && booking.status === "PAID") {
+      const payment = await findSuccessPaymentByBookingIdTx(tx, bookingId);
+      await createRefundRequestIfNeededTx(
+        tx,
+        payment,
+        data.reason || "Cancelled by owner",
+      );
+    }
+
+    return hydrateOwnerBooking(tx, bookingId);
+  });
+},
 
   markOwnerBookingCheckedIn(ownerId, bookingId, method, note) {
     return prisma.$transaction(async (tx) => {

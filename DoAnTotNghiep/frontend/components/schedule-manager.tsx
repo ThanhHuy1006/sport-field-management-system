@@ -94,6 +94,7 @@ interface ScheduleManagerProps {
   isAdmin?: boolean
   onApprove?: (id: number) => void
   onReject?: (id: number, reason: string) => void
+  onCancelBooking?: (id: number, reason: string) => void
   actionLoadingId?: number | null
   pendingRescheduleByBookingId?: Map<number, OwnerRescheduleRequest>
   rescheduleActionLoadingId?: number | null
@@ -113,6 +114,7 @@ export function ScheduleManager({
   isAdmin = false,
   onApprove,
   onReject,
+  onCancelBooking,
   actionLoadingId = null,
   pendingRescheduleByBookingId,
   rescheduleActionLoadingId = null,
@@ -136,6 +138,8 @@ export function ScheduleManager({
   const [showDetails, setShowDetails] = useState(false)
   const [rejectDialog, setRejectDialog] = useState<number | null>(null)
   const [rejectReason, setRejectReason] = useState("")
+  const [cancelDialog, setCancelDialog] = useState<number | null>(null)
+  const [cancelReason, setCancelReason] = useState("")
   const [rescheduleDialog, setRescheduleDialog] = useState<number | null>(null)
   const [rescheduleAction, setRescheduleAction] = useState<"approve" | "reject" | null>(null)
 
@@ -195,6 +199,17 @@ export function ScheduleManager({
     }
 
     return booking.status === "pending"
+  }
+
+  const canShowOwnerCancelAction = (booking: Booking) => {
+    if (isAdmin) return false
+    if (isExpiredPendingBooking(booking)) return false
+
+    if (booking.rawStatus) {
+      return ["APPROVED", "AWAITING_PAYMENT", "PAID"].includes(booking.rawStatus)
+    }
+
+    return booking.status === "confirmed"
   }
 
   const isConfirmedLikeBooking = (booking: Booking) => {
@@ -461,6 +476,31 @@ export function ScheduleManager({
     }
     setRejectDialog(null)
     setRejectReason("")
+  }
+
+  const handleCancelBooking = (id: number) => {
+    if (!cancelReason.trim()) return
+
+    if (onCancelBooking) {
+      onCancelBooking(id, cancelReason.trim())
+    } else {
+      setBookings(
+        bookings.map((b) =>
+          b.id === id
+            ? {
+                ...b,
+                status: "rejected" as const,
+                rawStatus: "CANCELLED",
+                rejectionReason: cancelReason.trim(),
+              }
+            : b,
+        ),
+      )
+    }
+
+    setCancelDialog(null)
+    setCancelReason("")
+    setShowDetails(false)
   }
 
   const handleApproveReschedule = (requestId: number) => {
@@ -893,6 +933,24 @@ export function ScheduleManager({
                         </div>
                       )}
 
+                      {canShowOwnerCancelAction(booking) && (
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={actionLoadingId === booking.id}
+                            className="text-destructive bg-transparent"
+                            onClick={() => {
+                              setCancelDialog(booking.id)
+                              setCancelReason("")
+                            }}
+                          >
+                            <AlertTriangle className="w-4 h-4 mr-2" />
+                            Hủy do sự cố
+                          </Button>
+                        </div>
+                      )}
+
                       {isExpiredPendingBooking(booking) && (
                         <div className="flex items-center">
                           <Badge variant="destructive">Đã quá giờ</Badge>
@@ -1101,6 +1159,24 @@ export function ScheduleManager({
                 </div>
               )}
 
+              {!isAdmin && canShowOwnerCancelAction(selectedBooking) && (
+                <div className="flex gap-2 pt-4 border-t">
+                  <Button
+                    variant="outline"
+                    className="flex-1 text-destructive bg-transparent"
+                    disabled={actionLoadingId === selectedBooking.id}
+                    onClick={() => {
+                      setShowDetails(false)
+                      setCancelDialog(selectedBooking.id)
+                      setCancelReason("")
+                    }}
+                  >
+                    <AlertTriangle className="w-4 h-4 mr-2" />
+                    Hủy do sự cố
+                  </Button>
+                </div>
+              )}
+
               {!isAdmin && isExpiredPendingBooking(selectedBooking) && (
                 <div className="pt-4 border-t">
                   <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-950/20">
@@ -1165,6 +1241,57 @@ export function ScheduleManager({
               onClick={() => rejectDialog && handleReject(rejectDialog)}
             >
               Xác nhận từ chối
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={cancelDialog !== null}
+        onOpenChange={() => {
+          setCancelDialog(null)
+          setCancelReason("")
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-destructive" />
+              Hủy booking do sự cố
+            </DialogTitle>
+            <DialogDescription>
+              Vui lòng nhập lý do hủy để khách hàng được thông báo rõ ràng. Nếu booking đã thanh toán, hệ thống sẽ ghi nhận yêu cầu hoàn tiền.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="cancel-reason">Lý do hủy *</Label>
+            <Textarea
+              id="cancel-reason"
+              placeholder="Ví dụ: Sân bảo trì đột xuất, mưa lớn, mất điện..."
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              rows={4}
+              maxLength={255}
+              className="mt-2"
+            />
+            <p className="mt-2 text-xs text-muted-foreground">Tối đa 255 ký tự.</p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCancelDialog(null)
+                setCancelReason("")
+              }}
+            >
+              Đóng
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={!cancelReason.trim() || actionLoadingId === cancelDialog}
+              onClick={() => cancelDialog && handleCancelBooking(cancelDialog)}
+            >
+              Xác nhận hủy
             </Button>
           </DialogFooter>
         </DialogContent>

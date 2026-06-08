@@ -129,8 +129,8 @@ export default function BookingsPage() {
   const [facilities, setFacilities] = useState(0);
   const [review, setReview] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [refundAmount, setRefundAmount] = useState(0);
   const [cancelBookingId, setCancelBookingId] = useState<number | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
@@ -313,23 +313,6 @@ export default function BookingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authChecked]);
 
-  const calculateRefund = (booking: Booking) => {
-    const bookingDateTime = new Date(
-      `${booking.date}T${getBookingStartTime(booking.time)}`,
-    );
-    const now = new Date();
-    const hoursUntilBooking =
-      (bookingDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-
-    if (hoursUntilBooking >= 24) {
-      return booking.price;
-    } else if (hoursUntilBooking >= 12) {
-      return booking.price * 0.5;
-    } else {
-      return 0;
-    }
-  };
-
   const resetRescheduleForm = () => {
     setNewDate("");
     setNewTime("");
@@ -410,31 +393,38 @@ export default function BookingsPage() {
     const booking = bookings.find((b) => b.id === bookingId);
     if (!booking) return;
 
-    const refund = calculateRefund(booking);
-    setRefundAmount(refund);
     setCancelBookingId(bookingId);
+    setCancelReason("");
   };
 
   const confirmCancelBooking = async () => {
     if (cancelBookingId === null) return;
 
+    const booking = bookings.find((b) => b.id === cancelBookingId);
+    const cancelPayload = {
+      reason: cancelReason.trim() || null,
+    };
+
     try {
       setIsCancelling(true);
 
-      await cancelMyBooking(cancelBookingId);
-
-      const refundText =
-        refundAmount > 0
-          ? `Số tiền hoàn: ${refundAmount.toLocaleString("vi-VN")} VNĐ`
-          : "Không được hoàn tiền";
+      await (
+        cancelMyBooking as (
+          bookingId: number,
+          payload?: { reason?: string | null },
+        ) => Promise<unknown>
+      )(cancelBookingId, cancelPayload);
 
       toast({
         title: "Đã hủy đặt sân",
-        description: refundText,
+        description:
+          booking?.status === "PAID"
+            ? "Đơn đã hủy. Hệ thống đã ghi nhận yêu cầu hoàn tiền của bạn."
+            : "Đơn đặt sân đã được hủy thành công.",
       });
 
       setCancelBookingId(null);
-      setRefundAmount(0);
+      setCancelReason("");
 
       await loadBookings();
     } catch (error) {
@@ -582,6 +572,14 @@ export default function BookingsPage() {
 
   const isFutureBooking = (booking: Booking) => {
     return new Date(booking.endDateTime).getTime() > Date.now();
+  };
+
+  const canCancelBeforeDeadline = (booking: Booking) => {
+    const startTime = new Date(booking.startDateTime).getTime();
+    const now = Date.now();
+    const diffMinutes = (startTime - now) / (1000 * 60);
+
+    return diffMinutes >= 60;
   };
 
   const tabBookings = useMemo(() => {
@@ -839,9 +837,11 @@ export default function BookingsPage() {
                 !booking.checkedInAt &&
                 isFutureBooking(booking);
               const canCancel =
-                ["PENDING_CONFIRM", "APPROVED", "AWAITING_PAYMENT"].includes(
+                ["PENDING_CONFIRM", "APPROVED", "AWAITING_PAYMENT", "PAID"].includes(
                   booking.status,
-                ) && isFutureBooking(booking);
+                ) &&
+                !booking.checkedInAt &&
+                canCancelBeforeDeadline(booking);
 
               return (
                 <Card
@@ -939,8 +939,8 @@ export default function BookingsPage() {
                               <div className="text-sm text-red-800 dark:text-red-200">
                                 <p className="font-medium">
                                   {booking.refundAmount > 0
-                                    ? `Số tiền hoàn: ${booking.refundAmount.toLocaleString()} VND`
-                                    : "Không được hoàn tiền (hủy dưới 12h)"}
+                                    ? `Yêu cầu hoàn tiền đã được ghi nhận: ${booking.refundAmount.toLocaleString()} VND`
+                                    : "Đơn đặt sân đã được hủy"}
                                 </p>
                               </div>
                             </div>
@@ -1037,30 +1037,46 @@ export default function BookingsPage() {
                                     Xác nhận hủy đặt sân?
                                   </AlertDialogTitle>
                                   <AlertDialogDescription asChild>
-                                    <div className="space-y-2">
+                                    <div className="space-y-3">
                                       <p>
                                         Bạn có chắc chắn muốn hủy đặt sân này
                                         không?
                                       </p>
-                                      <div className="p-3 bg-muted rounded-lg text-sm">
-                                        <p className="font-medium mb-1">
-                                          Chính sách hoàn tiền:
+
+                                      <div className="p-3 bg-muted rounded-lg text-sm space-y-2">
+                                        <p className="font-medium">
+                                          Chính sách hủy:
                                         </p>
                                         <ul className="list-disc list-inside space-y-1">
-                                          <li>Hủy trước 24h: Hoàn 100%</li>
-                                          <li>Hủy trước 12h: Hoàn 50%</li>
-                                          <li>Hủy dưới 12h: Không hoàn tiền</li>
+                                          <li>
+                                            Chỉ được hủy trước giờ bắt đầu ít
+                                            nhất 60 phút.
+                                          </li>
+                                          <li>
+                                            Nếu đơn đã thanh toán, hệ thống sẽ
+                                            ghi nhận yêu cầu hoàn tiền.
+                                          </li>
+                                          <li>
+                                            Nếu đơn chưa thanh toán, hệ thống
+                                            chỉ hủy booking.
+                                          </li>
                                         </ul>
-                                        {refundAmount > 0 ? (
-                                          <p className="mt-2 text-green-600 dark:text-green-400 font-medium">
-                                            Số tiền hoàn:{" "}
-                                            {refundAmount.toLocaleString()} VND
-                                          </p>
-                                        ) : (
-                                          <p className="mt-2 text-red-600 dark:text-red-400 font-medium">
-                                            Bạn sẽ không được hoàn tiền
-                                          </p>
-                                        )}
+                                      </div>
+
+                                      <div className="space-y-2">
+                                        <Label>Lý do hủy</Label>
+                                        <Textarea
+                                          value={cancelReason}
+                                          onChange={(event) =>
+                                            setCancelReason(event.target.value)
+                                          }
+                                          placeholder="Ví dụ: Bận việc cá nhân, đặt nhầm giờ..."
+                                          rows={3}
+                                          maxLength={255}
+                                        />
+                                        <p className="text-xs text-muted-foreground">
+                                          Không bắt buộc. Tối đa 255 ký tự.
+                                        </p>
                                       </div>
                                     </div>
                                   </AlertDialogDescription>

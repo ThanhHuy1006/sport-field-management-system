@@ -15,6 +15,22 @@ const CHECKIN_LATE_MINUTES = 60;
 const PAYMENT_EXPIRE_MINUTES = 30;
 const MAX_ACTIVE_BOOKINGS_PER_USER_PER_DAY = 3;
 
+const USER_CANCEL_BEFORE_MINUTES = 60;
+
+const MEMBER_CANCELLABLE_STATUSES = [
+  "PENDING_CONFIRM",
+  "APPROVED",
+  "AWAITING_PAYMENT",
+  "PAID",
+];
+
+const OWNER_CANCELLABLE_STATUSES = [
+  "PENDING_CONFIRM",
+  "APPROVED",
+  "AWAITING_PAYMENT",
+  "PAID",
+];
+
 // Nếu tạo booking thành công nhưng tạo notification lỗi
 // → Không nên làm booking fail
 // → Chỉ log lỗi notification
@@ -91,6 +107,45 @@ function overlaps(startA, endA, startB, endB) {
 function assertFutureBooking(startDatetime) {
   if (startDatetime <= new Date()) {
     throw new ValidationError("Không thể đặt sân ở thời điểm đã qua");
+  }
+}
+function assertMemberCanCancelBooking(booking) {
+  if (!MEMBER_CANCELLABLE_STATUSES.includes(booking.status)) {
+    throw new ForbiddenError("Booking hiện không thể hủy");
+  }
+
+  if (booking.checked_in_at || booking.status === "CHECKED_IN") {
+    throw new ForbiddenError("Booking đã check-in, không thể hủy");
+  }
+
+  if (booking.status === "COMPLETED") {
+    throw new ForbiddenError("Booking đã hoàn thành, không thể hủy");
+  }
+
+  const now = new Date();
+  const start = new Date(booking.start_datetime);
+  const cancelDeadline = new Date(
+    start.getTime() - USER_CANCEL_BEFORE_MINUTES * 60 * 1000,
+  );
+
+  if (now > cancelDeadline) {
+    throw new ForbiddenError(
+      `Chỉ được hủy booking trước giờ bắt đầu ít nhất ${USER_CANCEL_BEFORE_MINUTES} phút`,
+    );
+  }
+}
+
+function assertOwnerCanCancelBooking(booking) {
+  if (!OWNER_CANCELLABLE_STATUSES.includes(booking.status)) {
+    throw new ForbiddenError("Booking hiện không thể hủy");
+  }
+
+  if (booking.checked_in_at || booking.status === "CHECKED_IN") {
+    throw new ForbiddenError("Booking đã check-in, không thể hủy");
+  }
+
+  if (booking.status === "COMPLETED") {
+    throw new ForbiddenError("Booking đã hoàn thành, không thể hủy");
   }
 }
 
@@ -577,8 +632,9 @@ export const bookingsService = {
 
     return booking;
   },
+  async cancelMyBooking(userId, bookingId, payload = {}) {
+    await syncBookingLifecycle();
 
-  async cancelMyBooking(userId, bookingId) {
     const booking = await bookingsRepository.findMyBookingById(
       userId,
       bookingId,
@@ -588,22 +644,23 @@ export const bookingsService = {
       throw new NotFoundError("Không tìm thấy booking");
     }
 
-    if (
-      !["PENDING_CONFIRM", "APPROVED", "AWAITING_PAYMENT"].includes(
-        booking.status,
-      )
-    ) {
-      throw new ForbiddenError("Booking hiện không thể hủy");
-    }
+    assertMemberCanCancelBooking(booking);
 
-    if (new Date() >= new Date(booking.start_datetime)) {
-      throw new ForbiddenError("Không thể hủy booking đã bắt đầu hoặc đã qua");
-    }
+    const reason = payload.reason || "Cancelled by member";
 
     const cancelledBooking = await bookingsRepository.cancelMyBooking(
       userId,
       bookingId,
+      {
+        reason,
+        changed_by: userId,
+        create_refund_if_paid: booking.status === "PAID",
+      },
     );
+
+    if (!cancelledBooking) {
+      throw new NotFoundError("Không tìm thấy booking");
+    }
 
     const ownerId = cancelledBooking.fields?.owner_id;
 
@@ -618,9 +675,17 @@ export const bookingsService = {
       });
     }
 
+    if (booking.status === "PAID") {
+      await safeCreateNotification({
+        user_id: cancelledBooking.user_id,
+        title: "Đã ghi nhận yêu cầu hoàn tiền",
+        body: "Đơn đặt sân đã được hủy. Hệ thống đã ghi nhận yêu cầu hoàn tiền của bạn.",
+        type: "PAYMENT",
+      });
+    }
+
     return cancelledBooking;
   },
-
   async getMyBookingCheckInQr(userId, bookingId) {
     await syncBookingLifecycle();
 
@@ -784,6 +849,60 @@ export const bookingsService = {
     });
 
     return updatedBooking;
+  },
+  async cancelOwnerBooking(ownerId, bookingId, payload = {}) {
+    await syncBookingLifecycle();
+
+    const booking = await bookingsRepository.findOwnerBookingById(
+      ownerId,
+      bookingId,
+    );
+
+    if (!booking) {
+      throw new NotFoundError("Không tìm thấy booking");
+    }
+
+    assertOwnerCanCancelBooking(booking);
+
+    const reason = payload.reason;
+
+    if (!reason) {
+      throw new ValidationError("Lý do hủy booking là bắt buộc");
+    }
+
+    const cancelledBooking = await bookingsRepository.cancelOwnerBooking(
+      ownerId,
+      bookingId,
+      {
+        reason,
+        changed_by: ownerId,
+        create_refund_if_paid: booking.status === "PAID",
+      },
+    );
+
+    if (!cancelledBooking) {
+      throw new NotFoundError("Không tìm thấy booking");
+    }
+
+    await safeCreateNotification({
+      user_id: cancelledBooking.user_id,
+      title: "Đơn đặt sân đã bị hủy bởi chủ sân",
+      body: `Đơn đặt sân của bạn tại sân ${
+        cancelledBooking.fields?.field_name || ""
+      } đã bị hủy. Lý do: ${reason}`,
+      type: "BOOKING",
+    });
+
+    if (booking.status === "PAID") {
+      await safeCreateNotification({
+        user_id: cancelledBooking.user_id,
+        title: "Đã ghi nhận yêu cầu hoàn tiền",
+        body: "Do chủ sân hủy lịch đặt, hệ thống đã ghi nhận yêu cầu hoàn tiền cho bạn.",
+        type: "PAYMENT",
+      });
+    }
+
+    return cancelledBooking;
   },
 
   async checkInOwnerBooking(ownerId, bookingId, payload) {
