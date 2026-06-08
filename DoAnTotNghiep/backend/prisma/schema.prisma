@@ -186,11 +186,23 @@ model fields {
   reports_daily       reports_daily[]
   reviews             reviews[]
   field_reports       field_reports[]
+  favorite_fields favorite_fields[]
 
   @@index([owner_id], map: "fk_field_owner")
   @@index([province])
   @@index([district])
   @@index([ward])
+}
+model favorite_fields {
+  user_id    Int
+  field_id   Int
+  created_at DateTime? @default(now()) @db.DateTime(0)
+
+  users  users  @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  fields fields @relation(fields: [field_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([user_id, field_id])
+  @@index([field_id])
 }
 
 model notifications {
@@ -425,6 +437,7 @@ model users {
   field_reports_admin                              field_reports[]          @relation("field_reports_admin")
   review_reports_reporter                          review_reports[]         @relation("review_reports_reporter")
   review_reports_admin                             review_reports[]         @relation("review_reports_admin")
+  favorite_fields favorite_fields[]
 }
 
 model vouchers {
