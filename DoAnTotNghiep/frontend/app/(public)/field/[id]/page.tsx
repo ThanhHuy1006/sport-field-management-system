@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type SyntheticEvent } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -31,6 +31,11 @@ import {
 import { ReportFieldDialog } from "@/components/report-field-dialog";
 import { getImageUrl } from "@/lib/image-url";
 import { getStoredUser } from "@/features/auth/lib/auth-storage";
+import {
+  addFavoriteField,
+  checkFavoriteField,
+  removeFavoriteField,
+} from "@/features/favorites/services/favorites.service";
 
 type DetailFieldUi = {
   id: number;
@@ -68,11 +73,24 @@ type DetailFieldUi = {
 type QuickAvailabilitySlot =
   BookingAvailabilitySlotsResponse["data"]["slots"][number];
 
+type QuickAvailabilitySlotMeta = QuickAvailabilitySlot & {
+  status?: string | null;
+  booking_status?: string | null;
+  is_past?: boolean | null;
+  reason?: string | null;
+  price_per_hour?: number | string | null;
+  currency?: string | null;
+};
+
 type QuickAvailabilityWindow = {
   id: number | string;
   start_time: string;
   end_time: string;
 };
+
+function getQuickSlotMeta(slot: QuickAvailabilitySlot) {
+  return slot as QuickAvailabilitySlotMeta;
+}
 
 function getTodayLocalDate() {
   const now = new Date();
@@ -114,9 +132,10 @@ function formatQuickDateLabel(dateStr: string) {
 }
 
 function isBookedQuickSlot(slot: QuickAvailabilitySlot) {
-  const status = String(slot.available ?? "").toLowerCase();
-  const bookingStatus = String(slot.booking_status ?? "").toUpperCase();
-  const reason = String(slot.reason ?? "").toLowerCase();
+  const slotMeta = getQuickSlotMeta(slot);
+  const status = String(slotMeta.status ?? "").toLowerCase();
+  const bookingStatus = String(slotMeta.booking_status ?? "").toUpperCase();
+  const reason = String(slotMeta.reason ?? "").toLowerCase();
 
   return (
     status === "booked" ||
@@ -133,22 +152,28 @@ function isBookedQuickSlot(slot: QuickAvailabilitySlot) {
 }
 
 function isPastQuickSlot(slot: QuickAvailabilitySlot) {
-  const reason = String(slot.reason ?? "").toLowerCase();
-  const startTime = new Date(slot.start_datetime).getTime();
+  const slotMeta = getQuickSlotMeta(slot);
+  const status = String(slotMeta.status ?? "").toLowerCase();
+  const reason = String(slotMeta.reason ?? "").toLowerCase();
 
   return (
-    !Number.isNaN(startTime) &&
-    startTime <= Date.now()
-  ) || reason.includes("đã qua") || reason.includes("da qua");
+    status === "past" ||
+    Boolean(slotMeta.is_past) ||
+    reason.includes("đã qua") ||
+    reason.includes("da qua")
+  );
 }
+
 function getQuickSlotLabel(slot: QuickAvailabilitySlot) {
+  const slotMeta = getQuickSlotMeta(slot);
+
   if (slot.available) return "Còn trống";
 
   if (isBookedQuickSlot(slot)) return "Đã đặt";
 
   if (isPastQuickSlot(slot)) return "Đã qua";
 
-  if (slot.reason) return slot.reason;
+  if (slotMeta.reason) return slotMeta.reason;
 
   return "Không khả dụng";
 }
@@ -170,11 +195,8 @@ function getQuickSlotClassName(slot: QuickAvailabilitySlot) {
 }
 
 function getQuickSlotPricePerHour(slot: QuickAvailabilitySlot) {
-  const slotWithPrice = slot as QuickAvailabilitySlot & {
-    price_per_hour?: number | string | null;
-  };
-
-  const rawPrice = slotWithPrice.price_per_hour;
+  const slotMeta = getQuickSlotMeta(slot);
+  const rawPrice = slotMeta.price_per_hour;
 
   if (rawPrice === undefined || rawPrice === null || rawPrice === "") {
     return null;
@@ -186,11 +208,9 @@ function getQuickSlotPricePerHour(slot: QuickAvailabilitySlot) {
 }
 
 function getQuickSlotCurrency(slot: QuickAvailabilitySlot) {
-  const slotWithCurrency = slot as QuickAvailabilitySlot & {
-    currency?: string | null;
-  };
+  const slotMeta = getQuickSlotMeta(slot);
 
-  return slotWithCurrency.currency || "VND";
+  return slotMeta.currency || "VND";
 }
 
 function normalizeTime(value: string | null | undefined) {
@@ -344,11 +364,14 @@ function mapFieldDetailToUi(
 
 export default function FieldDetailsPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const fieldId = params?.id;
 
   const [field, setField] = useState<DetailFieldUi | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isWishlisted, setIsWishlisted] = useState(false);
+  const [isFavoriteLoading, setIsFavoriteLoading] = useState(false);
+  const [favoriteError, setFavoriteError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [isReportOpen, setIsReportOpen] = useState(false);
@@ -363,6 +386,46 @@ export default function FieldDetailsPage() {
   const storedUser = getStoredUser();
   const currentRole = String(storedUser?.role ?? "").toUpperCase();
   const canBookField = !storedUser || currentRole === "USER";
+  const canUseFavorite = Boolean(storedUser) && currentRole === "USER";
+
+  useEffect(() => {
+    if (!fieldId) return;
+
+    if (!canUseFavorite) {
+      setIsWishlisted(false);
+      setFavoriteError("");
+      return;
+    }
+
+    const numericFieldId = Number(fieldId);
+
+    if (Number.isNaN(numericFieldId)) return;
+
+    let cancelled = false;
+
+    async function fetchFavoriteStatus() {
+      try {
+        setFavoriteError("");
+
+        const result = await checkFavoriteField(numericFieldId);
+
+        if (cancelled) return;
+
+        setIsWishlisted(Boolean(result.data.is_favorite));
+      } catch (err) {
+        if (cancelled) return;
+
+        setIsWishlisted(false);
+        console.error("Không thể kiểm tra trạng thái yêu thích:", err);
+      }
+    }
+
+    fetchFavoriteStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fieldId, canUseFavorite]);
 
   useEffect(() => {
     if (!fieldId) return;
@@ -467,10 +530,11 @@ export default function FieldDetailsPage() {
     return field.images.map((image) => getImageUrl(image));
   }, [field]);
 
-const quickSlotGroups = useMemo(() => {
-  const futureOrAvailableSlots = quickSlots.filter(
-    (slot) => slot.available || !isPastQuickSlot(slot)
-  );
+  const quickSlotGroups = useMemo(() => {
+    const futureOrAvailableSlots = quickSlots.filter(
+      (slot) => slot.available || !isPastQuickSlot(slot)
+    );
+
     const source =
       futureOrAvailableSlots.length > 0 ? futureOrAvailableSlots : quickSlots;
 
@@ -501,6 +565,42 @@ const quickSlotGroups = useMemo(() => {
 
     return createGroupsFromContinuousSlots(source);
   }, [quickSlots, quickWindows]);
+
+  const handleToggleWishlist = async () => {
+    if (!field || isFavoriteLoading) return;
+
+    const user = getStoredUser();
+    const role = String(user?.role ?? "").toUpperCase();
+
+    if (!user) {
+      router.push(`/login?redirect=/field/${field.id}`);
+      return;
+    }
+
+    if (role !== "USER") {
+      setFavoriteError("Chỉ khách hàng mới được sử dụng chức năng yêu thích");
+      return;
+    }
+
+    try {
+      setIsFavoriteLoading(true);
+      setFavoriteError("");
+
+      if (isWishlisted) {
+        await removeFavoriteField(field.id);
+        setIsWishlisted(false);
+      } else {
+        await addFavoriteField(field.id);
+        setIsWishlisted(true);
+      }
+    } catch (err) {
+      setFavoriteError(
+        err instanceof Error ? err.message : "Không thể cập nhật yêu thích",
+      );
+    } finally {
+      setIsFavoriteLoading(false);
+    }
+  };
 
   const handleShare = async () => {
     const url = window.location.href;
@@ -589,8 +689,11 @@ const quickSlotGroups = useMemo(() => {
 
             <button
               data-cy="field-header-wishlist-button"
-              onClick={() => setIsWishlisted(!isWishlisted)}
-              className="p-2 hover:bg-muted rounded-lg transition"
+              type="button"
+              onClick={handleToggleWishlist}
+              disabled={isFavoriteLoading}
+              title={isWishlisted ? "Bỏ khỏi yêu thích" : "Thêm vào yêu thích"}
+              className="p-2 hover:bg-muted rounded-lg transition disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Heart
                 className={`w-5 h-5 ${
@@ -750,40 +853,42 @@ const quickSlotGroups = useMemo(() => {
                 <Clock className="w-5 h-5 text-primary" />
                 <h3 className="text-lg font-bold">Giờ hoạt động</h3>
               </div>
-<div data-cy="field-detail-hours" className="mb-6">
-  {quickWindows.length > 0 ? (
-    <div className="space-y-2">
-      <p className="text-sm text-muted-foreground">
-        Theo ngày đang xem:{" "}
-        <span className="font-medium text-foreground">
-          {formatQuickDateLabel(quickDate)}
-        </span>
-      </p>
 
-      <div className="space-y-2">
-        {quickWindows.map((windowItem, index) => (
-          <div
-            key={windowItem.id ?? `${windowItem.start_time}-${windowItem.end_time}`}
-            className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-3"
-          >
-            <span className="font-semibold text-foreground">
-              Ca {index + 1}
-            </span>
+              <div data-cy="field-detail-hours" className="mb-6">
+                {quickWindows.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      Theo ngày đang xem:{" "}
+                      <span className="font-medium text-foreground">
+                        {formatQuickDateLabel(quickDate)}
+                      </span>
+                    </p>
 
-            <span className="font-medium text-foreground">
-              {normalizeTime(windowItem.start_time)} -{" "}
-              {normalizeTime(windowItem.end_time)}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  ) : (
-    <p className="text-foreground">
-      {field.hours}
-    </p>
-  )}
-</div>
+                    <div className="space-y-2">
+                      {quickWindows.map((windowItem, index) => (
+                        <div
+                          key={
+                            windowItem.id ??
+                            `${windowItem.start_time}-${windowItem.end_time}`
+                          }
+                          className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-3"
+                        >
+                          <span className="font-semibold text-foreground">
+                            Ca {index + 1}
+                          </span>
+
+                          <span className="font-medium text-foreground">
+                            {normalizeTime(windowItem.start_time)} -{" "}
+                            {normalizeTime(windowItem.end_time)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-foreground">{field.hours}</p>
+                )}
+              </div>
 
               <div className="border-t border-border pt-5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
@@ -910,21 +1015,21 @@ const quickSlotGroups = useMemo(() => {
 
                     <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-  <span className="flex items-center gap-1.5">
-    <span className="h-2.5 w-2.5 rounded-full bg-primary" />
-    Còn trống
-  </span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+                          Còn trống
+                        </span>
 
-  <span className="flex items-center gap-1.5">
-    <span className="h-2.5 w-2.5 rounded-full bg-yellow-500" />
-    Đã đặt
-  </span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="h-2.5 w-2.5 rounded-full bg-yellow-500" />
+                          Đã đặt
+                        </span>
 
-  <span className="flex items-center gap-1.5">
-    <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/60" />
-    Đã qua
-  </span>
-</div>
+                        <span className="flex items-center gap-1.5">
+                          <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/60" />
+                          Đã qua
+                        </span>
+                      </div>
 
                       <Link href={`/booking/${field.id}`}>
                         <Button size="sm" variant="outline">
@@ -1062,12 +1167,24 @@ const quickSlotGroups = useMemo(() => {
 
               <Button
                 data-cy="field-wishlist-button"
+                type="button"
                 variant="outline"
                 className="w-full bg-transparent"
-                onClick={() => setIsWishlisted(!isWishlisted)}
+                onClick={handleToggleWishlist}
+                disabled={isFavoriteLoading}
               >
-                {isWishlisted ? "Đã thêm vào yêu thích" : "Thêm vào yêu thích"}
+                {isFavoriteLoading
+                  ? "Đang xử lý..."
+                  : isWishlisted
+                    ? "Đã thêm vào yêu thích"
+                    : "Thêm vào yêu thích"}
               </Button>
+
+              {favoriteError && (
+                <p className="mt-2 text-sm text-destructive">
+                  {favoriteError}
+                </p>
+              )}
 
               <Button
                 data-cy="report-field-button"

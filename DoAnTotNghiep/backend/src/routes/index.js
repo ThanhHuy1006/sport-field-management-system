@@ -35,6 +35,7 @@ import adminFieldReportsRoutes from "../modules/field-reports/admin.field-report
 
 import reviewReportsRoutes from "../modules/review-reports/review-reports.routes.js";
 import adminReviewReportsRoutes from "../modules/review-reports/admin.review-reports.routes.js";
+import favoritesRoutes from "../modules/favorites/favorites.routes.js";
 
 
 const router = Router();
@@ -53,6 +54,7 @@ router.use("/fields", publicReviewsRoutes);
 router.use("/bookings", memberBookingRoutes);
 router.use("/payments", paymentsRoutes);
 router.use("/reviews", memberReviewsRoutes);
+router.use("/favorites", favoritesRoutes);
 
 // Owner domain
 router.use("/owner/bookings", ownerBookingRoutes);
