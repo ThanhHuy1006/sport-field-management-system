@@ -114,7 +114,7 @@ function formatQuickDateLabel(dateStr: string) {
 }
 
 function isBookedQuickSlot(slot: QuickAvailabilitySlot) {
-  const status = String(slot.status ?? "").toLowerCase();
+  const status = String(slot.available ?? "").toLowerCase();
   const bookingStatus = String(slot.booking_status ?? "").toUpperCase();
   const reason = String(slot.reason ?? "").toLowerCase();
 
@@ -133,17 +133,14 @@ function isBookedQuickSlot(slot: QuickAvailabilitySlot) {
 }
 
 function isPastQuickSlot(slot: QuickAvailabilitySlot) {
-  const status = String(slot.status ?? "").toLowerCase();
   const reason = String(slot.reason ?? "").toLowerCase();
+  const startTime = new Date(slot.start_datetime).getTime();
 
   return (
-    status === "past" ||
-    Boolean(slot.is_past) ||
-    reason.includes("đã qua") ||
-    reason.includes("da qua")
-  );
+    !Number.isNaN(startTime) &&
+    startTime <= Date.now()
+  ) || reason.includes("đã qua") || reason.includes("da qua");
 }
-
 function getQuickSlotLabel(slot: QuickAvailabilitySlot) {
   if (slot.available) return "Còn trống";
 
@@ -470,11 +467,10 @@ export default function FieldDetailsPage() {
     return field.images.map((image) => getImageUrl(image));
   }, [field]);
 
-  const quickSlotGroups = useMemo(() => {
-    const futureOrAvailableSlots = quickSlots.filter(
-      (slot) => slot.available || (slot.status !== "past" && !slot.is_past)
-    );
-
+const quickSlotGroups = useMemo(() => {
+  const futureOrAvailableSlots = quickSlots.filter(
+    (slot) => slot.available || !isPastQuickSlot(slot)
+  );
     const source =
       futureOrAvailableSlots.length > 0 ? futureOrAvailableSlots : quickSlots;
 

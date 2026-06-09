@@ -58,6 +58,10 @@ import {
 import { cancelMyBooking } from "@/features/bookings/services/cancel-my-booking";
 import { getMyBookingCheckInQr } from "@/features/bookings/services/get-my-booking-checkin-qr";
 import { createMyRescheduleRequest } from "@/features/bookings/services/create-my-reschedule-request";
+import {
+  getBookingAvailabilitySlots,
+  type BookingAvailabilitySlot,
+} from "@/features/bookings/services/get-booking-availability-slots";
 import { createReview } from "@/features/reviews/services/create-review";
 import {
   getStoredAccessToken,
@@ -80,7 +84,7 @@ type Booking = {
   endDateTime: string;
   duration: number;
   price: number;
-  status: BookingStatus | "pending_reschedule" | "NO_SHOW";
+  status: BookingStatus | "NO_SHOW";
   image: string;
   bookingRef: string;
   rating?: number;
@@ -121,6 +125,8 @@ export default function BookingsPage() {
   const [showQRDialog, setShowQRDialog] = useState(false);
   const [newDate, setNewDate] = useState("");
   const [newTime, setNewTime] = useState("");
+  const [availableSlots, setAvailableSlots] = useState<BookingAvailabilitySlot[]>([]);
+  const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   const [rescheduleReason, setRescheduleReason] = useState("");
   const [rating, setRating] = useState(0);
   const [fieldQuality, setFieldQuality] = useState(0);
@@ -236,6 +242,15 @@ export default function BookingsPage() {
   const mapApiBookingToUi = (item: MyBookingListItem): Booking => {
     const source = item as MyBookingListItem & {
       requested_payment_method?: BookingPaymentMethod | null;
+      pending_reschedule_request?: {
+        id: number;
+        old_start_datetime: string;
+        old_end_datetime: string;
+        new_start_datetime: string;
+        new_end_datetime: string;
+        status: string;
+        created_at: string;
+      } | null;
     };
     const start = new Date(item.start_datetime);
     const end = new Date(item.end_datetime);
@@ -243,6 +258,8 @@ export default function BookingsPage() {
       1,
       Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60)),
     );
+
+    const pendingRequest = source.pending_reschedule_request;
 
     return {
       id: item.id,
@@ -262,6 +279,19 @@ export default function BookingsPage() {
       checkedInAt: item.checked_in_at ?? undefined,
       requestedPaymentMethod: source.requested_payment_method ?? null,
       rating: item.review?.rating ?? undefined,
+      rescheduleRequest: pendingRequest
+        ? {
+            oldDate: formatLocalDate(pendingRequest.old_start_datetime),
+            oldTime: `${formatLocalTime(
+              pendingRequest.old_start_datetime,
+            )} - ${formatLocalTime(pendingRequest.old_end_datetime)}`,
+            newDate: formatLocalDate(pendingRequest.new_start_datetime),
+            newTime: `${formatLocalTime(
+              pendingRequest.new_start_datetime,
+            )} - ${formatLocalTime(pendingRequest.new_end_datetime)}`,
+            requestedAt: pendingRequest.created_at,
+          }
+        : undefined,
     };
   };
 
@@ -316,9 +346,55 @@ export default function BookingsPage() {
   const resetRescheduleForm = () => {
     setNewDate("");
     setNewTime("");
+    setAvailableSlots([]);
+    setIsLoadingSlots(false);
     setRescheduleReason("");
     setSelectedBooking(null);
   };
+
+  useEffect(() => {
+    if (!showRescheduleDialog || !selectedBooking || !newDate) {
+      setAvailableSlots([]);
+      setNewTime("");
+      return;
+    }
+
+    const fieldId = selectedBooking.fieldId;
+
+    if (!fieldId) {
+      setAvailableSlots([]);
+      setNewTime("");
+      return;
+    }
+
+    const loadAvailableSlots = async () => {
+      try {
+        setIsLoadingSlots(true);
+
+        const res = await getBookingAvailabilitySlots({
+          field_id: fieldId,
+          date: newDate,
+          duration_minutes: selectedBooking.duration * 60,
+        });
+
+        setAvailableSlots(res.data.slots.filter((slot) => slot.available));
+        setNewTime("");
+      } catch (error) {
+        setAvailableSlots([]);
+        setNewTime("");
+        toast({
+          title: "Không tải được lịch trống",
+          description:
+            error instanceof Error ? error.message : "Đã có lỗi xảy ra",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingSlots(false);
+      }
+    };
+
+    void loadAvailableSlots();
+  }, [showRescheduleDialog, selectedBooking, newDate, toast]);
 
   const handleReschedule = async () => {
     if (!newDate || !newTime || !selectedBooking) {
@@ -347,16 +423,22 @@ export default function BookingsPage() {
     try {
       setIsSubmittingReschedule(true);
 
-      const oldStart = new Date(selectedBooking.startDateTime);
-      const oldEnd = new Date(selectedBooking.endDateTime);
-      const durationMs = oldEnd.getTime() - oldStart.getTime();
+      const selectedSlot = availableSlots.find(
+        (slot) => slot.start_datetime === newTime,
+      );
 
-      const newStart = new Date(`${newDate}T${newTime}:00`);
-      const newEnd = new Date(newStart.getTime() + durationMs);
+      if (!selectedSlot) {
+        toast({
+          title: "Chưa chọn giờ mới",
+          description: "Vui lòng chọn một khung giờ còn trống.",
+          variant: "destructive",
+        });
+        return;
+      }
 
       const res = await createMyRescheduleRequest(selectedBooking.id, {
-        start_datetime: newStart.toISOString(),
-        end_datetime: newEnd.toISOString(),
+        start_datetime: selectedSlot.start_datetime,
+        end_datetime: selectedSlot.end_datetime,
         reason: rescheduleReason.trim() || null,
       });
 
@@ -369,7 +451,7 @@ export default function BookingsPage() {
             : "Đã gửi yêu cầu đổi lịch",
         description:
           requestStatus === "APPROVED"
-            ? `Lịch đặt sân đã được đổi sang ${newDate} lúc ${newTime}.`
+            ? `Lịch đặt sân đã được đổi sang ${newDate}.`
             : "Yêu cầu đổi lịch đang chờ chủ sân xác nhận.",
       });
 
@@ -582,6 +664,14 @@ export default function BookingsPage() {
     return diffMinutes >= 60;
   };
 
+  const canRescheduleBeforeDeadline = (booking: Booking) => {
+    const startTime = new Date(booking.startDateTime).getTime();
+    const now = Date.now();
+    const diffHours = (startTime - now) / (1000 * 60 * 60);
+
+    return diffHours >= 24;
+  };
+
   const tabBookings = useMemo(() => {
     const upcomingStatuses = [
       "PENDING_CONFIRM",
@@ -601,9 +691,7 @@ export default function BookingsPage() {
     return {
       upcoming: bookings.filter(
         (booking) =>
-          (upcomingStatuses.includes(booking.status) ||
-            booking.status === "pending_reschedule") &&
-          isFutureBooking(booking),
+          upcomingStatuses.includes(booking.status) && isFutureBooking(booking),
       ),
       using: bookings.filter((booking) => booking.status === "CHECKED_IN"),
       completed: bookings.filter((booking) => booking.status === "COMPLETED"),
@@ -666,12 +754,6 @@ export default function BookingsPage() {
           text: "Đã check-in",
           className:
             "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-        };
-      case "pending_reschedule":
-        return {
-          text: "Chờ duyệt đổi lịch",
-          className:
-            "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
         };
       case "CANCELLED":
         return {
@@ -835,7 +917,9 @@ export default function BookingsPage() {
               const canReschedule =
                 ["APPROVED", "PAID"].includes(booking.status) &&
                 !booking.checkedInAt &&
-                isFutureBooking(booking);
+                !booking.rescheduleRequest &&
+                isFutureBooking(booking) &&
+                canRescheduleBeforeDeadline(booking);
               const canCancel =
                 ["PENDING_CONFIRM", "APPROVED", "AWAITING_PAYMENT", "PAID"].includes(
                   booking.status,
@@ -909,13 +993,12 @@ export default function BookingsPage() {
                           </div>
                         )}
 
-                        {booking.status === "pending_reschedule" &&
-                          booking.rescheduleRequest && (
+                        {booking.rescheduleRequest && (
                             <div className="flex items-start gap-2 mb-4 p-3 bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900 rounded-lg">
                               <AlertCircle className="w-4 h-4 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-0.5" />
                               <div className="text-sm text-purple-800 dark:text-purple-200">
                                 <p className="font-medium mb-1">
-                                  Yêu cầu đổi lịch
+                                  Yêu cầu đổi lịch đang chờ duyệt
                                 </p>
                                 <p>
                                   Từ: {booking.rescheduleRequest.oldDate} lúc{" "}
@@ -1010,6 +1093,7 @@ export default function BookingsPage() {
                                   setSelectedBooking(booking);
                                   setNewDate("");
                                   setNewTime("");
+                                  setAvailableSlots([]);
                                   setRescheduleReason("");
                                   setShowRescheduleDialog(true);
                                 }}
@@ -1384,53 +1468,67 @@ export default function BookingsPage() {
           <DialogHeader>
             <DialogTitle>Đổi lịch đặt sân</DialogTitle>
             <DialogDescription>
-              Chọn ngày và giờ mới cho đơn đặt sân của bạn. Yêu cầu sẽ được gửi
-              đến chủ sân để xác nhận.
+              Chọn ngày và khung giờ còn trống. Với sân tự động duyệt, lịch sẽ được đổi ngay nếu hợp lệ; với sân duyệt thủ công, yêu cầu sẽ chờ chủ sân xác nhận.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {selectedBooking && (
+              <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm">
+                <p className="font-medium text-foreground">{selectedBooking.fieldName}</p>
+                <p className="text-muted-foreground">
+                  Lịch hiện tại: {selectedBooking.date} • {selectedBooking.time}
+                </p>
+              </div>
+            )}
+
             <div>
               <Label htmlFor="newDate">Ngày mới</Label>
               <input
                 id="newDate"
                 type="date"
                 value={newDate}
-                onChange={(e) => setNewDate(e.target.value)}
+                onChange={(e) => {
+                  setNewDate(e.target.value);
+                  setNewTime("");
+                  setAvailableSlots([]);
+                }}
                 className="w-full mt-1 px-3 py-2 border rounded-md bg-background"
                 min={new Date().toISOString().split("T")[0]}
               />
             </div>
             <div>
               <Label htmlFor="newTime">Giờ mới</Label>
-              <Select value={newTime} onValueChange={setNewTime}>
+              <Select
+                value={newTime}
+                onValueChange={setNewTime}
+                disabled={!newDate || isLoadingSlots || availableSlots.length === 0}
+              >
                 <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Chọn giờ" />
+                  <SelectValue
+                    placeholder={
+                      isLoadingSlots
+                        ? "Đang tải giờ trống..."
+                        : !newDate
+                          ? "Chọn ngày trước"
+                          : availableSlots.length === 0
+                            ? "Không có giờ trống"
+                            : "Chọn giờ trống"
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  {[
-                    "06:00",
-                    "07:00",
-                    "08:00",
-                    "09:00",
-                    "10:00",
-                    "11:00",
-                    "12:00",
-                    "13:00",
-                    "14:00",
-                    "15:00",
-                    "16:00",
-                    "17:00",
-                    "18:00",
-                    "19:00",
-                    "20:00",
-                    "21:00",
-                  ].map((time) => (
-                    <SelectItem key={time} value={time}>
-                      {time}
+                  {availableSlots.map((slot) => (
+                    <SelectItem key={slot.start_datetime} value={slot.start_datetime}>
+                      {slot.start_time} - {slot.end_time}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {newDate && !isLoadingSlots && availableSlots.length === 0 && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Không có khung giờ trống phù hợp với thời lượng đặt hiện tại.
+                </p>
+              )}
             </div>
             <div>
               <Label htmlFor="rescheduleReason">Lý do đổi lịch (tùy chọn)</Label>
@@ -1440,8 +1538,12 @@ export default function BookingsPage() {
                 value={rescheduleReason}
                 onChange={(e) => setRescheduleReason(e.target.value)}
                 rows={3}
+                maxLength={255}
                 className="mt-1"
               />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Tối đa 255 ký tự. Đã nhập {rescheduleReason.length}/255.
+              </p>
             </div>
             <div className="p-3 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900 rounded-lg">
               <p className="text-sm text-yellow-800 dark:text-yellow-200">
@@ -1464,7 +1566,14 @@ export default function BookingsPage() {
             </Button>
             <Button
               onClick={handleReschedule}
-              disabled={isSubmittingReschedule}
+              disabled={
+                isSubmittingReschedule ||
+                !selectedBooking ||
+                !newDate ||
+                !newTime ||
+                isLoadingSlots ||
+                availableSlots.length === 0
+              }
             >
               {isSubmittingReschedule ? "Đang gửi..." : "Gửi yêu cầu"}
             </Button>

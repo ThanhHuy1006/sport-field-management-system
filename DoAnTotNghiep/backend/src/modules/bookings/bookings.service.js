@@ -16,6 +16,7 @@ const PAYMENT_EXPIRE_MINUTES = 30;
 const MAX_ACTIVE_BOOKINGS_PER_USER_PER_DAY = 3;
 
 const USER_CANCEL_BEFORE_MINUTES = 60;
+const USER_RESCHEDULE_BEFORE_MINUTES = 24 * 60;
 
 const MEMBER_CANCELLABLE_STATUSES = [
   "PENDING_CONFIRM",
@@ -170,6 +171,37 @@ function assertMemberCanCancelBooking(booking) {
   if (now > cancelDeadline) {
     throw new ForbiddenError(
       `Chỉ được hủy booking trước giờ bắt đầu ít nhất ${USER_CANCEL_BEFORE_MINUTES} phút`,
+    );
+  }
+}
+
+function assertMemberCanRescheduleBooking(booking) {
+  if (!["APPROVED", "PAID"].includes(booking.status)) {
+    throw new ForbiddenError("Booking hiện không thể đổi lịch");
+  }
+
+  if (booking.checked_in_at || booking.status === "CHECKED_IN") {
+    throw new ForbiddenError("Booking đã check-in, không thể đổi lịch");
+  }
+
+  if (booking.status === "COMPLETED") {
+    throw new ForbiddenError("Booking đã hoàn thành, không thể đổi lịch");
+  }
+
+  const now = new Date();
+  const start = new Date(booking.start_datetime);
+
+  if (now >= start) {
+    throw new ForbiddenError("Không thể đổi lịch booking đã bắt đầu hoặc đã qua");
+  }
+
+  const rescheduleDeadline = new Date(
+    start.getTime() - USER_RESCHEDULE_BEFORE_MINUTES * 60 * 1000,
+  );
+
+  if (now > rescheduleDeadline) {
+    throw new ForbiddenError(
+      `Chỉ được đổi lịch booking trước giờ bắt đầu ít nhất ${USER_RESCHEDULE_BEFORE_MINUTES} phút`,
     );
   }
 }
@@ -1114,19 +1146,7 @@ export const bookingsService = {
       throw new NotFoundError("Không tìm thấy booking");
     }
 
-    if (!["APPROVED", "PAID"].includes(booking.status)) {
-      throw new ForbiddenError("Booking hiện không thể đổi lịch");
-    }
-
-    if (booking.checked_in_at || booking.status === "CHECKED_IN") {
-      throw new ForbiddenError("Booking đã check-in, không thể đổi lịch");
-    }
-
-    if (new Date() >= new Date(booking.start_datetime)) {
-      throw new ForbiddenError(
-        "Không thể đổi lịch booking đã bắt đầu hoặc đã qua",
-      );
-    }
+    assertMemberCanRescheduleBooking(booking);
 
     if (payload.start_datetime <= new Date()) {
       throw new ValidationError("Không thể đổi sang thời điểm đã qua");
@@ -1227,6 +1247,12 @@ export const bookingsService = {
 
     if (booking.checked_in_at || booking.status === "CHECKED_IN") {
       throw new ForbiddenError("Booking đã check-in, không thể đổi lịch");
+    }
+
+    if (new Date() >= new Date(booking.start_datetime)) {
+      throw new ForbiddenError(
+        "Không thể duyệt đổi lịch cho booking đã bắt đầu hoặc đã qua",
+      );
     }
 
     const oldDuration = diffMinutes(

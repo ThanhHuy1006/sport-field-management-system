@@ -44,6 +44,29 @@ const userSelect = {
   phone: true,
 };
 
+const pendingRescheduleRequestInclude = {
+  where: {
+    status: "PENDING",
+  },
+  orderBy: {
+    created_at: "desc",
+  },
+  take: 1,
+  select: {
+    id: true,
+    booking_id: true,
+    old_start_datetime: true,
+    old_end_datetime: true,
+    new_start_datetime: true,
+    new_end_datetime: true,
+    status: true,
+    reason: true,
+    owner_note: true,
+    created_at: true,
+    updated_at: true,
+  },
+};
+
 function buildListWhere(baseWhere, status) {
   return {
     ...baseWhere,
@@ -77,6 +100,7 @@ function memberBookingDetailInclude() {
       },
       take: 1,
     },
+    booking_reschedule_requests: pendingRescheduleRequestInclude,
     booking_status_history: {
       orderBy: { changed_at: "desc" },
     },
@@ -494,6 +518,7 @@ export const bookingsRepository = {
             },
             take: 1,
           },
+          booking_reschedule_requests: pendingRescheduleRequestInclude,
         },
       }),
       prisma.bookings.count({ where }),
@@ -887,6 +912,7 @@ cancelMyBooking(userId, bookingId, data = {}) {
         data: {
           start_datetime: data.new_start_datetime,
           end_datetime: data.new_end_datetime,
+          updated_at: new Date(),
         },
       });
 
@@ -1003,6 +1029,7 @@ cancelMyBooking(userId, bookingId, data = {}) {
         data: {
           start_datetime: request.new_start_datetime,
           end_datetime: request.new_end_datetime,
+          updated_at: new Date(),
         },
       });
 
@@ -1014,6 +1041,7 @@ cancelMyBooking(userId, bookingId, data = {}) {
           status: "APPROVED",
           decided_by: ownerId,
           decided_at: new Date(),
+          updated_at: new Date(),
         },
       });
 
@@ -1063,6 +1091,7 @@ cancelMyBooking(userId, bookingId, data = {}) {
           owner_note: ownerNote || "Rejected by owner",
           decided_by: ownerId,
           decided_at: new Date(),
+          updated_at: new Date(),
         },
       });
 

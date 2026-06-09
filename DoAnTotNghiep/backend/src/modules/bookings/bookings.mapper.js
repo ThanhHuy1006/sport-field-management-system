@@ -1,3 +1,25 @@
+function toPendingRescheduleRequest(item) {
+  const request = item.booking_reschedule_requests?.[0];
+
+  if (!request) {
+    return null;
+  }
+
+  return {
+    id: request.id,
+    booking_id: request.booking_id,
+    old_start_datetime: request.old_start_datetime,
+    old_end_datetime: request.old_end_datetime,
+    new_start_datetime: request.new_start_datetime,
+    new_end_datetime: request.new_end_datetime,
+    status: request.status,
+    reason: request.reason ?? null,
+    owner_note: request.owner_note ?? null,
+    created_at: request.created_at,
+    updated_at: request.updated_at,
+  };
+}
+
 export function toBookingListItem(item) {
   return {
     id: item.id,
@@ -39,6 +61,7 @@ export function toBookingListItem(item) {
           created_at: item.reviews[0].created_at,
         }
       : null,
+    pending_reschedule_request: toPendingRescheduleRequest(item),
   };
 }
 function toBookingVoucher(item) {
@@ -108,6 +131,7 @@ export function toBookingDetail(item) {
           created_at: item.reviews[0].created_at,
         }
       : null,
+    pending_reschedule_request: toPendingRescheduleRequest(item),
   };
 }
 
