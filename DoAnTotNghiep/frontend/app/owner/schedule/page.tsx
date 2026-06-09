@@ -18,6 +18,7 @@ import {
 } from "@/features/bookings/services/get-owner-bookings"
 import { approveOwnerBooking } from "@/features/bookings/services/approve-owner-booking"
 import { rejectOwnerBooking } from "@/features/bookings/services/reject-owner-booking"
+import { cancelOwnerBooking } from "@/features/bookings/services/cancel-owner-booking"
 import { getOwnerRescheduleRequests } from "@/features/bookings/services/get-owner-reschedule-requests"
 import { approveOwnerRescheduleRequest } from "@/features/bookings/services/approve-owner-reschedule-request"
 import { rejectOwnerRescheduleRequest } from "@/features/bookings/services/reject-owner-reschedule-request"
@@ -336,6 +337,34 @@ export default function OwnerSchedulePage() {
     }
   }
 
+  const handleCancelBookingByOwner = async (id: number, reason: string) => {
+    if (actionLoadingId) return
+
+    try {
+      setActionLoadingId(id)
+
+      await cancelOwnerBooking(id, {
+        reason,
+      })
+
+      toast({
+        title: "Hủy booking thành công",
+        description:
+          "Booking đã được hủy. Nếu đơn đã thanh toán, hệ thống đã ghi nhận yêu cầu hoàn tiền.",
+      })
+
+      await Promise.all([loadOwnerBookings(), loadOwnerRescheduleRequests()])
+    } catch (error) {
+      toast({
+        title: "Hủy booking thất bại",
+        description: error instanceof Error ? error.message : "Đã có lỗi xảy ra",
+        variant: "destructive",
+      })
+    } finally {
+      setActionLoadingId(null)
+    }
+  }
+
   const handleApproveReschedule = async (requestId: number) => {
     if (rescheduleActionLoadingId) return
 
@@ -454,6 +483,7 @@ export default function OwnerSchedulePage() {
               pendingRescheduleByBookingId={pendingRescheduleByBookingId}
               onApprove={handleApprove}
               onReject={handleReject}
+              onCancelBooking={handleCancelBookingByOwner}
               onApproveReschedule={handleApproveReschedule}
               onRejectReschedule={handleRejectReschedule}
             />

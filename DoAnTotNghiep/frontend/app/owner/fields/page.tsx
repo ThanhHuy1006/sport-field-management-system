@@ -1,17 +1,17 @@
-"use client"
+"use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -19,7 +19,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import {
   Plus,
   Edit,
@@ -34,43 +34,42 @@ import {
   ShieldAlert,
   RefreshCcw,
   Loader2,
-} from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
-import { Pagination } from "@/components/pagination"
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Pagination } from "@/components/pagination";
 import {
   getOwnerFields,
   updateOwnerFieldStatus,
   type OwnerFieldApi,
   type OwnerFieldStatus,
-} from "@/features/fields/services/owner-fields.service"
+} from "@/features/fields/services/owner-fields.service";
 
-type HiddenByRole = "OWNER" | "ADMIN" | "SYSTEM"
+type HiddenByRole = "OWNER" | "ADMIN" | "SYSTEM";
 
 type OwnerFieldApiWithHidden = OwnerFieldApi & {
-  hidden_by_role?: HiddenByRole | null
-  hidden_reason?: string | null
-  hidden_at?: string | null
-}
+  hidden_by_role?: HiddenByRole | null;
+  hidden_reason?: string | null;
+  hidden_at?: string | null;
+};
 
 type OwnerFieldView = {
-  id: number
-  name: string
-  type: string
-  location: string
-  capacity: number
-  price: number
-  weekendPrice: number
-  openTime: string
-  closeTime: string
-  status: OwnerFieldStatus
-  image: string
+  id: number;
+  name: string;
+  type: string;
+  location: string;
+  capacity: number;
+  price: number;
+  weekendPrice: number;
+  todayOperatingHours: string;
+  status: OwnerFieldStatus;
+  image: string;
 
-  hiddenByRole: HiddenByRole | null
-  hiddenReason: string | null
-  hiddenAt: string | null
-}
+  hiddenByRole: HiddenByRole | null;
+  hiddenReason: string | null;
+  hiddenAt: string | null;
+};
 
-const ITEMS_PER_PAGE = 6
+const ITEMS_PER_PAGE = 6;
 
 const SPORT_TYPE_LABEL: Record<string, string> = {
   soccer: "Bóng Đá",
@@ -79,7 +78,7 @@ const SPORT_TYPE_LABEL: Record<string, string> = {
   badminton: "Cầu Lông",
   volleyball: "Bóng Chuyền",
   pickleball: "Pickleball",
-}
+};
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Chờ Duyệt",
@@ -87,29 +86,31 @@ const STATUS_LABEL: Record<string, string> = {
   hidden: "Đã Ẩn",
   inactive: "Đã Ẩn",
   maintenance: "Bảo Trì",
-}
+};
 
 function getStatusClass(status: OwnerFieldStatus) {
   if (status === "active") {
-    return "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+    return "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300";
   }
 
   if (status === "pending") {
-    return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300"
+    return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300";
   }
 
   if (status === "maintenance") {
-    return "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300"
+    return "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300";
   }
 
-  return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+  return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
 }
 
 function normalizeOwnerFieldStatus(status?: string | null): OwnerFieldStatus {
-  const normalized = String(status || "pending").trim().toLowerCase()
+  const normalized = String(status || "pending")
+    .trim()
+    .toLowerCase();
 
   if (normalized === "inactive") {
-    return "hidden" as OwnerFieldStatus
+    return "hidden" as OwnerFieldStatus;
   }
 
   if (
@@ -118,17 +119,17 @@ function normalizeOwnerFieldStatus(status?: string | null): OwnerFieldStatus {
     normalized === "hidden" ||
     normalized === "maintenance"
   ) {
-    return normalized as OwnerFieldStatus
+    return normalized as OwnerFieldStatus;
   }
 
-  return "pending" as OwnerFieldStatus
+  return "pending" as OwnerFieldStatus;
 }
 
 function extractOwnerFieldItems(response: unknown): OwnerFieldApiWithHidden[] {
-  const data = (response as { data?: unknown })?.data
+  const data = (response as { data?: unknown })?.data;
 
   if (Array.isArray(data)) {
-    return data as OwnerFieldApiWithHidden[]
+    return data as OwnerFieldApiWithHidden[];
   }
 
   if (
@@ -136,61 +137,105 @@ function extractOwnerFieldItems(response: unknown): OwnerFieldApiWithHidden[] {
     typeof data === "object" &&
     Array.isArray((data as { items?: unknown }).items)
   ) {
-    return (data as { items: OwnerFieldApiWithHidden[] }).items
+    return (data as { items: OwnerFieldApiWithHidden[] }).items;
   }
 
-  return []
+  return [];
 }
 
 function getFieldImageUrl(field: OwnerFieldApiWithHidden) {
   const primaryImage =
-    field.images?.find((img) => img.is_primary) || field.images?.[0]
+    field.images?.find((img) => img.is_primary) || field.images?.[0];
 
   if (!primaryImage?.url) {
-    return "/placeholder.svg"
+    return "/placeholder.svg";
   }
 
-  const normalizedPath = primaryImage.url.replaceAll("\\", "/")
+  const normalizedPath = primaryImage.url.replaceAll("\\", "/");
 
   if (normalizedPath.startsWith("http")) {
-    return normalizedPath
+    return normalizedPath;
   }
 
   const apiBaseUrl =
-    process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api/v1"
+    process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api/v1";
 
-  const backendOrigin = apiBaseUrl.replace(/\/api\/v1\/?$/, "")
+  const backendOrigin = apiBaseUrl.replace(/\/api\/v1\/?$/, "");
 
-  return `${backendOrigin}/${normalizedPath.replace(/^\/+/, "")}`
+  return `${backendOrigin}/${normalizedPath.replace(/^\/+/, "")}`;
 }
 
 function getPriceByDayType(
   field: OwnerFieldApiWithHidden,
   dayType: "WEEKDAY" | "WEEKEND",
 ) {
-  const rule = field.pricing_rules?.find((item) => item.day_type === dayType)
+  const rule = field.pricing_rules?.find((item) => item.day_type === dayType);
 
-  return Number(rule?.price || field.base_price_per_hour || 0)
+  return Number(rule?.price || field.base_price_per_hour || 0);
 }
 
-function getOperatingHourText(field: OwnerFieldApiWithHidden) {
-  const activeHours = field.operating_hours?.filter(
-    (item) => !item.is_closed && item.open_time && item.close_time,
-  )
+type OperatingWindowForDisplay = {
+  id?: number | string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+};
 
-  if (!activeHours || activeHours.length === 0) {
-    return {
-      openTime: "Chưa cấu hình",
-      closeTime: "",
-    }
+type OperatingHourForDisplay = {
+  day_of_week: number;
+  is_closed?: boolean;
+  windows?: OperatingWindowForDisplay[];
+
+  // Fallback nếu API cũ còn trả dạng open_time/close_time
+  open_time?: string | null;
+  close_time?: string | null;
+};
+
+function getTodayDayOfWeek() {
+  const jsDay = new Date().getDay();
+
+  // JavaScript: 0 = Chủ nhật, 1 = Thứ 2, ..., 6 = Thứ 7
+  // Hệ thống: 1 = Thứ 2, ..., 6 = Thứ 7, 7 = Chủ nhật
+  return jsDay === 0 ? 7 : jsDay;
+}
+
+function formatTodayOperatingHours(operatingHours?: OperatingHourForDisplay[]) {
+  if (!Array.isArray(operatingHours) || operatingHours.length === 0) {
+    return "Chưa cấu hình";
   }
 
-  const first = activeHours[0]
+  const today = getTodayDayOfWeek();
 
-  return {
-    openTime: first.open_time || "Chưa cấu hình",
-    closeTime: first.close_time || "",
+  const todaySchedule = operatingHours.find(
+    (item) => Number(item.day_of_week) === today,
+  );
+
+  if (!todaySchedule) {
+    return "Chưa cấu hình";
   }
+
+  const windows =
+    Array.isArray(todaySchedule.windows) && todaySchedule.windows.length > 0
+      ? todaySchedule.windows
+      : todaySchedule.open_time && todaySchedule.close_time
+        ? [
+            {
+              start_time: todaySchedule.open_time,
+              end_time: todaySchedule.close_time,
+            },
+          ]
+        : [];
+
+  const validWindows = windows.filter(
+    (window) => window.start_time && window.end_time,
+  );
+
+  if (todaySchedule.is_closed === true || validWindows.length === 0) {
+    return "Đóng cửa";
+  }
+
+  return validWindows
+    .map((window) => `${window.start_time} - ${window.end_time}`)
+    .join(", ");
 }
 
 function mapOwnerFieldToView(field: OwnerFieldApiWithHidden): OwnerFieldView {
@@ -199,9 +244,11 @@ function mapOwnerFieldToView(field: OwnerFieldApiWithHidden): OwnerFieldView {
     [field.address_line, field.ward, field.district, field.province]
       .filter(Boolean)
       .join(", ") ||
-    "Chưa cập nhật địa chỉ"
+    "Chưa cập nhật địa chỉ";
 
-  const operatingHour = getOperatingHourText(field)
+  const todayOperatingHours = formatTodayOperatingHours(
+    field.operating_hours as OperatingHourForDisplay[] | undefined,
+  );
 
   return {
     id: field.id,
@@ -215,8 +262,7 @@ function mapOwnerFieldToView(field: OwnerFieldApiWithHidden): OwnerFieldView {
     price: getPriceByDayType(field, "WEEKDAY"),
     weekendPrice: getPriceByDayType(field, "WEEKEND"),
 
-    openTime: operatingHour.openTime,
-    closeTime: operatingHour.closeTime,
+    todayOperatingHours,
 
     status: normalizeOwnerFieldStatus(field.status),
     image: getFieldImageUrl(field),
@@ -224,110 +270,113 @@ function mapOwnerFieldToView(field: OwnerFieldApiWithHidden): OwnerFieldView {
     hiddenByRole: field.hidden_by_role ?? null,
     hiddenReason: field.hidden_reason ?? null,
     hiddenAt: field.hidden_at ?? null,
-  }
+  };
 }
 
 function canOwnerHideField(field: OwnerFieldView) {
-  return field.status === "active" || field.status === "maintenance"
+  return field.status === "active" || field.status === "maintenance";
 }
 
 function canOwnerShowFieldAgain(field: OwnerFieldView) {
-  return field.status === "hidden" && field.hiddenByRole !== "ADMIN"
+  return field.status === "hidden" && field.hiddenByRole !== "ADMIN";
 }
 
 export default function OwnerFieldsPage() {
-  const [fields, setFields] = useState<OwnerFieldView[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [errorMessage, setErrorMessage] = useState("")
-  const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [hideDialog, setHideDialog] = useState<number | null>(null)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [actionLoadingId, setActionLoadingId] = useState<number | null>(null)
+  const [fields, setFields] = useState<OwnerFieldView[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [hideDialog, setHideDialog] = useState<number | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
 
-  const { toast } = useToast()
+  const { toast } = useToast();
 
   const fetchOwnerFields = useCallback(async () => {
     try {
-      setIsLoading(true)
-      setErrorMessage("")
+      setIsLoading(true);
+      setErrorMessage("");
 
-      const response = await getOwnerFields()
-      const items = extractOwnerFieldItems(response)
-      const mappedFields = items.map(mapOwnerFieldToView)
+      const response = await getOwnerFields();
+      const items = extractOwnerFieldItems(response);
+      const mappedFields = items.map(mapOwnerFieldToView);
 
-      setFields(mappedFields)
-      setCurrentPage(1)
+      setFields(mappedFields);
+      setCurrentPage(1);
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
-          : "Không tải được danh sách sân."
+          : "Không tải được danh sách sân.";
 
-      setFields([])
-      setErrorMessage(message)
+      setFields([]);
+      setErrorMessage(message);
 
       toast({
         title: "Không tải được danh sách sân",
         description: message,
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }, [toast])
+  }, [toast]);
 
   useEffect(() => {
-    void fetchOwnerFields()
-  }, [fetchOwnerFields])
+    void fetchOwnerFields();
+  }, [fetchOwnerFields]);
 
   const filteredFields = useMemo(() => {
-    const keyword = searchQuery.trim().toLowerCase()
+    const keyword = searchQuery.trim().toLowerCase();
 
     return fields.filter((field) => {
       const matchesSearch =
         !keyword ||
         field.name.toLowerCase().includes(keyword) ||
         field.type.toLowerCase().includes(keyword) ||
-        field.location.toLowerCase().includes(keyword)
+        field.location.toLowerCase().includes(keyword);
 
       const matchesStatus =
-        statusFilter === "all" || field.status === statusFilter
+        statusFilter === "all" || field.status === statusFilter;
 
-      return matchesSearch && matchesStatus
-    })
-  }, [fields, searchQuery, statusFilter])
+      return matchesSearch && matchesStatus;
+    });
+  }, [fields, searchQuery, statusFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredFields.length / ITEMS_PER_PAGE))
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredFields.length / ITEMS_PER_PAGE),
+  );
 
   const paginatedFields = filteredFields.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE,
-  )
+  );
 
   useEffect(() => {
     if (currentPage > totalPages) {
-      setCurrentPage(totalPages)
+      setCurrentPage(totalPages);
     }
-  }, [currentPage, totalPages])
+  }, [currentPage, totalPages]);
 
   const handleUpdateFieldStatus = async (
     id: number,
     status: OwnerFieldStatus,
   ) => {
     try {
-      setActionLoadingId(id)
+      setActionLoadingId(id);
 
-      const response = await updateOwnerFieldStatus(id, status)
+      const response = await updateOwnerFieldStatus(id, status);
       const updatedField = mapOwnerFieldToView(
         response.data as OwnerFieldApiWithHidden,
-      )
+      );
 
       setFields((prev) =>
         prev.map((field) => (field.id === id ? updatedField : field)),
-      )
+      );
 
-      setHideDialog(null)
+      setHideDialog(null);
 
       toast({
         title: status === "active" ? "Đã hiển thị lại sân" : "Đã ẩn sân",
@@ -335,26 +384,26 @@ export default function OwnerFieldsPage() {
           status === "active"
             ? "Sân đã được hiển thị công khai trở lại."
             : "Sân đã được ẩn khỏi danh sách công khai.",
-      })
+      });
     } catch (error) {
       toast({
         title: "Cập nhật trạng thái thất bại",
         description:
           error instanceof Error ? error.message : "Vui lòng thử lại sau.",
         variant: "destructive",
-      })
+      });
     } finally {
-      setActionLoadingId(null)
+      setActionLoadingId(null);
     }
-  }
+  };
 
   const handleHideField = async (id: number) => {
-    await handleUpdateFieldStatus(id, "hidden" as OwnerFieldStatus)
-  }
+    await handleUpdateFieldStatus(id, "hidden" as OwnerFieldStatus);
+  };
 
   const handleShowFieldAgain = async (id: number) => {
-    await handleUpdateFieldStatus(id, "active" as OwnerFieldStatus)
-  }
+    await handleUpdateFieldStatus(id, "active" as OwnerFieldStatus);
+  };
 
   return (
     <main data-cy="owner-fields-page" className="min-h-screen bg-background">
@@ -391,8 +440,8 @@ export default function OwnerFieldsPage() {
                 placeholder="Tìm kiếm sân..."
                 value={searchQuery}
                 onChange={(event) => {
-                  setSearchQuery(event.target.value)
-                  setCurrentPage(1)
+                  setSearchQuery(event.target.value);
+                  setCurrentPage(1);
                 }}
                 className="pl-10"
               />
@@ -401,8 +450,8 @@ export default function OwnerFieldsPage() {
             <Select
               value={statusFilter}
               onValueChange={(value) => {
-                setStatusFilter(value)
-                setCurrentPage(1)
+                setStatusFilter(value);
+                setCurrentPage(1);
               }}
             >
               <SelectTrigger
@@ -465,7 +514,9 @@ export default function OwnerFieldsPage() {
 
         {!isLoading && fields.length === 0 && !errorMessage && (
           <Card data-cy="owner-fields-empty" className="p-12 text-center">
-            <p className="text-muted-foreground text-lg mb-4">Chưa có sân nào</p>
+            <p className="text-muted-foreground text-lg mb-4">
+              Chưa có sân nào
+            </p>
             <Link href="/owner/fields/new">
               <Button data-cy="owner-add-first-field-button">
                 <Plus className="w-4 h-4 mr-2" />
@@ -487,7 +538,7 @@ export default function OwnerFieldsPage() {
           <div data-cy="owner-fields-list" className="space-y-4 mb-8">
             {paginatedFields.map((field) => {
               const isAdminHidden =
-                field.status === "hidden" && field.hiddenByRole === "ADMIN"
+                field.status === "hidden" && field.hiddenByRole === "ADMIN";
 
               return (
                 <Card
@@ -501,7 +552,7 @@ export default function OwnerFieldsPage() {
                       alt={field.name}
                       className="w-full md:w-48 h-48 object-cover"
                       onError={(event) => {
-                        event.currentTarget.src = "/placeholder.svg"
+                        event.currentTarget.src = "/placeholder.svg";
                       }}
                     />
 
@@ -537,7 +588,9 @@ export default function OwnerFieldsPage() {
                               <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
                               <p>
                                 Sân đang bị quản trị viên ẩn
-                                {field.hiddenReason ? `: ${field.hiddenReason}` : "."}
+                                {field.hiddenReason
+                                  ? `: ${field.hiddenReason}`
+                                  : "."}
                               </p>
                             </div>
                           </div>
@@ -547,13 +600,17 @@ export default function OwnerFieldsPage() {
                           field.hiddenByRole === "OWNER" && (
                             <div className="mb-4 rounded-lg border border-muted bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
                               Sân đang được ẩn bởi chủ sân
-                              {field.hiddenReason ? `: ${field.hiddenReason}` : "."}
+                              {field.hiddenReason
+                                ? `: ${field.hiddenReason}`
+                                : "."}
                             </div>
                           )}
 
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                           <div>
-                            <p className="text-xs text-muted-foreground">Loại</p>
+                            <p className="text-xs text-muted-foreground">
+                              Loại
+                            </p>
                             <p className="font-medium text-foreground">
                               {field.type}
                             </p>
@@ -593,10 +650,10 @@ export default function OwnerFieldsPage() {
                         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
                           <Clock className="w-4 h-4" />
                           <span>
-                            Giờ hoạt động:{" "}
-                            {field.closeTime
-                              ? `${field.openTime} - ${field.closeTime}`
-                              : field.openTime}
+                            Giờ hôm nay:{" "}
+                            <span className="text-foreground">
+                              {field.todayOperatingHours}
+                            </span>
                           </span>
                         </div>
                       </div>
@@ -659,7 +716,7 @@ export default function OwnerFieldsPage() {
                     </div>
                   </div>
                 </Card>
-              )
+              );
             })}
           </div>
         )}
@@ -679,7 +736,7 @@ export default function OwnerFieldsPage() {
         open={hideDialog !== null}
         onOpenChange={(open) => {
           if (!open) {
-            setHideDialog(null)
+            setHideDialog(null);
           }
         }}
       >
@@ -719,5 +776,5 @@ export default function OwnerFieldsPage() {
         </DialogContent>
       </Dialog>
     </main>
-  )
+  );
 }

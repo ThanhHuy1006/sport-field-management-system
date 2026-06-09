@@ -84,3 +84,36 @@ export function apiGet<T>(
     method: "GET",
   });
 }
+export function apiPost<T>(
+  endpoint: string,
+  body?: unknown,
+  options: Omit<ApiRequestOptions, "method" | "body"> = {}
+) {
+  return apiRequest<T>(endpoint, {
+    ...options,
+    method: "POST",
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+}
+
+export function apiPatch<T>(
+  endpoint: string,
+  body?: unknown,
+  options: Omit<ApiRequestOptions, "method" | "body"> = {}
+) {
+  return apiRequest<T>(endpoint, {
+    ...options,
+    method: "PATCH",
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+}
+
+export function apiDelete<T>(
+  endpoint: string,
+  options: Omit<ApiRequestOptions, "method" | "body"> = {}
+) {
+  return apiRequest<T>(endpoint, {
+    ...options,
+    method: "DELETE",
+  });
+}

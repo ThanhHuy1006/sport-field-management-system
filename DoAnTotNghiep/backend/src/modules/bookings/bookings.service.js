@@ -15,6 +15,23 @@ const CHECKIN_LATE_MINUTES = 60;
 const PAYMENT_EXPIRE_MINUTES = 30;
 const MAX_ACTIVE_BOOKINGS_PER_USER_PER_DAY = 3;
 
+const USER_CANCEL_BEFORE_MINUTES = 60;
+const USER_RESCHEDULE_BEFORE_MINUTES = 24 * 60;
+
+const MEMBER_CANCELLABLE_STATUSES = [
+  "PENDING_CONFIRM",
+  "APPROVED",
+  "AWAITING_PAYMENT",
+  "PAID",
+];
+
+const OWNER_CANCELLABLE_STATUSES = [
+  "PENDING_CONFIRM",
+  "APPROVED",
+  "AWAITING_PAYMENT",
+  "PAID",
+];
+
 // Nếu tạo booking thành công nhưng tạo notification lỗi
 // → Không nên làm booking fail
 // → Chỉ log lỗi notification
@@ -39,6 +56,45 @@ function getDayOfWeek(date) {
 }
 function pad2(n) {
   return String(n).padStart(2, "0");
+}
+
+function getPricingDayType(date) {
+  const jsDay = date.getDay();
+
+  // JavaScript: Sunday = 0, Saturday = 6
+  if (jsDay === 0 || jsDay === 6) {
+    return "WEEKEND";
+  }
+
+  return "WEEKDAY";
+}
+
+function formatLocalTime(date) {
+  return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+}
+
+function findMatchedPricingRule(rules, start, end) {
+  const startTime = formatLocalTime(start);
+  const endTime = formatLocalTime(end);
+
+  return rules.find(
+    (rule) => rule.start_time <= startTime && rule.end_time >= endTime,
+  );
+}
+
+function buildPriceInfo(field, start, end, pricingRule, dayType) {
+  const duration = diffMinutes(start, end);
+  const pricePerHour = Number(
+    pricingRule?.price ?? field.base_price_per_hour ?? 0,
+  );
+
+  return {
+    pricing_rule_id: pricingRule?.id ?? null,
+    pricing_day_type: dayType,
+    price_per_hour: pricePerHour,
+    total_price: (duration / 60) * pricePerHour,
+    currency: pricingRule?.currency || field.currency || "VND",
+  };
 }
 
 function formatLocalDate(date) {
@@ -91,6 +147,76 @@ function overlaps(startA, endA, startB, endB) {
 function assertFutureBooking(startDatetime) {
   if (startDatetime <= new Date()) {
     throw new ValidationError("Không thể đặt sân ở thời điểm đã qua");
+  }
+}
+function assertMemberCanCancelBooking(booking) {
+  if (!MEMBER_CANCELLABLE_STATUSES.includes(booking.status)) {
+    throw new ForbiddenError("Booking hiện không thể hủy");
+  }
+
+  if (booking.checked_in_at || booking.status === "CHECKED_IN") {
+    throw new ForbiddenError("Booking đã check-in, không thể hủy");
+  }
+
+  if (booking.status === "COMPLETED") {
+    throw new ForbiddenError("Booking đã hoàn thành, không thể hủy");
+  }
+
+  const now = new Date();
+  const start = new Date(booking.start_datetime);
+  const cancelDeadline = new Date(
+    start.getTime() - USER_CANCEL_BEFORE_MINUTES * 60 * 1000,
+  );
+
+  if (now > cancelDeadline) {
+    throw new ForbiddenError(
+      `Chỉ được hủy booking trước giờ bắt đầu ít nhất ${USER_CANCEL_BEFORE_MINUTES} phút`,
+    );
+  }
+}
+
+function assertMemberCanRescheduleBooking(booking) {
+  if (!["APPROVED", "PAID"].includes(booking.status)) {
+    throw new ForbiddenError("Booking hiện không thể đổi lịch");
+  }
+
+  if (booking.checked_in_at || booking.status === "CHECKED_IN") {
+    throw new ForbiddenError("Booking đã check-in, không thể đổi lịch");
+  }
+
+  if (booking.status === "COMPLETED") {
+    throw new ForbiddenError("Booking đã hoàn thành, không thể đổi lịch");
+  }
+
+  const now = new Date();
+  const start = new Date(booking.start_datetime);
+
+  if (now >= start) {
+    throw new ForbiddenError("Không thể đổi lịch booking đã bắt đầu hoặc đã qua");
+  }
+
+  const rescheduleDeadline = new Date(
+    start.getTime() - USER_RESCHEDULE_BEFORE_MINUTES * 60 * 1000,
+  );
+
+  if (now > rescheduleDeadline) {
+    throw new ForbiddenError(
+      `Chỉ được đổi lịch booking trước giờ bắt đầu ít nhất ${USER_RESCHEDULE_BEFORE_MINUTES} phút`,
+    );
+  }
+}
+
+function assertOwnerCanCancelBooking(booking) {
+  if (!OWNER_CANCELLABLE_STATUSES.includes(booking.status)) {
+    throw new ForbiddenError("Booking hiện không thể hủy");
+  }
+
+  if (booking.checked_in_at || booking.status === "CHECKED_IN") {
+    throw new ForbiddenError("Booking đã check-in, không thể hủy");
+  }
+
+  if (booking.status === "COMPLETED") {
+    throw new ForbiddenError("Booking đã hoàn thành, không thể hủy");
   }
 }
 
@@ -182,29 +308,32 @@ async function assertBookableField(valid) {
 
   const dayOfWeek = getDayOfWeek(valid.start_datetime);
 
-  const operatingHour = await bookingsRepository.findOperatingHourByFieldAndDay(
-    field.id,
-    dayOfWeek,
-  );
+  const operatingHours =
+    await bookingsRepository.findOperatingHoursByFieldAndDay(
+      field.id,
+      dayOfWeek,
+    );
 
-  if (!operatingHour) {
+  if (!operatingHours || operatingHours.length === 0) {
     throw new ForbiddenError("Sân không hoạt động vào ngày này");
   }
 
-  if (
-    !isWithinOperatingHours(
+  const matchedOperatingHour = operatingHours.find((operatingHour) =>
+    isWithinOperatingHours(
       valid.start_datetime,
       valid.end_datetime,
       operatingHour,
-    )
-  ) {
+    ),
+  );
+
+  if (!matchedOperatingHour) {
     throw new ForbiddenError("Khung giờ đặt nằm ngoài giờ hoạt động của sân");
   }
 
   return {
     field,
     minDuration,
-    operatingHour,
+    operatingHour: matchedOperatingHour,
   };
 }
 
@@ -285,104 +414,138 @@ export const bookingsService = {
     const dayEnd = startOfNextLocalDay(query.date);
     const dayOfWeek = getDayOfWeek(dayStart);
 
-    const operatingHour =
-      await bookingsRepository.findOperatingHourByFieldAndDay(
+    const operatingHours =
+      await bookingsRepository.findOperatingHoursByFieldAndDay(
         field.id,
         dayOfWeek,
       );
 
-    if (!operatingHour) {
+    if (!operatingHours || operatingHours.length === 0) {
       return {
         field,
         date: query.date,
         is_open: false,
         open_time: null,
         close_time: null,
+        windows: [],
         slot_step_minutes: minDuration,
         duration_minutes: durationMinutes,
         slots: [],
       };
     }
 
-    const [blackouts, bookings] = await Promise.all([
+    const pricingDayType = getPricingDayType(dayStart);
+
+    const [blackouts, bookings, pricingRules] = await Promise.all([
       bookingsRepository.findBlackoutsByFieldAndDate(
         field.id,
         dayStart,
         dayEnd,
       ),
       bookingsRepository.findBookingsByFieldAndDate(field.id, dayStart, dayEnd),
+      bookingsRepository.findActivePricingRulesByFieldAndDay(
+        field.id,
+        pricingDayType,
+      ),
     ]);
-
-    const open = combineDateStringAndTime(query.date, operatingHour.open_time);
-    const close = combineDateStringAndTime(
-      query.date,
-      operatingHour.close_time,
-    );
 
     const slots = [];
     const now = new Date();
 
-    for (
-      let cursor = new Date(open);
-      cursor.getTime() + durationMinutes * 60000 <= close.getTime();
-      cursor = new Date(cursor.getTime() + minDuration * 60000)
-    ) {
-      const slotStart = new Date(cursor);
-      const slotEnd = new Date(cursor.getTime() + durationMinutes * 60000);
-
-      const blackout = blackouts.find((item) =>
-        overlaps(
-          slotStart,
-          slotEnd,
-          new Date(item.start_datetime),
-          new Date(item.end_datetime),
-        ),
+    for (const operatingHour of operatingHours) {
+      const open = combineDateStringAndTime(query.date, operatingHour.open_time);
+      const close = combineDateStringAndTime(
+        query.date,
+        operatingHour.close_time,
       );
 
-      const conflict = bookings.find((item) =>
-        overlaps(
+      for (
+        let cursor = new Date(open);
+        cursor.getTime() + durationMinutes * 60000 <= close.getTime();
+        cursor = new Date(cursor.getTime() + minDuration * 60000)
+      ) {
+        const slotStart = new Date(cursor);
+        const slotEnd = new Date(cursor.getTime() + durationMinutes * 60000);
+
+        const blackout = blackouts.find((item) =>
+          overlaps(
+            slotStart,
+            slotEnd,
+            new Date(item.start_datetime),
+            new Date(item.end_datetime),
+          ),
+        );
+
+        const conflict = bookings.find((item) =>
+          overlaps(
+            slotStart,
+            slotEnd,
+            new Date(item.start_datetime),
+            new Date(item.end_datetime),
+          ),
+        );
+
+        let available = true;
+        let reason = null;
+        let booking_status = null;
+
+        if (slotStart <= now) {
+          available = false;
+          reason = "Khung giờ đã qua";
+        } else if (blackout) {
+          available = false;
+          reason = blackout.reason || "Khung giờ đang bị khóa";
+        } else if (conflict) {
+          available = false;
+          reason = "Khung giờ đã được đặt";
+          booking_status = conflict.status;
+        }
+
+        const pricingRule = findMatchedPricingRule(
+          pricingRules,
           slotStart,
           slotEnd,
-          new Date(item.start_datetime),
-          new Date(item.end_datetime),
-        ),
-      );
+        );
 
-      let available = true;
-      let reason = null;
-      let booking_status = null;
+        const priceInfo = buildPriceInfo(
+          field,
+          slotStart,
+          slotEnd,
+          pricingRule,
+          pricingDayType,
+        );
 
-      if (slotStart <= now) {
-        available = false;
-        reason = "Khung giờ đã qua";
-      } else if (blackout) {
-        available = false;
-        reason = blackout.reason || "Khung giờ đang bị khóa";
-      } else if (conflict) {
-        available = false;
-        reason = "Khung giờ đã được đặt";
-        booking_status = conflict.status;
+        slots.push({
+          start_datetime: slotStart.toISOString(),
+          end_datetime: slotEnd.toISOString(),
+          start_time: `${pad2(slotStart.getHours())}:${pad2(
+            slotStart.getMinutes(),
+          )}`,
+          end_time: `${pad2(slotEnd.getHours())}:${pad2(slotEnd.getMinutes())}`,
+          available,
+          reason,
+          booking_status,
+
+          pricing_rule_id: priceInfo.pricing_rule_id,
+          pricing_day_type: priceInfo.pricing_day_type,
+          price_per_hour: priceInfo.price_per_hour,
+          total_price: priceInfo.total_price,
+          currency: priceInfo.currency,
+        });
       }
-
-      slots.push({
-        start_datetime: slotStart.toISOString(),
-        end_datetime: slotEnd.toISOString(),
-        start_time: `${pad2(slotStart.getHours())}:${pad2(
-          slotStart.getMinutes(),
-        )}`,
-        end_time: `${pad2(slotEnd.getHours())}:${pad2(slotEnd.getMinutes())}`,
-        available,
-        reason,
-        booking_status,
-      });
     }
 
     return {
       field,
       date: query.date,
       is_open: true,
-      open_time: operatingHour.open_time,
-      close_time: operatingHour.close_time,
+      open_time: operatingHours[0]?.open_time ?? null,
+      close_time: operatingHours[operatingHours.length - 1]?.close_time ?? null,
+      windows: operatingHours.map((item) => ({
+        id: item.id,
+        start_time: item.open_time,
+        end_time: item.close_time,
+      })),
       slot_step_minutes: minDuration,
       duration_minutes: durationMinutes,
       slots,
@@ -419,12 +582,32 @@ export const bookingsService = {
       };
     }
 
-    const duration = diffMinutes(payload.start_datetime, payload.end_datetime);
-    const total_price = (duration / 60) * Number(field.base_price_per_hour);
+    const pricingDayType = getPricingDayType(payload.start_datetime);
+    const startTime = formatLocalTime(payload.start_datetime);
+    const endTime = formatLocalTime(payload.end_datetime);
+
+    const pricingRule = await bookingsRepository.findActivePricingRuleForSlot(
+      field.id,
+      pricingDayType,
+      startTime,
+      endTime,
+    );
+
+    const priceInfo = buildPriceInfo(
+      field,
+      payload.start_datetime,
+      payload.end_datetime,
+      pricingRule,
+      pricingDayType,
+    );
 
     return {
       available: true,
-      total_price,
+      total_price: priceInfo.total_price,
+      price_per_hour: priceInfo.price_per_hour,
+      pricing_day_type: priceInfo.pricing_day_type,
+      pricing_rule_id: priceInfo.pricing_rule_id,
+      currency: priceInfo.currency,
       field,
     };
   },
@@ -577,8 +760,9 @@ export const bookingsService = {
 
     return booking;
   },
+  async cancelMyBooking(userId, bookingId, payload = {}) {
+    await syncBookingLifecycle();
 
-  async cancelMyBooking(userId, bookingId) {
     const booking = await bookingsRepository.findMyBookingById(
       userId,
       bookingId,
@@ -588,22 +772,23 @@ export const bookingsService = {
       throw new NotFoundError("Không tìm thấy booking");
     }
 
-    if (
-      !["PENDING_CONFIRM", "APPROVED", "AWAITING_PAYMENT"].includes(
-        booking.status,
-      )
-    ) {
-      throw new ForbiddenError("Booking hiện không thể hủy");
-    }
+    assertMemberCanCancelBooking(booking);
 
-    if (new Date() >= new Date(booking.start_datetime)) {
-      throw new ForbiddenError("Không thể hủy booking đã bắt đầu hoặc đã qua");
-    }
+    const reason = payload.reason || "Cancelled by member";
 
     const cancelledBooking = await bookingsRepository.cancelMyBooking(
       userId,
       bookingId,
+      {
+        reason,
+        changed_by: userId,
+        create_refund_if_paid: booking.status === "PAID",
+      },
     );
+
+    if (!cancelledBooking) {
+      throw new NotFoundError("Không tìm thấy booking");
+    }
 
     const ownerId = cancelledBooking.fields?.owner_id;
 
@@ -618,9 +803,17 @@ export const bookingsService = {
       });
     }
 
+    if (booking.status === "PAID") {
+      await safeCreateNotification({
+        user_id: cancelledBooking.user_id,
+        title: "Đã ghi nhận yêu cầu hoàn tiền",
+        body: "Đơn đặt sân đã được hủy. Hệ thống đã ghi nhận yêu cầu hoàn tiền của bạn.",
+        type: "PAYMENT",
+      });
+    }
+
     return cancelledBooking;
   },
-
   async getMyBookingCheckInQr(userId, bookingId) {
     await syncBookingLifecycle();
 
@@ -785,6 +978,60 @@ export const bookingsService = {
 
     return updatedBooking;
   },
+  async cancelOwnerBooking(ownerId, bookingId, payload = {}) {
+    await syncBookingLifecycle();
+
+    const booking = await bookingsRepository.findOwnerBookingById(
+      ownerId,
+      bookingId,
+    );
+
+    if (!booking) {
+      throw new NotFoundError("Không tìm thấy booking");
+    }
+
+    assertOwnerCanCancelBooking(booking);
+
+    const reason = payload.reason;
+
+    if (!reason) {
+      throw new ValidationError("Lý do hủy booking là bắt buộc");
+    }
+
+    const cancelledBooking = await bookingsRepository.cancelOwnerBooking(
+      ownerId,
+      bookingId,
+      {
+        reason,
+        changed_by: ownerId,
+        create_refund_if_paid: booking.status === "PAID",
+      },
+    );
+
+    if (!cancelledBooking) {
+      throw new NotFoundError("Không tìm thấy booking");
+    }
+
+    await safeCreateNotification({
+      user_id: cancelledBooking.user_id,
+      title: "Đơn đặt sân đã bị hủy bởi chủ sân",
+      body: `Đơn đặt sân của bạn tại sân ${
+        cancelledBooking.fields?.field_name || ""
+      } đã bị hủy. Lý do: ${reason}`,
+      type: "BOOKING",
+    });
+
+    if (booking.status === "PAID") {
+      await safeCreateNotification({
+        user_id: cancelledBooking.user_id,
+        title: "Đã ghi nhận yêu cầu hoàn tiền",
+        body: "Do chủ sân hủy lịch đặt, hệ thống đã ghi nhận yêu cầu hoàn tiền cho bạn.",
+        type: "PAYMENT",
+      });
+    }
+
+    return cancelledBooking;
+  },
 
   async checkInOwnerBooking(ownerId, bookingId, payload) {
     const booking = await bookingsRepository.findOwnerBookingById(
@@ -899,19 +1146,7 @@ export const bookingsService = {
       throw new NotFoundError("Không tìm thấy booking");
     }
 
-    if (!["APPROVED", "PAID"].includes(booking.status)) {
-      throw new ForbiddenError("Booking hiện không thể đổi lịch");
-    }
-
-    if (booking.checked_in_at || booking.status === "CHECKED_IN") {
-      throw new ForbiddenError("Booking đã check-in, không thể đổi lịch");
-    }
-
-    if (new Date() >= new Date(booking.start_datetime)) {
-      throw new ForbiddenError(
-        "Không thể đổi lịch booking đã bắt đầu hoặc đã qua",
-      );
-    }
+    assertMemberCanRescheduleBooking(booking);
 
     if (payload.start_datetime <= new Date()) {
       throw new ValidationError("Không thể đổi sang thời điểm đã qua");
@@ -1012,6 +1247,12 @@ export const bookingsService = {
 
     if (booking.checked_in_at || booking.status === "CHECKED_IN") {
       throw new ForbiddenError("Booking đã check-in, không thể đổi lịch");
+    }
+
+    if (new Date() >= new Date(booking.start_datetime)) {
+      throw new ForbiddenError(
+        "Không thể duyệt đổi lịch cho booking đã bắt đầu hoặc đã qua",
+      );
     }
 
     const oldDuration = diffMinutes(

@@ -1,3 +1,25 @@
+function toPendingRescheduleRequest(item) {
+  const request = item.booking_reschedule_requests?.[0];
+
+  if (!request) {
+    return null;
+  }
+
+  return {
+    id: request.id,
+    booking_id: request.booking_id,
+    old_start_datetime: request.old_start_datetime,
+    old_end_datetime: request.old_end_datetime,
+    new_start_datetime: request.new_start_datetime,
+    new_end_datetime: request.new_end_datetime,
+    status: request.status,
+    reason: request.reason ?? null,
+    owner_note: request.owner_note ?? null,
+    created_at: request.created_at,
+    updated_at: request.updated_at,
+  };
+}
+
 export function toBookingListItem(item) {
   return {
     id: item.id,
@@ -39,6 +61,7 @@ export function toBookingListItem(item) {
           created_at: item.reviews[0].created_at,
         }
       : null,
+    pending_reschedule_request: toPendingRescheduleRequest(item),
   };
 }
 function toBookingVoucher(item) {
@@ -95,6 +118,7 @@ export function toBookingDetail(item) {
       id: h.id,
       from_status: h.from_status,
       to_status: h.to_status,
+      changed_by: h.changed_by ?? null,
       changed_at: h.changed_at,
       reason: h.reason ?? null,
     })),
@@ -107,6 +131,7 @@ export function toBookingDetail(item) {
           created_at: item.reviews[0].created_at,
         }
       : null,
+    pending_reschedule_request: toPendingRescheduleRequest(item),
   };
 }
 
@@ -196,6 +221,7 @@ export function toOwnerBookingDetail(item) {
       id: h.id,
       from_status: h.from_status,
       to_status: h.to_status,
+      changed_by: h.changed_by ?? null,
       changed_at: h.changed_at,
       reason: h.reason ?? null,
     })),
@@ -212,5 +238,11 @@ export function toAvailabilitySlot(item) {
     available: item.available,
     reason: item.reason ?? null,
     booking_status: item.booking_status ?? null,
+
+    pricing_rule_id: item.pricing_rule_id ?? null,
+    pricing_day_type: item.pricing_day_type ?? null,
+    price_per_hour: item.price_per_hour ?? null,
+    total_price: item.total_price ?? null,
+    currency: item.currency ?? "VND",
   };
 }

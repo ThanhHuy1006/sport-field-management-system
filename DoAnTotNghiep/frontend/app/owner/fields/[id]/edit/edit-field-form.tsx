@@ -51,6 +51,11 @@ import {
   type OwnerApprovalMode,
   type UpdateOwnerFieldPayload,
 } from "@/features/fields/services/owner-fields.service";
+import {
+  createOwnerFieldClosure,
+  previewOwnerFieldClosure,
+  type FieldClosureAction,
+} from "@/features/fields/services/owner-field-closures.service";
 
 type SelectedImage = {
   id?: number;
@@ -66,20 +71,35 @@ type ExistingImage = {
   isPrimary?: boolean;
 };
 
+type OperatingWindow = {
+  id?: number | string;
+  start_time: string;
+  end_time: string;
+};
+
 type ExistingOperatingHour = {
   day_of_week: number;
-  open_time: string | null;
-  close_time: string | null;
+  open_time?: string | null;
+  close_time?: string | null;
   is_closed?: boolean | null;
+  windows?: OperatingWindow[];
 };
 
 type OperatingHourItem = {
   day_of_week: number;
   label: string;
   short: string;
-  open_time: string;
-  close_time: string;
   is_closed: boolean;
+  windows: OperatingWindow[];
+};
+
+type AffectedClosureBooking = {
+  id: number;
+  customer_name?: string | null;
+  start_datetime: string;
+  end_datetime: string;
+  status: string;
+  total_price?: number | string | null;
 };
 
 const MAX_IMAGES = 5;
@@ -96,57 +116,50 @@ const DEFAULT_OPERATING_HOURS: OperatingHourItem[] = [
     day_of_week: 1,
     label: "Thứ 2",
     short: "T2",
-    open_time: "06:00",
-    close_time: "22:00",
     is_closed: false,
+    windows: [{ id: "1-1", start_time: "06:00", end_time: "22:00" }],
   },
   {
     day_of_week: 2,
     label: "Thứ 3",
     short: "T3",
-    open_time: "06:00",
-    close_time: "22:00",
     is_closed: false,
+    windows: [{ id: "2-1", start_time: "06:00", end_time: "22:00" }],
   },
   {
     day_of_week: 3,
     label: "Thứ 4",
     short: "T4",
-    open_time: "06:00",
-    close_time: "22:00",
     is_closed: false,
+    windows: [{ id: "3-1", start_time: "06:00", end_time: "22:00" }],
   },
   {
     day_of_week: 4,
     label: "Thứ 5",
     short: "T5",
-    open_time: "06:00",
-    close_time: "22:00",
     is_closed: false,
+    windows: [{ id: "4-1", start_time: "06:00", end_time: "22:00" }],
   },
   {
     day_of_week: 5,
     label: "Thứ 6",
     short: "T6",
-    open_time: "06:00",
-    close_time: "22:00",
     is_closed: false,
+    windows: [{ id: "5-1", start_time: "06:00", end_time: "22:00" }],
   },
   {
     day_of_week: 6,
     label: "Thứ 7",
     short: "T7",
-    open_time: "06:00",
-    close_time: "23:00",
     is_closed: false,
+    windows: [{ id: "6-1", start_time: "06:00", end_time: "23:00" }],
   },
   {
     day_of_week: 7,
     label: "Chủ nhật",
     short: "CN",
-    open_time: "06:00",
-    close_time: "23:00",
     is_closed: false,
+    windows: [{ id: "7-1", start_time: "06:00", end_time: "23:00" }],
   },
 ];
 
@@ -301,25 +314,43 @@ export default function EditFieldForm({
           return {
             ...day,
             is_closed: true,
+            windows: [],
           };
         }
 
+        const windows = Array.isArray(matched.windows)
+          ? matched.windows.map((window, index) => ({
+              id: window.id ?? `${day.day_of_week}-${index}`,
+              start_time: window.start_time,
+              end_time: window.end_time,
+            }))
+          : matched.open_time && matched.close_time
+            ? [
+                {
+                  id: `${day.day_of_week}-legacy-1`,
+                  start_time: matched.open_time,
+                  end_time: matched.close_time,
+                },
+              ]
+            : [];
+
         return {
           ...day,
-          open_time: matched.open_time || day.open_time,
-          close_time: matched.close_time || day.close_time,
-          is_closed:
-            Boolean(matched.is_closed) ||
-            !matched.open_time ||
-            !matched.close_time,
+          is_closed: Boolean(matched.is_closed) || windows.length === 0,
+          windows,
         };
       });
     }
 
     return DEFAULT_OPERATING_HOURS.map((item) => ({
       ...item,
-      open_time: safeData.openTime || "06:00",
-      close_time: safeData.closeTime || "22:00",
+      windows: [
+        {
+          id: `${item.day_of_week}-default-1`,
+          start_time: safeData.openTime || item.windows[0]?.start_time || "06:00",
+          end_time: safeData.closeTime || item.windows[0]?.end_time || "22:00",
+        },
+      ],
     }));
   };
 
@@ -390,6 +421,25 @@ export default function EditFieldForm({
   const [isHiding, setIsHiding] = useState(false);
   const [imageActionId, setImageActionId] = useState<number | null>(null);
 
+  const [closureForm, setClosureForm] = useState<{
+    date: string;
+    start_time: string;
+    end_time: string;
+    reason: string;
+    action: FieldClosureAction;
+  }>({
+    date: "",
+    start_time: "",
+    end_time: "",
+    reason: "",
+    action: "NOTIFY_ONLY",
+  });
+  const [affectedBookings, setAffectedBookings] = useState<
+    AffectedClosureBooking[]
+  >([]);
+  const [isPreviewingClosure, setIsPreviewingClosure] = useState(false);
+  const [isCreatingClosure, setIsCreatingClosure] = useState(false);
+
   useEffect(() => {
     selectedImagesRef.current = selectedImages;
   }, [selectedImages]);
@@ -412,14 +462,97 @@ export default function EditFieldForm({
     });
   };
 
-  const updateOperatingHour = (
+  const toggleOperatingDay = (dayOfWeek: number, isOpen: boolean) => {
+    setOperatingHours((prev) =>
+      prev.map((item) =>
+        item.day_of_week === dayOfWeek
+          ? {
+              ...item,
+              is_closed: !isOpen,
+              windows:
+                isOpen && item.windows.length === 0
+                  ? [
+                      {
+                        id: `${dayOfWeek}-${Date.now()}`,
+                        start_time: "06:00",
+                        end_time: "22:00",
+                      },
+                    ]
+                  : item.windows,
+            }
+          : item,
+      ),
+    );
+
+    clearError("operatingHours");
+  };
+
+  const addOperatingWindow = (dayOfWeek: number) => {
+    setOperatingHours((prev) =>
+      prev.map((item) => {
+        if (item.day_of_week !== dayOfWeek) return item;
+
+        const lastWindow = item.windows[item.windows.length - 1];
+
+        return {
+          ...item,
+          is_closed: false,
+          windows: [
+            ...item.windows,
+            {
+              id: `${dayOfWeek}-${Date.now()}`,
+              start_time: lastWindow?.end_time || "13:00",
+              end_time: "17:00",
+            },
+          ],
+        };
+      }),
+    );
+
+    clearError("operatingHours");
+  };
+
+  const updateOperatingWindow = (
     dayOfWeek: number,
-    key: "open_time" | "close_time" | "is_closed",
-    value: string | boolean,
+    windowId: number | string | undefined,
+    key: "start_time" | "end_time",
+    value: string,
   ) => {
     setOperatingHours((prev) =>
       prev.map((item) =>
-        item.day_of_week === dayOfWeek ? { ...item, [key]: value } : item,
+        item.day_of_week === dayOfWeek
+          ? {
+              ...item,
+              windows: item.windows.map((window, index) => {
+                const currentId = window.id ?? `${dayOfWeek}-${index}`;
+
+                return currentId === windowId
+                  ? { ...window, id: currentId, [key]: value }
+                  : window;
+              }),
+            }
+          : item,
+      ),
+    );
+
+    clearError("operatingHours");
+  };
+
+  const removeOperatingWindow = (
+    dayOfWeek: number,
+    windowId: number | string | undefined,
+  ) => {
+    setOperatingHours((prev) =>
+      prev.map((item) =>
+        item.day_of_week === dayOfWeek
+          ? {
+              ...item,
+              windows: item.windows.filter((window, index) => {
+                const currentId = window.id ?? `${dayOfWeek}-${index}`;
+                return currentId !== windowId;
+              }),
+            }
+          : item,
       ),
     );
 
@@ -464,24 +597,49 @@ export default function EditFieldForm({
     }
 
     const openDaysCount = operatingHours.filter(
-      (item) => !item.is_closed,
+      (item) => !item.is_closed && item.windows.length > 0,
     ).length;
 
     if (openDaysCount === 0) {
       newErrors.operatingHours = "Sân phải mở cửa ít nhất 1 ngày trong tuần";
     } else {
       for (const item of operatingHours) {
-        if (!item.is_closed) {
-          if (!item.open_time || !item.close_time) {
-            newErrors.operatingHours = "Ngày mở cửa phải có giờ mở và đóng cửa";
+        if (item.is_closed) continue;
+
+        if (item.windows.length === 0) {
+          newErrors.operatingHours = `${item.label}: ngày mở cửa phải có ít nhất 1 ca`;
+          break;
+        }
+
+        const sortedWindows = [...item.windows].sort((a, b) =>
+          a.start_time.localeCompare(b.start_time),
+        );
+
+        for (const window of sortedWindows) {
+          if (!window.start_time || !window.end_time) {
+            newErrors.operatingHours = `${item.label}: vui lòng nhập đầy đủ giờ bắt đầu và kết thúc`;
             break;
           }
 
-          if (item.open_time >= item.close_time) {
-            newErrors.operatingHours = `${item.label}: giờ mở cửa phải trước giờ đóng cửa`;
+          if (window.start_time >= window.end_time) {
+            newErrors.operatingHours = `${item.label}: giờ bắt đầu phải trước giờ kết thúc`;
             break;
           }
         }
+
+        if (newErrors.operatingHours) break;
+
+        for (let i = 1; i < sortedWindows.length; i++) {
+          const previous = sortedWindows[i - 1];
+          const current = sortedWindows[i];
+
+          if (previous.end_time > current.start_time) {
+            newErrors.operatingHours = `${item.label}: các ca mở cửa không được chồng lên nhau`;
+            break;
+          }
+        }
+
+        if (newErrors.operatingHours) break;
       }
     }
 
@@ -706,6 +864,115 @@ export default function EditFieldForm({
   })
 }
 
+  const validateClosureForm = (requireReason = false) => {
+    if (!closureForm.date || !closureForm.start_time || !closureForm.end_time) {
+      toast({
+        title: "Thiếu thông tin",
+        description: "Vui lòng chọn ngày, giờ bắt đầu và giờ kết thúc.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    if (closureForm.start_time >= closureForm.end_time) {
+      toast({
+        title: "Thời gian không hợp lệ",
+        description: "Giờ bắt đầu phải nhỏ hơn giờ kết thúc.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    if (requireReason && !closureForm.reason.trim()) {
+      toast({
+        title: "Thiếu lý do",
+        description: "Vui lòng nhập lý do đóng sân.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    return true;
+  };
+
+  const handlePreviewClosure = async () => {
+    if (!validateClosureForm(false)) return;
+
+    try {
+      setIsPreviewingClosure(true);
+
+      const res = await previewOwnerFieldClosure(fieldId, closureForm);
+      const data = res.data;
+      const bookings = data?.bookings || [];
+
+      setAffectedBookings(bookings);
+
+      toast({
+        title: "Đã kiểm tra đơn bị ảnh hưởng",
+        description: `Có ${data?.total_affected || bookings.length || 0} đơn đặt sân bị ảnh hưởng.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Không thể kiểm tra đơn bị ảnh hưởng",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Đã có lỗi xảy ra, vui lòng thử lại.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPreviewingClosure(false);
+    }
+  };
+
+  const handleCreateClosure = async () => {
+    if (!validateClosureForm(true)) return;
+
+    if (
+      affectedBookings.length > 0 &&
+      !window.confirm(
+        `Có ${affectedBookings.length} đơn đặt sân bị ảnh hưởng. Bạn có chắc muốn tiếp tục?`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setIsCreatingClosure(true);
+
+      await createOwnerFieldClosure(fieldId, {
+        ...closureForm,
+        reason: closureForm.reason.trim(),
+      });
+
+      toast({
+        title: "Đã tạo lịch đóng sân",
+        description: "Khung giờ này sẽ không còn cho khách đặt sân.",
+      });
+
+      setClosureForm({
+        date: "",
+        start_time: "",
+        end_time: "",
+        reason: "",
+        action: "NOTIFY_ONLY",
+      });
+      setAffectedBookings([]);
+      router.refresh();
+    } catch (error) {
+      toast({
+        title: "Không thể tạo lịch đóng sân",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Đã có lỗi xảy ra, vui lòng thử lại.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingClosure(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -755,11 +1022,15 @@ export default function EditFieldForm({
 
         operating_hours: operatingHours.map((item) => ({
           day_of_week: item.day_of_week,
-          open_time: item.is_closed ? null : item.open_time,
-          close_time: item.is_closed ? null : item.close_time,
           is_closed: item.is_closed,
+          windows: item.is_closed
+            ? []
+            : item.windows.map((window) => ({
+                start_time: window.start_time,
+                end_time: window.end_time,
+              })),
         })),
-      };
+      } as UpdateOwnerFieldPayload;
 
       await updateOwnerField(fieldId, payload);
 
@@ -896,6 +1167,7 @@ export default function EditFieldForm({
               <TabsTrigger value="location">Vị trí</TabsTrigger>
               <TabsTrigger value="pricing">Giá & Lịch</TabsTrigger>
               <TabsTrigger value="images">Hình ảnh</TabsTrigger>
+              <TabsTrigger value="closures">Lịch đóng sân</TabsTrigger>
               <TabsTrigger value="settings">Cài đặt</TabsTrigger>
             </TabsList>
 
@@ -1279,7 +1551,7 @@ export default function EditFieldForm({
                 <CardHeader>
                   <CardTitle className="text-lg">Giờ hoạt động</CardTitle>
                   <CardDescription>
-                    Cài đặt giờ mở cửa cho từng ngày trong tuần
+                    Cài đặt nhiều ca mở cửa cho từng ngày trong tuần
                   </CardDescription>
                 </CardHeader>
 
@@ -1294,59 +1566,113 @@ export default function EditFieldForm({
                     {operatingHours.map((item) => (
                       <div
                         key={item.day_of_week}
-                        className={`flex items-center gap-4 p-3 rounded-lg border ${
-                          item.is_closed ? "bg-muted/30" : "bg-background"
+                        className={`p-3 rounded-lg border transition-colors ${
+                          item.is_closed
+                            ? "bg-muted/30 opacity-80"
+                            : "bg-background"
                         }`}
                       >
-                        <div className="w-24 flex items-center gap-2">
-                          <Switch
-                            checked={!item.is_closed}
-                            onCheckedChange={(checked) =>
-                              updateOperatingHour(
-                                item.day_of_week,
-                                "is_closed",
-                                !checked,
-                              )
-                            }
-                          />
-                          <span
-                            className={`text-sm font-medium ${item.is_closed ? "text-muted-foreground" : ""}`}
-                          >
-                            {item.label}
-                          </span>
+                        <div className="flex items-center gap-3">
+                          <div className="w-24 flex items-center gap-2">
+                            <Switch
+                              checked={!item.is_closed}
+                              onCheckedChange={(checked) =>
+                                toggleOperatingDay(item.day_of_week, checked)
+                              }
+                            />
+                            <span
+                              className={`text-sm font-medium ${
+                                item.is_closed ? "text-muted-foreground" : ""
+                              }`}
+                            >
+                              {item.label}
+                            </span>
+                          </div>
+
+                          <div className="flex-1">
+                            <p className="text-xs text-muted-foreground">
+                              {item.is_closed
+                                ? "Đóng cửa"
+                                : `${item.windows.length} ca mở cửa`}
+                            </p>
+                          </div>
+
+                          {!item.is_closed && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => addOperatingWindow(item.day_of_week)}
+                            >
+                              <Plus className="w-3 h-3 mr-1" />
+                              Thêm ca
+                            </Button>
+                          )}
                         </div>
 
-                        {item.is_closed ? (
-                          <span className="text-sm text-muted-foreground">
-                            Đóng cửa
-                          </span>
-                        ) : (
-                          <div className="flex items-center gap-2 flex-1">
-                            <Input
-                              type="time"
-                              value={item.open_time}
-                              onChange={(e) =>
-                                updateOperatingHour(
-                                  item.day_of_week,
-                                  "open_time",
-                                  e.target.value,
-                                )
-                              }
-                              className="w-28"
-                            />
-                            <span className="text-muted-foreground">-</span>
-                            <Input
-                              type="time"
-                              value={item.close_time}
-                              onChange={(e) =>
-                                updateOperatingHour(
-                                  item.day_of_week,
-                                  "close_time",
-                                  e.target.value,
-                                )
-                              }
-                              className="w-28"
-                            />
+                        {!item.is_closed && (
+                          <div className="mt-3 pl-0 md:pl-28 space-y-2">
+                            {item.windows.map((window, index) => {
+                              const windowId =
+                                window.id ?? `${item.day_of_week}-${index}`;
+
+                              return (
+                                <div
+                                  key={windowId}
+                                  className="flex items-center gap-2"
+                                >
+                                  <span className="w-10 text-xs text-muted-foreground">
+                                    Ca {index + 1}
+                                  </span>
+
+                                  <Input
+                                    type="time"
+                                    value={window.start_time}
+                                    onChange={(e) =>
+                                      updateOperatingWindow(
+                                        item.day_of_week,
+                                        windowId,
+                                        "start_time",
+                                        e.target.value,
+                                      )
+                                    }
+                                    className="w-28"
+                                  />
+
+                                  <span className="text-muted-foreground">-</span>
+
+                                  <Input
+                                    type="time"
+                                    value={window.end_time}
+                                    onChange={(e) =>
+                                      updateOperatingWindow(
+                                        item.day_of_week,
+                                        windowId,
+                                        "end_time",
+                                        e.target.value,
+                                      )
+                                    }
+                                    className="w-28"
+                                  />
+
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() =>
+                                      removeOperatingWindow(
+                                        item.day_of_week,
+                                        windowId,
+                                      )
+                                    }
+                                    disabled={item.windows.length <= 1}
+                                    className="h-9 w-9 text-muted-foreground hover:text-red-500"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
@@ -1459,6 +1785,177 @@ export default function EditFieldForm({
                       )}
                     </div>
                   )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="closures" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Lịch đóng sân</CardTitle>
+                  <CardDescription>
+                    Dùng khi sân cần đóng đột xuất theo ngày/giờ cụ thể như
+                    mưa lớn, mất điện, bảo trì khẩn cấp hoặc sự cố mặt sân.
+                  </CardDescription>
+                </CardHeader>
+
+                <CardContent className="space-y-4">
+                  <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm text-orange-800 dark:border-orange-900/60 dark:bg-orange-950/20 dark:text-orange-100">
+                    Trước khi xác nhận, hãy bấm “Xem đơn bị ảnh hưởng” để kiểm
+                    tra các booking nằm trong khoảng thời gian đóng sân.
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div>
+                      <Label htmlFor="closureDate">Ngày đóng sân</Label>
+                      <Input
+                        id="closureDate"
+                        type="date"
+                        value={closureForm.date}
+                        onChange={(e) => {
+                          setClosureForm((prev) => ({
+                            ...prev,
+                            date: e.target.value,
+                          }));
+                          setAffectedBookings([]);
+                        }}
+                        className="mt-1.5"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="closureStartTime">Từ giờ</Label>
+                      <Input
+                        id="closureStartTime"
+                        type="time"
+                        value={closureForm.start_time}
+                        onChange={(e) => {
+                          setClosureForm((prev) => ({
+                            ...prev,
+                            start_time: e.target.value,
+                          }));
+                          setAffectedBookings([]);
+                        }}
+                        className="mt-1.5"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="closureEndTime">Đến giờ</Label>
+                      <Input
+                        id="closureEndTime"
+                        type="time"
+                        value={closureForm.end_time}
+                        onChange={(e) => {
+                          setClosureForm((prev) => ({
+                            ...prev,
+                            end_time: e.target.value,
+                          }));
+                          setAffectedBookings([]);
+                        }}
+                        className="mt-1.5"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="closureReason">Lý do đóng sân</Label>
+                    <Textarea
+                      id="closureReason"
+                      value={closureForm.reason}
+                      onChange={(e) =>
+                        setClosureForm((prev) => ({
+                          ...prev,
+                          reason: e.target.value,
+                        }))
+                      }
+                      placeholder="Ví dụ: Mưa lớn, sân ngập nước, mất điện, bảo trì khẩn cấp..."
+                      rows={3}
+                      className="mt-1.5 resize-none"
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Cách xử lý đơn bị ảnh hưởng</Label>
+                    <Select
+                      value={closureForm.action}
+                      onValueChange={(value) =>
+                        setClosureForm((prev) => ({
+                          ...prev,
+                          action: value as FieldClosureAction,
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="mt-1.5">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="NOTIFY_ONLY">
+                          Chỉ thông báo / chờ xử lý
+                        </SelectItem>
+                        <SelectItem value="CANCEL_BOOKINGS">
+                          Hủy các đơn bị ảnh hưởng
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      Nếu chọn hủy, các booking bị ảnh hưởng sẽ được chuyển sang
+                      trạng thái đã hủy và khách hàng nhận thông báo.
+                    </p>
+                  </div>
+
+                  {affectedBookings.length > 0 && (
+                    <div className="rounded-lg border p-4">
+                      <p className="font-medium">
+                        Có {affectedBookings.length} đơn đặt sân bị ảnh hưởng
+                      </p>
+
+                      <div className="mt-3 space-y-2">
+                        {affectedBookings.map((booking) => (
+                          <div
+                            key={booking.id}
+                            className="flex flex-col gap-2 rounded-md bg-muted/50 px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
+                          >
+                            <div>
+                              <p className="font-medium">
+                                Booking #{booking.id} - {booking.customer_name || "Khách hàng"}
+                              </p>
+                              <p className="text-muted-foreground">
+                                {String(booking.start_datetime)} - {String(booking.end_datetime)}
+                              </p>
+                              <p className="text-muted-foreground">
+                                Tổng tiền: {Number(booking.total_price || 0).toLocaleString("vi-VN")}đ
+                              </p>
+                            </div>
+
+                            <Badge variant="outline">{booking.status}</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handlePreviewClosure}
+                      disabled={isPreviewingClosure || isCreatingClosure}
+                    >
+                      {isPreviewingClosure
+                        ? "Đang kiểm tra..."
+                        : "Xem đơn bị ảnh hưởng"}
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      onClick={handleCreateClosure}
+                      disabled={isCreatingClosure || isPreviewingClosure}
+                    >
+                      {isCreatingClosure ? "Đang đóng sân..." : "Xác nhận đóng sân"}
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>

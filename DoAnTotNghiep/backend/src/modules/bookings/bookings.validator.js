@@ -1,5 +1,6 @@
 import { ValidationError } from "../../core/errors/index.js";
-
+// ONSITE         → thanh toán tại sân
+// BANK_TRANSFER → chuyển khoản / thanh toán online giả lập
 const ALLOWED_BOOKING_PAYMENT_METHODS = ["ONSITE", "BANK_TRANSFER"];
 
 function parseDateTime(value, fieldName) {
@@ -30,6 +31,33 @@ function parsePositiveInt(
   }
 
   return num;
+}
+export function validateCancelBookingPayload(payload) {
+  const reason = payload?.reason ? String(payload.reason).trim() : null;
+
+  if (reason && reason.length > 255) {
+    throw new ValidationError("Lý do hủy booking không được vượt quá 255 ký tự");
+  }
+
+  return {
+    reason,
+  };
+}
+
+export function validateOwnerCancelBookingPayload(payload) {
+  const reason = payload?.reason ? String(payload.reason).trim() : "";
+
+  if (!reason) {
+    throw new ValidationError("Lý do hủy booking là bắt buộc");
+  }
+
+  if (reason.length > 255) {
+    throw new ValidationError("Lý do hủy booking không được vượt quá 255 ký tự");
+  }
+
+  return {
+    reason,
+  };
 }
 
 export function validateBookingIdParams(params) {
@@ -210,6 +238,10 @@ export function validateCreateRescheduleRequestPayload(payload) {
 
   const reason = payload?.reason ? String(payload.reason).trim() : null;
 
+  if (reason && reason.length > 255) {
+    throw new ValidationError("Lý do đổi lịch không được vượt quá 255 ký tự");
+  }
+
   return {
     start_datetime,
     end_datetime,
@@ -228,10 +260,16 @@ export function validateRescheduleRequestIdParams(params) {
 }
 
 export function validateRejectRescheduleRequestPayload(payload) {
+  const owner_note = payload?.owner_note
+    ? String(payload.owner_note).trim()
+    : "Owner rejected reschedule request";
+
+  if (owner_note.length > 255) {
+    throw new ValidationError("Ghi chú từ chối không được vượt quá 255 ký tự");
+  }
+
   return {
-    owner_note: payload?.owner_note
-      ? String(payload.owner_note).trim()
-      : "Owner rejected reschedule request",
+    owner_note,
   };
 }
 

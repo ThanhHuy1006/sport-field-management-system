@@ -16,80 +16,88 @@ import {
   validateCompleteBookingPayload,
   validateBookingListQuery,
   validateRescheduleRequestIdParams,
-validateRejectRescheduleRequestPayload,
-validateRescheduleRequestListQuery,
+  validateOwnerCancelBookingPayload,
+  validateRejectRescheduleRequestPayload,
+  validateRescheduleRequestListQuery,
 } from "./bookings.validator.js";
 
 const router = Router();
+// console.log("✅ owner.schedules.routes.js loaded");
 
 router.use(requireAuth, requireApprovedOwner());
 
 router.get(
   "/",
   validateQuery(validateBookingListQuery),
-  bookingsController.getOwnerBookings
+  bookingsController.getOwnerBookings,
 );
 router.get(
   "/reschedule-requests",
   validateQuery(validateRescheduleRequestListQuery),
-  bookingsController.getOwnerRescheduleRequests
+  bookingsController.getOwnerRescheduleRequests,
 );
 
 router.patch(
   "/reschedule-requests/:requestId/approve",
   validateParams(validateRescheduleRequestIdParams),
-  bookingsController.approveOwnerRescheduleRequest
+  bookingsController.approveOwnerRescheduleRequest,
 );
 
 router.patch(
   "/reschedule-requests/:requestId/reject",
   validateParams(validateRescheduleRequestIdParams),
   validateBody(validateRejectRescheduleRequestPayload),
-  bookingsController.rejectOwnerRescheduleRequest
+  bookingsController.rejectOwnerRescheduleRequest,
 );
 
 router.get(
   "/:bookingId",
   validateParams(validateBookingIdParams),
-  bookingsController.getOwnerBookingDetail
+  bookingsController.getOwnerBookingDetail,
 );
 
 router.patch(
   "/:bookingId/approve",
   validateParams(validateBookingIdParams),
-  bookingsController.approveOwnerBooking
+  bookingsController.approveOwnerBooking,
 );
 
 router.patch(
   "/:bookingId/reject",
   validateParams(validateBookingIdParams),
   validateBody(validateRejectBookingPayload),
-  bookingsController.rejectOwnerBooking
+  bookingsController.rejectOwnerBooking,
+);
+router.patch(
+  "/:bookingId/cancel",
+  validateParams(validateBookingIdParams),
+  validateBody(validateOwnerCancelBookingPayload),
+  bookingsController.cancelOwnerBooking,
 );
 
 router.patch(
   "/:bookingId/check-in",
   validateParams(validateBookingIdParams),
   validateBody(validateManualCheckInPayload),
-  bookingsController.checkInOwnerBooking
+  bookingsController.checkInOwnerBooking,
 );
 router.post(
   "/check-in/verify",
   validateBody(validateCheckInQrPayload),
-  ownerBookingsController.verifyOwnerBookingQr
+  ownerBookingsController.verifyOwnerBookingQr,
 );
 
 router.post(
   "/check-in/scan",
   validateBody(validateCheckInQrPayload),
-  bookingsController.scanOwnerBookingQr
+  bookingsController.scanOwnerBookingQr,
 );
 
 router.patch(
   "/:bookingId/complete",
   validateParams(validateBookingIdParams),
   validateBody(validateCompleteBookingPayload),
-  bookingsController.completeOwnerBooking
+  bookingsController.completeOwnerBooking,
 );
 
 export default router;

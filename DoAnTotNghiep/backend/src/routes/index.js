@@ -23,7 +23,7 @@ import ownerRegistrationRoutes from "../modules/owners/owner.registration.routes
 import ownerProfileRoutes from "../modules/owners/owner.profile.routes.js";
 import ownerDashboardRoutes from "../modules/owners/owner.dashboard.routes.js";
 import ownerFieldsRoutes from "../modules/owners/owner.fields.routes.js";
-import ownerSchedulesRoutes from "../modules/owners/owner.schedules.routes.js";
+import ownerSchedulesRoutes from "../modules/schedules/owner.schedules.routes.js";
 import uploadsRoutes from "../modules/uploads/uploads.routes.js";
 import publicReviewsRoutes from "../modules/reviews/public.reviews.routes.js";
 import ownerReportsRoutes from "../modules/reports/owner.reports.routes.js";
@@ -35,6 +35,8 @@ import adminFieldReportsRoutes from "../modules/field-reports/admin.field-report
 
 import reviewReportsRoutes from "../modules/review-reports/review-reports.routes.js";
 import adminReviewReportsRoutes from "../modules/review-reports/admin.review-reports.routes.js";
+import favoritesRoutes from "../modules/favorites/favorites.routes.js";
+
 
 const router = Router();
 
@@ -52,6 +54,7 @@ router.use("/fields", publicReviewsRoutes);
 router.use("/bookings", memberBookingRoutes);
 router.use("/payments", paymentsRoutes);
 router.use("/reviews", memberReviewsRoutes);
+router.use("/favorites", favoritesRoutes);
 
 // Owner domain
 router.use("/owner/bookings", ownerBookingRoutes);
@@ -61,8 +64,9 @@ router.use("/owner/vouchers", ownerVouchersRoutes);
 router.use("/owner", ownerRegistrationRoutes);
 router.use("/owner", ownerProfileRoutes);
 router.use("/owner", ownerDashboardRoutes);
-router.use("/owner", ownerFieldsRoutes);
 router.use("/owner", ownerSchedulesRoutes);
+router.use("/owner", ownerFieldsRoutes);
+
 router.use("/owner/reports", ownerReportsRoutes);
 
 // Shared/public voucher routes
@@ -74,10 +78,12 @@ router.use("/notifications", notificationsRoutes);
 // Admin
 router.use("/admin", adminRoutes);
 router.use("/admin/reports", adminReportsRoutes);
-//field-reports
+
+// Field reports
 router.use("/field-reports", fieldReportsRoutes);
 router.use("/admin/field-reports", adminFieldReportsRoutes);
 
+// Review reports
 router.use("/review-reports", reviewReportsRoutes);
 router.use("/admin/review-reports", adminReviewReportsRoutes);
 

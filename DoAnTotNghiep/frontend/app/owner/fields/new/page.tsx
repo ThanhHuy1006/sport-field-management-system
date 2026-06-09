@@ -44,13 +44,18 @@ type SelectedImage = {
   previewUrl: string;
 };
 
+type OperatingWindow = {
+  id: string;
+  start_time: string;
+  end_time: string;
+};
+
 type OperatingHourItem = {
   day_of_week: number;
   label: string;
   short: string;
-  open_time: string;
-  close_time: string;
   is_closed: boolean;
+  windows: OperatingWindow[];
 };
 
 const MAX_IMAGES = 5;
@@ -62,62 +67,76 @@ const ALLOWED_IMAGE_TYPES = [
   "image/webp",
 ];
 
+const createDefaultWindow = (
+  dayOfWeek: number,
+  index: number,
+  startTime = "06:00",
+  endTime = "22:00",
+): OperatingWindow => ({
+  id: `${dayOfWeek}-${index}-${startTime}-${endTime}`,
+  start_time: startTime,
+  end_time: endTime,
+});
+
+const createRuntimeWindow = (
+  dayOfWeek: number,
+  startTime = "06:00",
+  endTime = "22:00",
+): OperatingWindow => ({
+  id: `${dayOfWeek}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  start_time: startTime,
+  end_time: endTime,
+});
+
 const DEFAULT_OPERATING_HOURS: OperatingHourItem[] = [
   {
     day_of_week: 1,
     label: "Thứ 2",
     short: "T2",
-    open_time: "06:00",
-    close_time: "22:00",
     is_closed: false,
+    windows: [createDefaultWindow(1, 1)],
   },
   {
     day_of_week: 2,
     label: "Thứ 3",
     short: "T3",
-    open_time: "06:00",
-    close_time: "22:00",
     is_closed: false,
+    windows: [createDefaultWindow(2, 1)],
   },
   {
     day_of_week: 3,
     label: "Thứ 4",
     short: "T4",
-    open_time: "06:00",
-    close_time: "22:00",
     is_closed: false,
+    windows: [createDefaultWindow(3, 1)],
   },
   {
     day_of_week: 4,
     label: "Thứ 5",
     short: "T5",
-    open_time: "06:00",
-    close_time: "22:00",
     is_closed: false,
+    windows: [createDefaultWindow(4, 1)],
   },
   {
     day_of_week: 5,
     label: "Thứ 6",
     short: "T6",
-    open_time: "06:00",
-    close_time: "22:00",
     is_closed: false,
+    windows: [createDefaultWindow(5, 1)],
   },
   {
     day_of_week: 6,
     label: "Thứ 7",
     short: "T7",
-    open_time: "06:00",
-    close_time: "23:00",
     is_closed: false,
+    windows: [createDefaultWindow(6, 1, "06:00", "23:00")],
   },
   {
     day_of_week: 7,
     label: "Chủ nhật",
     short: "CN",
-    open_time: "06:00",
-    close_time: "23:00",
     is_closed: false,
+    windows: [createDefaultWindow(7, 1, "06:00", "23:00")],
   },
 ];
 
@@ -222,14 +241,76 @@ export default function NewFieldPage() {
     });
   };
 
-  const updateOperatingHour = (
+  const toggleOperatingDay = (dayOfWeek: number, isOpen: boolean) => {
+    setOperatingHours((prev) =>
+      prev.map((item) => {
+        if (item.day_of_week !== dayOfWeek) return item;
+
+        return {
+          ...item,
+          is_closed: !isOpen,
+          windows:
+            isOpen && item.windows.length === 0
+              ? [createRuntimeWindow(dayOfWeek)]
+              : item.windows,
+        };
+      }),
+    );
+    clearError("operatingHours");
+  };
+
+  const addOperatingWindow = (dayOfWeek: number) => {
+    setOperatingHours((prev) =>
+      prev.map((item) => {
+        if (item.day_of_week !== dayOfWeek) return item;
+
+        const lastWindow = item.windows[item.windows.length - 1];
+        const nextStartTime = lastWindow?.end_time || "06:00";
+        const nextEndTime = nextStartTime < "22:00" ? "22:00" : "23:00";
+
+        return {
+          ...item,
+          is_closed: false,
+          windows: [
+            ...item.windows,
+            createRuntimeWindow(dayOfWeek, nextStartTime, nextEndTime),
+          ],
+        };
+      }),
+    );
+    clearError("operatingHours");
+  };
+
+  const updateOperatingWindow = (
     dayOfWeek: number,
-    key: "open_time" | "close_time" | "is_closed",
-    value: string | boolean,
+    windowId: string,
+    key: "start_time" | "end_time",
+    value: string,
   ) => {
     setOperatingHours((prev) =>
       prev.map((item) =>
-        item.day_of_week === dayOfWeek ? { ...item, [key]: value } : item,
+        item.day_of_week === dayOfWeek
+          ? {
+              ...item,
+              windows: item.windows.map((window) =>
+                window.id === windowId ? { ...window, [key]: value } : window,
+              ),
+            }
+          : item,
+      ),
+    );
+    clearError("operatingHours");
+  };
+
+  const removeOperatingWindow = (dayOfWeek: number, windowId: string) => {
+    setOperatingHours((prev) =>
+      prev.map((item) =>
+        item.day_of_week === dayOfWeek
+          ? {
+              ...item,
+              windows: item.windows.filter((window) => window.id !== windowId),
+            }
+          : item,
       ),
     );
     clearError("operatingHours");
@@ -266,18 +347,6 @@ export default function NewFieldPage() {
       newErrors.capacity = "Sức chứa phải là số dương";
     else if (capacity > 100) newErrors.capacity = "Sức chứa tối đa 100 người";
 
-    // for (const item of operatingHours) {
-    //   if (!item.is_closed) {
-    //     if (!item.open_time || !item.close_time) {
-    //       newErrors.operatingHours = "Ngày mở cửa phải có giờ mở và đóng cửa"
-    //       break
-    //     }
-    //     if (item.open_time >= item.close_time) {
-    //       newErrors.operatingHours = `${item.label}: giờ mở cửa phải trước giờ đóng cửa`
-    //       break
-    //     }
-    //   }
-    // }
     const openDaysCount = operatingHours.filter(
       (item) => !item.is_closed,
     ).length;
@@ -286,17 +355,42 @@ export default function NewFieldPage() {
       newErrors.operatingHours = "Sân phải mở cửa ít nhất 1 ngày trong tuần";
     } else {
       for (const item of operatingHours) {
-        if (!item.is_closed) {
-          if (!item.open_time || !item.close_time) {
-            newErrors.operatingHours = "Ngày mở cửa phải có giờ mở và đóng cửa";
+        if (item.is_closed) continue;
+
+        if (item.windows.length === 0) {
+          newErrors.operatingHours = `${item.label}: ngày mở cửa phải có ít nhất 1 khung giờ`;
+          break;
+        }
+
+        const sortedWindows = [...item.windows].sort((a, b) =>
+          a.start_time.localeCompare(b.start_time),
+        );
+
+        for (const window of sortedWindows) {
+          if (!window.start_time || !window.end_time) {
+            newErrors.operatingHours = `${item.label}: vui lòng nhập đầy đủ giờ bắt đầu và giờ kết thúc`;
             break;
           }
 
-          if (item.open_time >= item.close_time) {
-            newErrors.operatingHours = `${item.label}: giờ mở cửa phải trước giờ đóng cửa`;
+          if (window.start_time >= window.end_time) {
+            newErrors.operatingHours = `${item.label}: giờ bắt đầu phải trước giờ kết thúc`;
             break;
           }
         }
+
+        if (newErrors.operatingHours) break;
+
+        for (let i = 1; i < sortedWindows.length; i++) {
+          const previous = sortedWindows[i - 1];
+          const current = sortedWindows[i];
+
+          if (previous.end_time > current.start_time) {
+            newErrors.operatingHours = `${item.label}: các khung giờ mở cửa không được chồng lên nhau`;
+            break;
+          }
+        }
+
+        if (newErrors.operatingHours) break;
       }
     }
 
@@ -417,10 +511,18 @@ export default function NewFieldPage() {
         amenities,
         operating_hours: operatingHours.map((item) => ({
           day_of_week: item.day_of_week,
-          open_time: item.is_closed ? null : item.open_time,
-          close_time: item.is_closed ? null : item.close_time,
           is_closed: item.is_closed,
-        })),
+          // Giữ open_time/close_time để không vỡ backend cũ nếu API chưa đổi ngay.
+          open_time: item.is_closed ? null : item.windows[0]?.start_time || null,
+          close_time: item.is_closed ? null : item.windows[item.windows.length - 1]?.end_time || null,
+          // windows là dữ liệu mới: một ngày có thể có nhiều ca mở cửa.
+          windows: item.is_closed
+            ? []
+            : item.windows.map((window) => ({
+                start_time: window.start_time,
+                end_time: window.end_time,
+              })),
+        })) as unknown as CreateOwnerFieldPayload["operating_hours"],
       };
 
       const createdField = await createOwnerField(payload);
@@ -787,73 +889,123 @@ export default function NewFieldPage() {
                     </span>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {operatingHours.map((item) => (
                       <div
                         key={item.day_of_week}
-                        className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                        className={`p-3 rounded-lg border transition-colors ${
                           item.is_closed
-                            ? "border-border bg-muted/20 opacity-60"
+                            ? "border-border bg-muted/20 opacity-70"
                             : "border-border bg-background"
                         }`}
                       >
-                        {/* Day Label */}
-                        <div className="w-8 text-center">
-                          <span
-                            className={`text-xs font-semibold ${item.is_closed ? "text-muted-foreground" : "text-foreground"}`}
-                          >
-                            {item.short}
-                          </span>
+                        <div className="flex items-center gap-3">
+                          {/* Day Label */}
+                          <div className="w-8 text-center">
+                            <span
+                              className={`text-xs font-semibold ${
+                                item.is_closed
+                                  ? "text-muted-foreground"
+                                  : "text-foreground"
+                              }`}
+                            >
+                              {item.short}
+                            </span>
+                          </div>
+
+                          {/* Toggle */}
+                          <Switch
+                            checked={!item.is_closed}
+                            onCheckedChange={(checked) =>
+                              toggleOperatingDay(item.day_of_week, checked)
+                            }
+                            className="flex-shrink-0"
+                          />
+
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-foreground">
+                              {item.label}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {item.is_closed
+                                ? "Đóng cửa"
+                                : `${item.windows.length} ca mở cửa`}
+                            </p>
+                          </div>
+
+                          {!item.is_closed && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => addOperatingWindow(item.day_of_week)}
+                              className="h-8 px-2 text-xs"
+                            >
+                              <Plus className="w-3 h-3 mr-1" />
+                              Thêm ca
+                            </Button>
+                          )}
                         </div>
 
-                        {/* Toggle */}
-                        <Switch
-                          checked={!item.is_closed}
-                          onCheckedChange={(checked) =>
-                            updateOperatingHour(
-                              item.day_of_week,
-                              "is_closed",
-                              !checked,
-                            )
-                          }
-                          className="flex-shrink-0"
-                        />
-
-                        {/* Time Inputs */}
-                        {!item.is_closed ? (
-                          <div className="flex items-center gap-2 flex-1">
-                            <Input
-                              type="time"
-                              value={item.open_time}
-                              onChange={(e) =>
-                                updateOperatingHour(
-                                  item.day_of_week,
-                                  "open_time",
-                                  e.target.value,
-                                )
-                              }
-                              className="h-8 text-sm flex-1"
-                            />
-                            <span className="text-muted-foreground text-xs">
-                              –
-                            </span>
-                            <Input
-                              type="time"
-                              value={item.close_time}
-                              onChange={(e) =>
-                                updateOperatingHour(
-                                  item.day_of_week,
-                                  "close_time",
-                                  e.target.value,
-                                )
-                              }
-                              className="h-8 text-sm flex-1"
-                            />
+                        {!item.is_closed && (
+                          <div className="mt-3 pl-11 space-y-2">
+                            {item.windows.map((window) => (
+                              <div
+                                key={window.id}
+                                className="flex items-center gap-2"
+                              >
+                                <Input
+                                  type="time"
+                                  value={window.start_time}
+                                  onChange={(e) =>
+                                    updateOperatingWindow(
+                                      item.day_of_week,
+                                      window.id,
+                                      "start_time",
+                                      e.target.value,
+                                    )
+                                  }
+                                  className="h-8 text-sm flex-1"
+                                />
+                                <span className="text-muted-foreground text-xs">
+                                  –
+                                </span>
+                                <Input
+                                  type="time"
+                                  value={window.end_time}
+                                  onChange={(e) =>
+                                    updateOperatingWindow(
+                                      item.day_of_week,
+                                      window.id,
+                                      "end_time",
+                                      e.target.value,
+                                    )
+                                  }
+                                  className="h-8 text-sm flex-1"
+                                />
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() =>
+                                    removeOperatingWindow(
+                                      item.day_of_week,
+                                      window.id,
+                                    )
+                                  }
+                                  disabled={item.windows.length === 1}
+                                  className="h-8 w-8 text-muted-foreground hover:text-red-500"
+                                  title={
+                                    item.windows.length === 1
+                                      ? "Ngày mở cửa cần ít nhất 1 ca"
+                                      : "Xóa ca"
+                                  }
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            ))}
                           </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground flex-1">
-                            Đóng cửa
-                          </span>
                         )}
                       </div>
                     ))}

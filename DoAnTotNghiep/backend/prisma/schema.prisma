@@ -170,9 +170,11 @@ model fields {
   max_players          Int?
   created_at           DateTime?           @default(now()) @db.DateTime(0)
   updated_at           DateTime?           @default(now()) @db.DateTime(0)
-  hidden_by_role String?   // OWNER | ADMIN | SYSTEM
-hidden_reason  String?
-hidden_at      DateTime?
+  hidden_by_role       String? // OWNER | ADMIN | SYSTEM
+  hidden_reason        String?
+  hidden_at            DateTime?
+  slot_step_minutes    Int?                @default(30)
+  advance_booking_days Int?                @default(30)
 
   blackout_dates      blackout_dates[]
   bookings            bookings[]
@@ -184,11 +186,23 @@ hidden_at      DateTime?
   reports_daily       reports_daily[]
   reviews             reviews[]
   field_reports       field_reports[]
+  favorite_fields favorite_fields[]
 
   @@index([owner_id], map: "fk_field_owner")
   @@index([province])
   @@index([district])
   @@index([ward])
+}
+model favorite_fields {
+  user_id    Int
+  field_id   Int
+  created_at DateTime? @default(now()) @db.DateTime(0)
+
+  users  users  @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  fields fields @relation(fields: [field_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([user_id, field_id])
+  @@index([field_id])
 }
 
 model notifications {
@@ -205,14 +219,19 @@ model notifications {
 }
 
 model operating_hours {
-  id          Int     @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   field_id    Int
-  day_of_week Int     @db.TinyInt
-  open_time   String? @db.VarChar(10)
-  close_time  String? @db.VarChar(10)
-  fields      fields  @relation(fields: [field_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_operating_field")
+  day_of_week Int       @db.TinyInt
+  open_time   String    @db.VarChar(5)
+  close_time  String    @db.VarChar(5)
+  is_active   Boolean?  @default(true)
+  created_at  DateTime? @default(now()) @db.DateTime(0)
+  updated_at  DateTime? @default(now()) @db.DateTime(0)
+
+  fields fields @relation(fields: [field_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_operating_field")
 
   @@index([field_id], map: "fk_operating_field")
+  @@index([field_id, day_of_week], map: "idx_operating_field_day")
 }
 
 model owner_profiles {
@@ -418,6 +437,7 @@ model users {
   field_reports_admin                              field_reports[]          @relation("field_reports_admin")
   review_reports_reporter                          review_reports[]         @relation("review_reports_reporter")
   review_reports_admin                             review_reports[]         @relation("review_reports_admin")
+  favorite_fields favorite_fields[]
 }
 
 model vouchers {

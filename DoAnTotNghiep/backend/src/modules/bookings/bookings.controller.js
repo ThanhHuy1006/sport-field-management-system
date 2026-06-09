@@ -1,8 +1,5 @@
 import { asyncHandler } from "../../core/utils/asyncHandler.js";
-import {
-  successResponse,
-  createdResponse,
-} from "../../core/utils/response.js";
+import { successResponse, createdResponse } from "../../core/utils/response.js";
 import { bookingsService } from "./bookings.service.js";
 import {
   toAvailabilitySlot,
@@ -75,7 +72,13 @@ export const bookingsController = {
 
   cancelMyBooking: asyncHandler(async (req, res) => {
     const { bookingId } = req.validated?.params ?? req.params;
-    const item = await bookingsService.cancelMyBooking(req.user.id, bookingId);
+    const payload = req.validated?.body ?? req.body;
+
+    const item = await bookingsService.cancelMyBooking(
+      req.user.id,
+      bookingId,
+      payload,
+    );
 
     return successResponse(
       res,
@@ -94,11 +97,7 @@ export const bookingsController = {
       payload,
     );
 
-    return createdResponse(
-      res,
-      item,
-      "Gửi yêu cầu đổi lịch thành công",
-    );
+    return createdResponse(res, item, "Gửi yêu cầu đổi lịch thành công");
   }),
 
   getMyBookingCheckInQr: asyncHandler(async (req, res) => {
@@ -169,6 +168,22 @@ export const bookingsController = {
       "Từ chối booking thành công",
     );
   }),
+  cancelOwnerBooking: asyncHandler(async (req, res) => {
+    const { bookingId } = req.validated?.params ?? req.params;
+    const payload = req.validated?.body ?? req.body;
+
+    const item = await bookingsService.cancelOwnerBooking(
+      req.user.id,
+      bookingId,
+      payload,
+    );
+
+    return successResponse(
+      res,
+      toOwnerBookingDetail(item),
+      "Hủy booking do sự cố thành công",
+    );
+  }),
 
   getOwnerRescheduleRequests: asyncHandler(async (req, res) => {
     const query = req.validated?.query ?? req.query;
@@ -193,11 +208,7 @@ export const bookingsController = {
       requestId,
     );
 
-    return successResponse(
-      res,
-      item,
-      "Duyệt yêu cầu đổi lịch thành công",
-    );
+    return successResponse(res, item, "Duyệt yêu cầu đổi lịch thành công");
   }),
 
   rejectOwnerRescheduleRequest: asyncHandler(async (req, res) => {
@@ -210,11 +221,7 @@ export const bookingsController = {
       payload,
     );
 
-    return successResponse(
-      res,
-      item,
-      "Từ chối yêu cầu đổi lịch thành công",
-    );
+    return successResponse(res, item, "Từ chối yêu cầu đổi lịch thành công");
   }),
 
   checkInOwnerBooking: asyncHandler(async (req, res) => {
