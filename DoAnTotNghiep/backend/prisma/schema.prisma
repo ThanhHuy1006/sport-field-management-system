@@ -222,8 +222,8 @@ model operating_hours {
   id          Int       @id @default(autoincrement())
   field_id    Int
   day_of_week Int       @db.TinyInt
-  open_time   String?  @db.VarChar(5)
-  close_time  String?  @db.VarChar(5)
+  open_time   String?  @db.VarChar(10)
+  close_time  String?  @db.VarChar(10)
   is_active   Boolean?  @default(true)
   created_at  DateTime? @default(now()) @db.DateTime(0)
   updated_at  DateTime? @default(now()) @db.DateTime(0)
